@@ -1,0 +1,22 @@
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# LiteLLM Configuration (contains sensitive keys)
+litellm_config.yaml
+
+# Virtual Environment
+.venv/
+env/
+venv/
+
+# Python cache / bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# OS specific
+.DS_Store
+Thumbs.db

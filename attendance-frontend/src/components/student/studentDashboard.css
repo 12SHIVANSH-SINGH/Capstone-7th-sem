@@ -1,0 +1,161 @@
+/* StudentDashboard.css */
+.dashboard-container {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 20px;
+}
+
+.dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    padding: 1rem 2rem;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 15px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+}
+
+.header-left h1 {
+    margin: 0;
+    color: #2d3748;
+    font-size: 1.8rem;
+}
+
+.header-left p {
+    color: #718096;
+    margin: 0.5rem 0 0;
+}
+
+.logout-btn {
+    padding: 10px 25px;
+    background: #667eea;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.logout-btn:hover {
+    background: #5666b3;
+    transform: translateY(-2px);
+}
+
+.dashboard-main {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: 2rem;
+}
+
+.quick-actions {
+    background: rgba(255, 255, 255, 0.95);
+    padding: 1rem;
+    border-radius: 15px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+    height: fit-content;
+}
+
+.attendance-card {
+    text-align: center;
+}
+
+.attendance-card h2 {
+    color: #2d3748;
+    margin-bottom: 1.5rem;
+}
+
+.mark-attendance-btn {
+    width: 100%;
+    padding: 15px;
+    background: #48bb78;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.mark-attendance-btn:hover {
+    background: #38a169;
+    transform: translateY(-2px);
+}
+
+.dashboard-content {
+    display: flex;
+    margin-left: 4vw;
+    max-width: 70vw;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+.upcoming-classes, .attendance-overview {
+    background: rgba(255, 255, 255, 0.95);
+    padding: 1.5rem;
+    border-radius: 15px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+}
+
+.classes-list {
+    display: grid;
+    gap: 1rem;
+}
+
+.class-card {
+    padding: 1rem;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    transition: all 0.3s ease;
+}
+
+.class-card:hover {
+    border-color: #667eea;
+    transform: translateY(-3px);
+}
+
+.attendance-list {
+    display: grid;
+    gap: 1rem;
+}
+
+.attendance-record {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background: #f7fafc;
+    border-radius: 8px;
+}
+
+.status {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-weight: 500;
+}
+
+.status.present {
+    background: #c6f6d5;
+    color: #22543d;
+}
+
+.status.absent {
+    background: #fed7d7;
+    color: #742a2a;
+}
+
+@media (max-width: 768px) {
+    .dashboard-main {
+        grid-template-columns: 1fr;
+    }
+    
+    .dashboard-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+}

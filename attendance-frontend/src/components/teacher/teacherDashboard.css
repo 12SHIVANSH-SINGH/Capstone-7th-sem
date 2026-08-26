@@ -1,0 +1,132 @@
+/* TeacherDashboard.css */
+.dashboard-container.teacher {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.dashboard-header {
+    background: rgba(255, 255, 255, 0.95);
+}
+
+.admin-card {
+    text-align: center;
+    padding: 1.5rem;
+}
+
+.admin-card h2 {
+    color: #2d3748;
+    margin-bottom: 1.5rem;
+}
+
+.action-btn {
+    width: 100%;
+    padding: 15px;
+    border: none;
+    border-radius: 10px;
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin: 10px 0;
+}
+
+.action-btn.primary {
+    background: #667eea;
+    color: white;
+}
+
+.action-btn.primary:hover {
+    background: #5666b3;
+    transform: translateY(-2px);
+}
+
+.action-btn.secondary {
+    background: #805ad5;
+    color: white;
+}
+
+.action-btn.secondary:hover {
+    background: #6b46c1;
+    transform: translateY(-2px);
+}
+
+.class-card {
+    position: relative;
+    padding: 1.5rem;
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.class-info {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.class-info p {
+    margin: 0;
+    color: #718096;
+    font-size: 0.9rem;
+}
+
+.attendance-record {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background: white;
+    border-radius: 8px;
+    margin: 0.5rem 0;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.attendance-meta {
+    display: flex;
+    flex-direction: column;
+}
+
+.attendance-meta .date {
+    color: #718096;
+    font-size: 0.9rem;
+}
+
+.attendance-meta .class {
+    font-weight: 500;
+    color: #2d3748;
+}
+
+.attendance-stats {
+    display: flex;
+    gap: 1.5rem;
+}
+
+.attendance-stats span {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.present {
+    color: #48bb78;
+}
+
+.absent {
+    color: #f56565;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .class-info {
+        grid-template-columns: 1fr;
+    }
+    
+    .attendance-record {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+}

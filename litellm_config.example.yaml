@@ -1,0 +1,5 @@
+model_list:
+  - model_name: gemini-3.6-flash
+    litellm_params:
+      model: gemini/gemini-3.6-flash
+      api_key: os.environ/YOUR_GEMINI_API_KEY_ENV_VAR

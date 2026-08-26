@@ -1,0 +1,93 @@
+/* 📌 Mark.css - Improved UI */
+.global {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 94vh;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 20px;
+}
+.mark-container {
+    max-width: 350px;
+    margin: 100px auto;
+    padding: 20px;
+    text-align: center;
+    background: #ffffff;
+    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+}
+
+h2 {
+    font-size: 22px;
+    color: #333;
+    margin-bottom: 15px;
+}
+
+/* 📌 Input Box */
+.input-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 20px;
+}
+
+.input-box {
+    width: 100%;
+    padding: 10px 40px 10px 15px;
+    font-size: 16px;
+    border: 2px solid #ddd;
+    border-radius: 5px;
+    outline: none;
+    transition: 0.3s ease-in-out;
+}
+
+.input-box:focus {
+    border-color: #007bff;
+}
+
+/* 📌 Icon */
+.input-icon {
+    position: absolute;
+    right: 10px;
+    font-size: 20px;
+    color: #007bff;
+}
+
+/* 📌 Button */
+.mark-btn {
+    width: 100%;
+    padding: 12px;
+    font-size: 16px;
+    color: #fff;
+    background: #007bff;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: 0.3s ease-in-out;
+}
+
+.mark-btn:hover {
+    background: #0056b3;
+}
+
+.mark-btn:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+}
+
+/* 📌 Success & Error Messages */
+.message {
+    margin-top: 10px;
+    font-size: 14px;
+    font-weight: bold;
+    transition: 0.3s ease-in-out;
+}
+
+.success {
+    color: green;
+}
+
+.error {
+    color: red;
+}

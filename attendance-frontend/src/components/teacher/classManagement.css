@@ -1,0 +1,20 @@
+.class-management { min-height: 100vh; padding: 3rem clamp(1rem, 5vw, 5rem); background: #f4f7f6; color: #18324a; }
+.class-management__header, .class-management__roster-heading { display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start; }
+.class-management__header { max-width: 1120px; margin: 0 auto 1.5rem; }
+.class-management h1, .class-management h2, .class-management h3, .class-management p { margin-top: 0; }
+.class-management h1 { margin-bottom: .4rem; }.class-management h2 { font-size: 1.25rem; margin-bottom: 1rem; }
+.class-management__eyebrow { margin-bottom: .35rem !important; color: #00509e; font-size: .78rem; font-weight: 800; text-transform: uppercase; letter-spacing: .09em; }
+.class-management__header p:not(.class-management__eyebrow) { color: #526b7d; max-width: 660px; }
+.class-management__back, .class-management button { border: 0; border-radius: 8px; background: #003366; color: #fff; padding: .7rem 1rem; font: inherit; font-weight: 700; cursor: pointer; }
+.class-management button:disabled { cursor: not-allowed; opacity: .55; }.class-management__back { white-space: nowrap; background: #e7eef2; color: #18324a; }
+.class-management__alert, .class-management__grid, .class-management__roster { max-width: 1120px; margin-left: auto; margin-right: auto; }
+.class-management__alert { margin-bottom: 1rem; border-radius: 8px; padding: .8rem 1rem; }.class-management__alert--error { background: #ffe9e8; color: #8a241e; }.class-management__alert--success { background: #e6f5e9; color: #1c6730; }
+.class-management__grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1.25rem; align-items: start; }
+.class-management__card { background: #fff; border-radius: 12px; box-shadow: 0 5px 18px rgba(20, 50, 74, .1); padding: 1.4rem; }
+.class-management__card label { display: block; margin: .85rem 0; color: #375469; font-size: .9rem; font-weight: 700; }
+.class-management__card input, .class-management__card select, .class-management__card textarea { width: 100%; border: 1px solid #c6d4dc; border-radius: 7px; color: #18324a; font: inherit; margin-top: .35rem; padding: .65rem; }
+.class-management__card textarea { resize: vertical; line-height: 1.45; }.class-management__hint, .class-management__empty { color: #607686; font-size: .9rem; }
+.class-management__list { display: grid; gap: .65rem; max-height: 330px; overflow-y: auto; }.class-management__class { width: 100%; text-align: left; background: #f8fbfc !important; border: 1px solid #d7e3e8 !important; color: #1d415a !important; padding: .8rem !important; }.class-management__class:hover, .class-management__class.is-selected { border-color: #00509e !important; background: #eaf4fb !important; }.class-management__class span, .class-management__class small { display: block; margin-top: .22rem; }.class-management__class small { color: #607686; }
+.class-management__roster { margin-top: 1.25rem; }.class-management__roster-heading > span { background: #edf3f5; border-radius: 999px; padding: .4rem .65rem; font-size: .85rem; white-space: nowrap; }.class-management__roster > p { color: #526b7d; }.class-management__roster input[type="file"] { border: 0; padding: .35rem 0; }.class-management__actions { display: flex; gap: .7rem; margin-top: .9rem; }.class-management__save { background: #0a7a47 !important; }
+.class-management__preview { margin-top: 1rem; border-top: 1px solid #dce6eb; padding-top: 1rem; }.class-management__preview h3 { margin-bottom: .55rem; }.class-management__errors { color: #992c24; margin: 0 0 .8rem; padding-left: 1.25rem; }.class-management__chips { display: flex; flex-wrap: wrap; gap: .45rem; }.class-management__chips span { background: #edf4f7; border-radius: 999px; color: #31536a; font-size: .8rem; padding: .35rem .55rem; }.class-page-loading { margin-top: 20vh; text-align: center; }
+@media (max-width: 700px) { .class-management { padding: 1.25rem; }.class-management__header, .class-management__roster-heading { flex-direction: column; }.class-management__grid { grid-template-columns: 1fr; }.class-management__back { width: 100%; }.class-management__actions { flex-direction: column; } }

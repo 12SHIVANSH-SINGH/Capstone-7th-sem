@@ -80,7 +80,11 @@ const AddRoom = () => {
     }
 
     try {
-      await axios.post(`${SERVER_URL}/admin/addRoom`, { roomNo, coordinates });
+      await axios.post(
+        `${SERVER_URL}/admin/addRoom`,
+        { roomNo, coordinates },
+        { withCredentials: true }
+      );
       setMessage({ type: "success", text: "Room data added successfully!" });
       setRoomNo("");
       setCoordinates([]);

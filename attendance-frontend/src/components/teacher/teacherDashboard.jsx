@@ -13,6 +13,10 @@ const TeacherDashboard = () => {
         const fetchUser = async () => {
             try {
                 const response = await axios.get(`${SERVER_URL}/islogin`, { withCredentials: true });
+                if (response.data.user.role !== "teacher") {
+                    navigate("/student-dashboard");
+                    return;
+                }
                 setTeacherName(response.data.user.name || response.data.user.email.split('@')[0]);
             } catch (error) {
                 console.error("Failed to fetch user:", error);
@@ -62,13 +66,19 @@ const TeacherDashboard = () => {
                 <div className="quick-actions">
                     <div className="admin-card">
                         <h2>Class Management</h2>
-                        <button 
+                        <button
                             className="action-btn primary"
                             onClick={() => navigate("/admin/takeAttendance")}
                         >
                             📋 Take Attendance
                         </button>
-                        <button 
+                        <button
+                            className="action-btn secondary"
+                            onClick={() => navigate("/teacher/classes")}
+                        >
+                            👥 Manage Classes & Rosters
+                        </button>
+                        <button
                             className="action-btn secondary"
                             onClick={() => navigate("/admin/addRoom")}
                         >

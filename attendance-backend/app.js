@@ -26,6 +26,9 @@ app.use("/api/v1", notes);
 const codeRoute = require('./routes/codeRoute');
 app.use("/api/v1", codeRoute);
 
+const classRoute = require('./routes/classRoute');
+app.use("/api/v1", classRoute);
+
 const errorMiddleware = require('./middleware/error');
 app.use(errorMiddleware);
 

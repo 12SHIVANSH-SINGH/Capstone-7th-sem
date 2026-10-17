@@ -1,7 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
-import SERVER_URL from "../../config/api";
 import "./acousticLab.css";
 
 const TEST_FREQUENCIES = [15500, 16500, 17500, 18500, 19500];
@@ -21,8 +19,6 @@ const getVerdict = (margin) => {
 
 const AcousticLab = () => {
   const navigate = useNavigate();
-  const [authorized, setAuthorized] = useState(false);
-  const [person, setPerson] = useState("");
   const [phase, setPhase] = useState("idle");
   const [error, setError] = useState("");
   const [deviceInfo, setDeviceInfo] = useState(null);
@@ -32,19 +28,6 @@ const AcousticLab = () => {
   const audioRef = useRef(null);
   const activeTestRef = useRef(null);
   const ambientRef = useRef({});
-
-  useEffect(() => {
-    const verifyUser = async () => {
-      try {
-        const response = await axios.get(`${SERVER_URL}/islogin`, { withCredentials: true });
-        setPerson(response.data.user.name || response.data.user.email);
-        setAuthorized(true);
-      } catch {
-        navigate("/login");
-      }
-    };
-    verifyUser();
-  }, [navigate]);
 
   const stopLab = useCallback(async () => {
     const audio = audioRef.current;
@@ -220,10 +203,6 @@ const AcousticLab = () => {
     setPhase("idle");
   };
 
-  if (!authorized) {
-    return <div className="acoustic-lab acoustic-lab--loading">Checking sign-in…</div>;
-  }
-
   const highBandHasSignal = results.some((result) => result.frequency >= 18500 && result.margin >= 12);
   const fallbackHasSignal = results.some((result) => result.frequency >= 15500 && result.frequency <= 17500 && result.margin >= 12);
 
@@ -233,14 +212,14 @@ const AcousticLab = () => {
         <div>
           <p className="acoustic-lab__eyebrow">Prototype · Layer 1</p>
           <h1>Acoustic capability check</h1>
-          <p>Hi, {person}. This is a local calibration only; it cannot mark attendance.</p>
+          <p>This local calibration stores no identity or result, and it cannot mark attendance.</p>
         </div>
         <button className="acoustic-lab__back" type="button" onClick={() => navigate(-1)}>Back</button>
       </header>
 
       <section className="acoustic-lab__notice">
         <h2>Before you test</h2>
-        <p>Use current Chrome on an Android phone, set media volume around 50%, keep the phone flat in a quiet room, and allow microphone access. The test plays five brief, low-volume high-frequency tones. Stop if any tone is uncomfortable.</p>
+        <p>Use current Chrome on an Android phone, set media volume around 50%, keep the phone flat in a quiet room, and allow microphone access. The test plays five brief, low-volume high-frequency tones. Stop if any tone is uncomfortable. This page is intentionally shareable for prototype testing; it does not use sign-in or save a result.</p>
       </section>
 
       {error && <p className="acoustic-lab__error" role="alert">{error}</p>}

@@ -12,11 +12,10 @@
     "start": "node index.js"
   },
   "engines": {
-    "node": ">=22 <26"
+    "node": ">=22"
   },
   "dependencies": {
     "@simplewebauthn/server": "^13.3.3",
-    "bcrypt": "^5.1.1",
     "bcryptjs": "^2.4.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",

@@ -2,14 +2,15 @@
 
 Update this at the end of every session. If it disagrees with the real code, the code wins: fix this file and tell the owner.
 
-Last updated: 2026-10-17 (audit session: real code inspected, backend unit tests run; statuses below now match the code, no code was changed)
+Last updated: 2026-10-17 (session 3: Google test accounts added for login/roster testing; Node 26 supported again — plain `npm start` works)
 
 ## Status
 
 - Current layer: **Layer 1, Physical layer** (web app sends and hears tones)
-- Current slice: **none running.** Audit done. Slices 1.1–1.5 are partly built by earlier AI sessions (the "Acoustic capability check" lab — see the audit table) and are **not tested**. Slices 1.6–1.10 (FSK frames) are not built at all.
-- Last gate passed: none
-- Next action: owner picks the next slice (see "Next slice options"). Proposed: verify 1.1 + 1.2 on a real Android phone over HTTPS.
+- Current slice: **1.6 + 1.7 — FSK frame encoder + decoder: passed** (synthetic Node tests only; results below). Next proposed: **1.8** (live two-phone send/receive at 1 m).
+- Last gate passed: none (Layer 1 gate = frames decode at 1 m, 6 m and the far corner on real phones)
+- Setup done: teacher sign-in (`2023ugcs059@nitjsr.ac.in`) verified in the browser on 2026-10-17; backend runs with plain `npm start` on any Node ≥22 (including the default Node 26).
+- Next action: owner runs the same lab on the **second phone** (first phone's numbers are in the Measurements log) and signs in once with each test Gmail on localhost; then build 1.8.
 
 ## Done: planning (no code)
 
@@ -27,11 +28,42 @@ Earlier sessions (git commits say "Iteration-1/2/3 ... via Codex Terra 5.6") bui
 | --- | --- | --- | --- |
 | Acoustic capability lab (Layer 1) | `attendance-frontend/src/components/acousticLab/AcousticLab.jsx`, `attendance-frontend/public/tone-detector-worklet.js`, route `/acoustic-lab` (needs no sign-in; linked from both dashboards as "Test phone audio") | Mic + AudioContext setup; shows sample rate, applied mic settings (echo/noise/AGC), constraint support; plays 5 fixed tones 15.5–19.5 kHz from the phone speaker and measures them on the phone's own mic with a Goertzel AudioWorklet; shows ambient baseline and per-tone margin with 12/6 dB verdicts; stores nothing | **No** — never run on a real phone |
 | Roster + class management (Layer 2 shape, built early) | backend `utils/roster.js`, `controllers/classController.js`, `models/classModels.js`, `models/enrollmentModels.js`, `routes/classRoute.js`; frontend `components/teacher/classManagement.jsx` | Parse CSV/paste roster (lowercase, dedupe, `@nitjsr.ac.in` only, derive batch/branch/roll); create class; preview/save/read roster; enrollment active/inactive | Unit tests pass (3 roster tests via `npm test`). No end-to-end run (needs MongoDB + teacher session) |
-| Google sign-in + device binding (Layer 2 shape, built early) | backend `controllers/googleAuthController.js`, `models/deviceBindingRequestModels.js`, `utils/deviceBinding.js`, `routes/googleAuthRoute.js`; frontend `GoogleSignInButton.jsx`, `Login.jsx`, `utils/deviceKey.js`, `classManagement.jsx` review queue | Server verifies nitjsr.ac.in Google ID token, roster-gates accounts; student browser makes a P-256 key pair (IndexedDB) bound to the account; key changes go to a teacher review queue (approve/reject) | Device-binding unit tests pass (2 tests). Not runnable end-to-end: `attendance-backend/config/config.env` has no `GOOGLE_CLIENT_ID`/`TEACHER_EMAILS`, server answers 503. Never tested on a phone |
-| Legacy attendance app (pre-plan scaffold, 2026-08-26) | `Mark.jsx`, `takeAttendance.jsx`, `addRoom.jsx`, location/code/passkey routes and controllers, dashboards, `docs/codebase/*` | Original GPS-rectangle + 6-digit-code + WebAuthn attendance and its docs. Predates `plan.md`; not part of the Layer 1 gate | Not retested this session |
-| Deployment | `attendance-frontend/build/` (built 10:14 today, includes the lab) | Local production build exists. The live Vercel URL (`attendance-frontend-sage.vercel.app`) serves an **older bundle without the lab or Google sign-in** | n/a |
+| Google sign-in + device binding (Layer 2 shape, built early) | backend `controllers/googleAuthController.js`, `models/deviceBindingRequestModels.js`, `utils/deviceBinding.js`, `routes/googleAuthRoute.js`; frontend `GoogleSignInButton.jsx`, `Login.jsx`, `utils/deviceKey.js`, `classManagement.jsx` review queue | Server verifies nitjsr.ac.in Google ID token, roster-gates accounts; student browser makes a P-256 key pair (IndexedDB) bound to the account; key changes go to a teacher review queue (approve/reject) | Device-binding unit tests pass (2 tests); the sign-in policy is now unit-tested too (5 tests) — backend suite 10/10. It was doubly broken until 2026-10-17: `config.env` had no `GOOGLE_CLIENT_ID` (503), and `classRoute`'s blanket `router.use` swallowed `/auth/google` so the handler never ran. Both fixed; verified by curl up to the token-verification step (garbage token → 401 "could not be verified"). Test accounts now exist for browser testing (see "Test accounts"). Teacher sign-in (`2023ugcs059@nitjsr.ac.in`) was verified for real on 2026-10-17 in Chrome on localhost; the two student test accounts still to be tried. Never tested on a phone |
+| Legacy attendance app (pre-plan scaffold, 2026-08-26) | `Mark.jsx`, `takeAttendance.jsx`, `addRoom.jsx`, location/code/passkey routes and controllers, dashboards, `docs/codebase/*` | Original GPS-rectangle + 6-digit-code + WebAuthn attendance and its docs (this is the seniors' hand-over base we are adapting; its coordinate precision is why we are moving to acoustics). Not part of the Layer 1 gate | Not retested this session |
+| Deployment | `attendance-frontend/build/` (rebuilt 2026-10-17 evening; a rebuild after this session's changes passes) | Local production build. The live Vercel URL (`attendance-frontend-sage.vercel.app`) is the seniors' deploy — we do **not** have access to it, so we will host our own copy. Added `vercel.json` + `public/_redirects` so deep links (e.g. `/acoustic-lab`) work on our own Vercel/Netlify deploy | n/a |
 
 Instruction for the next session: verify slices in order; mark a slice `passed` only after its test is actually run.
+
+## Test accounts (2026-10-17, for login/roster testing)
+
+| Account | Role | Configured in |
+| --- | --- | --- |
+| `2023ugcs059@nitjsr.ac.in` | teacher (provisioned on first Google sign-in) | `TEACHER_EMAILS` in `attendance-backend/config/config.env` |
+| `testforshivansh059@gmail.com` | test student (skips the class-roster gate) | `TEST_STUDENT_EMAILS` in `config.env` |
+| `12shivanshsingha@gmail.com` | test student (skips the class-roster gate) | `TEST_STUDENT_EMAILS` in `config.env` |
+
+- Test students are a test-only feature: any address in `TEST_STUDENT_EMAILS` may sign in with Google even though it is not `@nitjsr.ac.in`, and it skips the "must be on an active roster" gate. Remove the line (or empty it) before the real pilot.
+- Their device-binding review requests are visible to any teacher, because test accounts can never appear on a college roster.
+- Roster upload still accepts `@nitjsr.ac.in` only (unchanged): test students will not show up inside class rosters.
+- Still to check in Google Cloud Console (owner): `http://localhost:3000` in the OAuth client's Authorized JavaScript origins; and if the OAuth consent screen is in "Testing" status, add all three accounts as test users.
+
+## Codec evidence (FSK, synthetic — 2026-10-17)
+
+`npm run test:acoustic` in `attendance-frontend` — **12/12 tests pass, exit 0** (seeded PRNG, numbers reproducible):
+
+| Test | Result |
+| --- | --- |
+| Clean frames, 48 kHz, 1000 random keys | 1000/1000 decoded |
+| Clean frames, 44.1 kHz, 200 keys | 200/200 decoded |
+| Frame found behind 0–500 ms leading silence (search mode) | 100/100 |
+| Full-band SNR 30 / 20 / 10 / 0 dB (100 keys each) | 100/100 each |
+| Echo (single tap, gain 0.5) at 30 / 60 / 90 ms | 50/50 each |
+| Echo 60 ms + 10 dB noise | 50/50 |
+| False positives: white noise only / random tone sequences | 0/100 and 0/30 |
+| Check symbols: single tone flips rejected | 0/200 accepted |
+| Check symbols: two tone flips | 2/200 accepted (checksum collisions, ~1 in 225 expected) |
+
+Codec facts as built: 17 tones at 110 Hz spacing from 18.0 kHz; 120 ms symbols; frame = 2 marker + 7 data + 2 check symbols (1.32 s); data digits base 15; consecutive data/check tones can never repeat (carried by construction, inverted by the decoder); check digits = weighted sum mod 225; 6 ms raised-cosine fade per symbol; detection = ≥9 dB above the median of the 17 tones. Caveat: this is synthetic audio — real speaker/mic behaviour is still untested (that is what the lab run and slice 1.8 are for).
 
 ## Layer 1: slice list
 
@@ -39,24 +71,24 @@ Status key: `todo`, `built, needs test`, `partial (built with gaps, needs test)`
 
 | # | Slice | Pass/fail test | Status |
 | --- | --- | --- | --- |
-| 1.1 | Static page with a Join button, served over HTTPS (free host) | Page opens on an Android Chrome phone from the hosted URL | **built, needs test** — page + button exist and need no sign-in; not deployed (README quick-tunnel instructions only; live Vercel build lacks the lab) |
-| 1.2 | Join starts AudioContext and mic; app logs real sample rate and the mic settings the browser applied; refuses below 44.1 kHz | Log shows sample rate and applied settings on a real phone | **partial** — shows sample rate + applied settings + constraint support; **no below-44.1-kHz refusal in code**; not run on a phone |
-| 1.3 | Play one tone at a chosen frequency with ~6 ms fade; frequency sweep page | A second phone's spectrum view shows the tone; no audible clicks | **partial** — plays 5 fixed tones (15.5–19.5 kHz), no chosen frequency, **no 6 ms fade**, no second-phone spectrum view; tones are measured on the same phone's mic |
-| 1.4 | Single-tone detector (Goertzel) with live level display and noise-floor estimate | Detects a tone from the other phone at 1 m; quiet room shows no detection | **partial** — Goertzel worklet, ambient baseline, margin verdicts exist (12/6 dB, not the plan's ~9 dB-above-median rule); **no live level display**; never tested from a second phone |
-| 1.5 | Band sweep across 15–20 kHz on each available phone model; record which frequencies play and record well | Table of phone model vs usable frequencies saved in this file | **partial** — sweep tool exists (5 frequencies); **no measurements recorded**, no model table |
-| 1.6 | FSK frame encoder (start marker, 7 data symbols, 2 check symbols, no repeated adjacent tone) | Node test: encode then decode a synthetic buffer, 1000 random keys, all correct | todo — **no frame encoder exists anywhere in the code** |
-| 1.7 | Frame decoder tested on synthetic audio with added noise and echo | Node test: decode rate and false-positive rate reported at several noise levels | todo — no frame decoder exists |
-| 1.8 | Live send and receive between two phones at 1 m | Frames sent vs decoded recorded; at least 95% | todo |
+| 1.1 | Static page with a Join button, served over HTTPS (free host) | Page opens on an Android Chrome phone from the hosted URL | **passed (2026-10-17, interim)** — the lab page opened over HTTPS in Chrome on an Android phone via a cloudflared quick tunnel; our own permanent host still to come (own Vercel/Netlify later; `vercel.json` + `_redirects` ready) |
+| 1.2 | Join starts AudioContext and mic; app logs real sample rate and the mic settings the browser applied; refuses below 44.1 kHz | Log shows sample rate and applied settings on a real phone | **partial** — on a real phone (2026-10-17): 48 kHz, echo/noise/AGC disabled "Yes", 1 mic channel; **no below-44.1-kHz refusal in code**; the second phone (44.1 kHz case) still pending |
+| 1.3 | Play one tone at a chosen frequency with ~6 ms fade; frequency sweep page | A second phone's spectrum view shows the tone; no audible clicks | **partial** — plays 5 fixed tones (15.5–19.5 kHz), no chosen frequency, **no 6 ms fade in the lab** (the fade now exists in the codec), no second-phone spectrum view; tones are measured on the same phone's mic |
+| 1.4 | Single-tone detector (Goertzel) with live level display and noise-floor estimate | Detects a tone from the other phone at 1 m; quiet room shows no detection | **partial** — self-detection verified on a real phone 2026-10-17 (margins 46–53 dB); ambient baseline + 12/6 dB verdicts exist (not the plan's ~9 dB-above-median rule); **no live level display**; the second-phone test is still pending |
+| 1.5 | Band sweep across 15–20 kHz on each available phone model; record which frequencies play and record well | Table of phone model vs usable frequencies saved in this file | **partial (started)** — one phone measured 2026-10-17 (see Measurements log; model to confirm): 15.5 / 16.5 / 17.5 / 18.5 kHz clearly usable, **19.5 kHz not detected**; second phone pending |
+| 1.6 | FSK frame encoder (start marker, 7 data symbols, 2 check symbols, no repeated adjacent tone) | Node test: encode then decode a synthetic buffer, 1000 random keys, all correct | **passed (2026-10-17)** — `src/acoustic/fsk.js` + `src/acoustic/fsk.node-tests.js`; 1000/1000 keys at 48 kHz, 200/200 at 44.1 kHz, 1000/1000 tone-level. Files: `attendance-frontend/src/acoustic/fsk.js`, tests `fsk.node-tests.js`, script `npm run test:acoustic` |
+| 1.7 | Frame decoder tested on synthetic audio with added noise and echo | Node test: decode rate and false-positive rate reported at several noise levels | **passed (2026-10-17)** — noise 100/100 at 30/20/10/0 dB; echo (30/60/90 ms, gain 0.5) 50/50 each; echo+noise 50/50; false positives 0/100 + 0/30; single tone flips rejected 200/200; double flips 2/200 (checksum collisions ~1/225). Full numbers in "Codec evidence" |
+| 1.8 | Live send and receive between two phones at 1 m | Frames sent vs decoded recorded; at least 95% | todo — next slice proposed |
 | 1.9 | Range test at 6 m and at the far corner (about 20 m) | Same record at each distance; at least 95% (proposed target) | todo |
 | 1.10 | Choose the band (18–20 kHz or lower) from the measurements; decide whether Layer 1 gate passes | Decision written here with the numbers behind it | todo |
 
 Layer 1 gate (from `plan.md`): frames decode at 1 m, 6 m and the far corner, proposed target 95% of frames on phones students actually use.
 
-## Next slice options (owner decides; go-ahead pending)
+## Next slice (proposed; owner confirms)
 
-- **A (proposed, needs a real Android phone):** verify **1.1 + 1.2** together — expose the lab over HTTPS (quick tunnel or redeploy the current build to Vercel), open it on a real phone, record sample rate and applied mic settings; first add the small "refuse below 44.1 kHz" check that 1.2 requires. Pass = page opens over HTTPS on Android Chrome; report shows sample rate + applied settings; app refuses to run when the rate is below 44.1 kHz.
-- **B (no hardware needed):** build **1.6 + 1.7** — FSK frame encoder + decoder with Node synthetic-audio tests (noise, echo). Can be built and fully tested in one session.
-- **C:** something else the owner wants.
+- **1.8 — live send and receive between two phones at 1 m.** TX page plays frames from `src/acoustic/fsk.js` in a loop (with the 6 ms fade, screen wake lock, repeated key played N times); RX page runs the 17-tone Goertzel bank over the audio worklet and decodes on the known symbol schedule; both pages show counters (frames played / heard / decoded). Owner runs M01 ⇄ M32 at 1 m and records the numbers in the measurements log. Pass = ≥95% decoded (proposed).
+- **In parallel, owner runs the existing lab (1.1–1.5 checks) on M01 + M32** over HTTPS and shares: sample rate, applied mic settings, the five tone margins, and the recommendation line. This closes 1.1/1.2 and fills the 1.5 table.
+- If either fails, fix before starting 1.9 (range tests).
 
 ## Later layers (not started; do not begin before the previous gate passes)
 
@@ -73,16 +105,22 @@ Each of these must be broken into slices like Layer 1 before work starts.
 
 Record real results here (phone model, Android version, Chrome version, band, distance, frames sent, frames decoded, notes).
 
+First test phones (owner, 2026-10-17): **Samsung M01** and **Samsung M32** (more phones later).
+
 | Date | Phone | Android / Chrome | Band | Distance | Sent | Decoded | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| | | | | | | | |
+| 2026-10-17 | Samsung M32 | Android (version to add) / latest Chrome | 15.5 / 16.5 / 17.5 / 18.5 / 19.5 kHz | 0 m (self-test) | 5 tones | 4 clear | 48 kHz; AudioWorklet available; echo/noise/AGC disabled ("Yes"); 1 mic channel; baseline −98…−101 dB; margins 51.5 / 48.1 / 46.5 / 53.0 dB, **19.5 kHz = 0.7 dB (no reliable detection)**; via cloudflared tunnel → `/acoustic-lab` |
 
 ## Session log
 
 | Date | Slice | What was done | Test result | Next |
 | --- | --- | --- | --- | --- |
 | 2026-10-17 | n/a | Planning and these four markdown files | n/a | Owner lists what is already built; verify it |
-| 2026-10-17 | audit (no code changes) | Read the real codebase; mapped built code to Layer 1 slices; checked the live Vercel bundle (older, no lab); checked env/config; ran existing backend tests | `npm test` in `attendance-backend`: **5/5 pass** (roster + device-binding utils). Backend `npm start` is blocked on this machine: installed Node 26.11.1, project requires <26 (`.nvmrc` = 24) | Owner picks slice A or B above |
+| 2026-10-17 | audit (no code changes) | Read the real codebase; mapped built code to Layer 1 slices; checked the live Vercel bundle (older, no lab); checked env/config; ran existing backend tests | `npm test` in `attendance-backend`: **5/5 pass** (roster + device-binding utils). Backend `npm start` is blocked on this machine: installed Node 26.11.1, project requires <26 | Owner picks slice A or B |
+| 2026-10-17 | 1.6 + 1.7 (+ login/setup fixes) | Built `attendance-frontend/src/acoustic/fsk.js` (frame codec) + `fsk.node-tests.js` (`npm run test:acoustic`). Fixed login chain: CORS allowlist now configurable (`CLIENT_URLS`) + 127.0.0.1 + `*.trycloudflare.com`; removed `classRoute`'s blanket guard that shadowed `/auth/google` (guards now per route); filled local `config.env` (`DB_URI` → local Mongo, fresh `JWT_SECRET`, `GOOGLE_CLIENT_ID`); documented `CLIENT_URLS` in `config.env.example`; set up local Mongo (`~/data/db-attendance-dev`) | Codec: **12/12 tests pass** (numbers in the 1.6/1.7 rows and "Codec evidence"). Backend `npm test` 5/5. Frontend production build passes. CORS preflights verified by curl for localhost/127.0.0.1/trycloudflare (denied origin gets no headers). `/auth/google` reachable again (garbage token → 401 verify error). Backend runs on Node 22 + local Mongo | Owner: run lab on M01 + M32; then build 1.8 |
+| 2026-10-17 | setup (test accounts + Node fix) | Extracted the sign-in policy into `utils/signInPolicy.js` (+ 5 unit tests); `googleAuthController` now accepts `TEST_STUDENT_EMAILS` Gmails as roster-exempt students and shows their device reviews to teachers; frontend Google button's `hosted_domain` is now configurable (`REACT_APP_GOOGLE_HOSTED_DOMAIN`, locally set empty for testing); `config.env` gained `TEACHER_EMAILS=2023ugcs059@nitjsr.ac.in` + `TEST_STUDENT_EMAILS=testforshivansh059@gmail.com,12shivanshsingha@gmail.com`; removed the unused, broken native `bcrypt` dependency; widened the Node guard/engines to `>=22` | Backend `npm test`: **10/10 pass on Node 26** (roster 3, device binding 2, sign-in policy 5). Full auth flow (register → login → islogin → logout) verified on Node 26.11.1 against local Mongo; plain `npm start` now works. Post-restart curl battery green (`/` 200, google garbage 401, classes without cookie 401, CORS header for localhost:3000). Policy sanity check: teacher + both Gmails allowed, random Gmail blocked | Owner: browser sign-in test with the 3 accounts; then lab on M01 + M32; then build 1.8 |
+| 2026-10-17 | setup (phone-test enablement) | Hardened `start:shared` with `DANGEROUSLY_DISABLE_HOST_CHECK=true` (tunnel host headers); seeded test room `B-204` in the local dev DB (Add New Room needs 4 GPS captures and class creation needs a room); verified the cloudflared quick-tunnel chain live | Tunnel tested: `/` 200 ("Bio Attend"), `/acoustic-lab` 200 deep link, `/api/v1/islogin` 401 JSON through the same-origin proxy. Live URL shared with the owner (random, changes per run) | Owner: run the acoustic lab on M01 + M32 and share both reports |
+| 2026-10-17 | lab run 1 (interim) | Owner: signed in with the teacher account for real (worked end-to-end); opened the lab on an Android phone through the live tunnel and ran the tone sweep | Phone: 48 kHz, AudioWorklet available, echo/noise/AGC disabled, 1 mic channel; margins 51.5 / 48.1 / 46.5 / 53.0 dB at 15.5–18.5 kHz; **19.5 kHz = 0.7 dB (not detected)**; baseline ≈ −100 dB. Phone model to confirm | Owner: same lab on the second phone; one sign-in per student Gmail on localhost; then build 1.8 |
 
 ## Open items (from `plan.md`)
 
@@ -90,11 +128,33 @@ Record real results here (phone model, Android version, Chrome version, band, di
 - Confirm the college Google domain sign-in setup.
 - Pick the free host for Layer 2 after checking idle sleep and connection limits.
 - Confirm the assumptions in `plan.md` section 3.
+- Check the Google OAuth client (in Google Cloud Console) allows `http://localhost:3000` as an authorized JavaScript origin, and later add any deployed frontend origin. If the consent screen is in "Testing" status, add the accounts in "Test accounts" as test users.
+- `bcrypt` (native) was removed from `package.json`; if anything later genuinely needs native bcrypt, use `bcryptjs` (already present) or re-add and rebuild it.
 
 ## Blockers
 
-- **Real-device testing not done:** no acoustic-lab run on a real phone has been recorded. Needs an Android phone (2020+) with Chrome, plus the owner.
-- **Deployed frontend is stale:** `attendance-frontend-sage.vercel.app` serves an old bundle without the lab. Redeploy `attendance-frontend/build` or use the README's `cloudflared` quick tunnel for phone tests.
-- **Backend cannot start on this machine as-is:** Node v26.11.1 installed; `engines` wants >=22 <26 and `scripts/verify-node-version.js` exits 1. Use `nvm use` (Node 24) before backend work.
-- **Google sign-in server side unconfigured:** `config.env` lacks `GOOGLE_CLIENT_ID` and `TEACHER_EMAILS`; `/auth/google` answers 503 until set. (Not needed for Layer 1.)
-- **MongoDB not verified:** backend expects a local DB (`DB_URI` is set in `config.env`); not checked this session. (Not needed for Layer 1.)
+- **Second phone + cross-phone testing still pending:** the first real-phone lab run is recorded (2026-10-17, see Measurements log); the lab needs no sign-in, and the tunnel URL changes on every run.
+- **Student test-account sign-in pending:** teacher sign-in with `2023ugcs059@nitjsr.ac.in` verified end-to-end on 2026-10-17 (Chrome on localhost). The two Gmail test accounts still need one sign-in each (separate Chrome profiles recommended, because one device key is stored per browser).
+- **Old MongoDB data dir `~/data/db` is partially root-owned (13 files):** cannot be opened by the current user. A fresh dev dir is in use instead. Only relevant if the old data matters — `sudo chown shivanshsingh:staff ~/data/db/*` would reclaim it.
+- **Resolved 2026-10-17 — Node version:** the old `>=22 <26` restriction came from an unused, broken native `bcrypt` dependency (nothing required it; both models use pure-JS `bcryptjs`). It was removed, the guard and `engines` widened to `>=22`, and the whole auth flow verified on Node 26.11.1. Plain `npm start` works now.
+
+## Local commands (verified 2026-10-17)
+
+```bash
+# 1. MongoDB (fresh dev data dir; keep running in its own terminal)
+~/mongodb-macos-aarch64--8.3.11/bin/mongod --dbpath ~/data/db-attendance-dev --logpath ~/data/log/mongod-attendance.log
+
+# 2. Backend (any Node >=22, including your default Node 26)
+cd attendance-backend && npm start                                      # http://localhost:4000
+
+# 3. Frontend (desktop)
+cd attendance-frontend && npm start                                     # http://localhost:3000
+
+# 4. Phone tests over HTTPS (cloudflared installed; chain verified 2026-10-17)
+cd attendance-frontend && npm run start:shared                          # binds 0.0.0.0 + same-origin API proxy
+cloudflared tunnel --url http://localhost:3000                          # new URL each run; open it on the phones
+
+# Tests
+cd attendance-backend && npm test                                       # 10/10 (roster + device binding + sign-in policy)
+cd attendance-frontend && npm run test:acoustic                         # FSK codec, 12 tests
+```

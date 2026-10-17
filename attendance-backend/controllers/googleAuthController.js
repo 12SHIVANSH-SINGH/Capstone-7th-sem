@@ -7,21 +7,19 @@ const Enrollment = require("../models/enrollmentModels");
 const DeviceBindingRequest = require("../models/deviceBindingRequestModels");
 const CourseClass = require("../models/classModels");
 const { fingerprintPublicKey } = require("../utils/deviceBinding");
-
-const WORKSPACE_DOMAIN = "nitjsr.ac.in";
-
-const isProvisionedTeacher = (email) => String(process.env.TEACHER_EMAILS || "")
-  .split(",")
-  .map((entry) => entry.trim().toLowerCase())
-  .filter(Boolean)
-  .includes(email);
+const {
+  WORKSPACE_DOMAIN,
+  normaliseEmail,
+  isProvisionedTeacher,
+  isTestStudent,
+  isWorkspaceAccount,
+  testStudentEmails,
+} = require("../utils/signInPolicy");
 
 const getGoogleClient = () => {
   if (!process.env.GOOGLE_CLIENT_ID) return null;
   return new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 };
-
-const normaliseEmail = (email) => String(email || "").trim().toLowerCase();
 
 const hasRosterAccess = async (email) => Enrollment.exists({ email, status: "active" });
 
@@ -48,12 +46,16 @@ exports.googleSignIn = catchAsyncError(async (req, res, next) => {
   }
 
   const email = normaliseEmail(payload?.email);
-  if (!payload || payload.hd !== WORKSPACE_DOMAIN || !payload.email_verified || !email.endsWith(`@${WORKSPACE_DOMAIN}`)) {
+  const workspaceAccount = Boolean(payload) && payload.hd === WORKSPACE_DOMAIN && isWorkspaceAccount(email);
+  const testAccount = isTestStudent(email);
+  if (!payload || !payload.email_verified || (!workspaceAccount && !testAccount)) {
     return next(new ErrorHandler("Sign in with your NIT Jamshedpur Google Workspace account", 403));
   }
 
   let user = await User.findOne({ email }).select("+password");
-  const rosterAccess = await hasRosterAccess(email);
+  // Test students (TEST_STUDENT_EMAILS) skip the roster gate: they exist to
+  // exercise the app before the pilot and are never on a college roster.
+  const rosterAccess = (await hasRosterAccess(email)) || testAccount;
 
   if (user?.googleSubject && user.googleSubject !== payload.sub) {
     return next(new ErrorHandler("This account is already linked to a different Google identity", 403));
@@ -135,17 +137,22 @@ exports.getDeviceBindingStatus = catchAsyncError(async (req, res) => {
 });
 
 const teacherCanReviewStudent = async (teacherId, studentId) => {
-  const classes = await CourseClass.find({ teacher: teacherId }).select("_id");
-  if (classes.length === 0) return false;
   const student = await User.findById(studentId).select("email");
   if (!student) return false;
+  // Test accounts are not on any roster; any teacher may review them so the
+  // device queue stays usable during testing.
+  if (isTestStudent(student.email)) return true;
+  const classes = await CourseClass.find({ teacher: teacherId }).select("_id");
+  if (classes.length === 0) return false;
   return Enrollment.exists({ class: { $in: classes.map((courseClass) => courseClass._id) }, email: student.email, status: "active" });
 };
 
 exports.listDeviceReviews = catchAsyncError(async (req, res) => {
   const classes = await CourseClass.find({ teacher: req.user._id }).select("_id");
-  const emails = await Enrollment.distinct("email", { class: { $in: classes.map((courseClass) => courseClass._id) }, status: "active" });
-  const students = await User.find({ email: { $in: emails }, role: "student" }).select("_id");
+  const enrolledEmails = await Enrollment.distinct("email", { class: { $in: classes.map((courseClass) => courseClass._id) }, status: "active" });
+  // Test accounts never appear on a roster; show their pending device changes too.
+  const visibleEmails = [...new Set([...enrolledEmails.map(normaliseEmail), ...testStudentEmails()])];
+  const students = await User.find({ email: { $in: visibleEmails }, role: "student" }).select("_id");
   const reviews = await DeviceBindingRequest.find({ student: { $in: students.map((student) => student._id) }, status: "pending" })
     .populate("student", "name email")
     .sort({ createdAt: 1 });

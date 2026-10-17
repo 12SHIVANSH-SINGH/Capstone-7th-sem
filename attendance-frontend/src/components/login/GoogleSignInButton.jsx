@@ -2,6 +2,10 @@ import React, { useEffect, useRef } from "react";
 
 const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || "690196150991-39rsb4sffjvfl66jt22unp0uulhfgu5m.apps.googleusercontent.com";
 const SCRIPT_ID = "google-identity-services";
+// College-only account chooser by default. Set REACT_APP_GOOGLE_HOSTED_DOMAIN
+// to an empty value while testing so test Gmail accounts stay selectable; the
+// server still gates every sign-in by domain or TEST_STUDENT_EMAILS.
+const HOSTED_DOMAIN = process.env.REACT_APP_GOOGLE_HOSTED_DOMAIN ?? "nitjsr.ac.in";
 
 const GoogleSignInButton = ({ onCredential, onLoadError, disabled }) => {
   const buttonRef = useRef(null);
@@ -14,8 +18,8 @@ const GoogleSignInButton = ({ onCredential, onLoadError, disabled }) => {
       window.google.accounts.id.initialize({
         client_id: GOOGLE_CLIENT_ID,
         callback: onCredential,
-        hosted_domain: "nitjsr.ac.in",
         auto_select: false,
+        ...(HOSTED_DOMAIN ? { hosted_domain: HOSTED_DOMAIN } : {}),
       });
       buttonRef.current.replaceChildren();
       window.google.accounts.id.renderButton(buttonRef.current, {

@@ -2,6 +2,7 @@ const express = require("express");
 const isAuthenticated = require("../middleware/auth");
 const {
   listRooms,
+  createRoom,
   createClass,
   listClasses,
   previewRoster,
@@ -17,6 +18,7 @@ const guards = [isAuthenticated, teacherOnly];
 // also swallow every /api/v1 route mounted after this router (Google sign-in,
 // device bindings) and answer them with 401 before they can run.
 router.get("/rooms", guards, listRooms);
+router.post("/rooms", guards, createRoom);
 router.route("/classes").get(guards, listClasses).post(guards, createClass);
 router.post("/classes/:classId/roster/preview", guards, previewRoster);
 router.put("/classes/:classId/roster", guards, replaceRoster);

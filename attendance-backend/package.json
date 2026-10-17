@@ -1,11 +1,11 @@
 {
-  "name": "hotel_management",
+  "name": "attendance-backend",
   "version": "1.0.0",
-  "description": "",
+  "description": "Bio Attend — acoustic presence check-in backend",
   "license": "ISC",
   "author": "",
   "type": "commonjs",
-  "main": "backend/index.js",
+  "main": "index.js",
   "scripts": {
     "prestart": "node scripts/verify-node-version.js",
     "test": "node --test",
@@ -15,18 +15,12 @@
     "node": ">=22"
   },
   "dependencies": {
-    "@simplewebauthn/server": "^13.3.3",
-    "bcryptjs": "^2.4.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
-    "crypto": "^1.0.1",
     "dotenv": "^16.6.1",
     "express": "^4.22.3",
-    "geoip-lite": "^1.4.10",
     "google-auth-library": "^10.9.1",
     "jsonwebtoken": "^9.0.3",
-    "mongoose": "^8.24.5",
-    "node-cron": "^3.0.3",
-    "validator": "^13.12.0"
+    "mongoose": "^8.24.5"
   }
 }

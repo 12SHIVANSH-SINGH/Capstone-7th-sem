@@ -1,18 +1,17 @@
 import React, { useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./Login.css";
-import img1 from "../../assets/logo.png"
+import img1 from "../../assets/logo.png";
 import SERVER_URL from "../../config/api";
 import GoogleSignInButton from "./GoogleSignInButton";
 import { getOrCreateDevicePublicKey } from "../../utils/deviceKey";
+import Brand from "../../ui/Brand";
+import { Spinner } from "../../ui/Spinner";
 
 const Login = () => {
     const navigate = useNavigate();
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState("");
-    const [showPassword, setShowPassword] = useState(false);
 
     const handleGoogleCredential = useCallback(async ({ credential }) => {
         setError("");
@@ -50,102 +49,59 @@ const Login = () => {
         }
     }, [navigate]);
 
-    const handleLogin = async (e) => {
-        e.preventDefault();
-        setError("");
-        setIsLoading(true);
-        
-        try {
-            const response = await fetch(`${SERVER_URL}/login`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email, password }),
-                credentials: "include",
-            });
-
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.message);
-
-            navigate(data.user.role === "teacher" ? "/teacher-dashboard" : "/student-dashboard");
-        } catch (error) {
-            setError(error.message || "Invalid email or password. Please try again.");
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
     return (
-        <div className="login-container">
-            <div className="login-box">
-                <div className="login-header">
-                    <img src={img1} alt="App Logo" className="logo" />
-                    <h2>Welcome Back</h2>
-                    <p>Please sign in to continue</p>
+        <div className="login-page">
+            <aside className="login-brand">
+                <div className="login-brand__top">
+                    <Brand />
                 </div>
+                <div className="login-brand__content">
+                    <span className="login-brand__badge">Acoustic presence check-in</span>
+                    <h1>Attendance that proves who’s actually in the room.</h1>
+                    <p>
+                        One-time near-ultrasonic key tones travel between student phones, and the
+                        server verifies who heard them. No GPS tracking, no roll-call, no extra hardware.
+                    </p>
+                    <ul className="login-brand__points">
+                        <li>College Google sign-in — nothing to remember</li>
+                        <li>Each browser binds to a private device key</li>
+                        <li>Teachers approve new devices in seconds</li>
+                    </ul>
+                </div>
+                <div className="login-brand__wave" aria-hidden="true">
+                    {[12, 22, 34, 20, 28, 14, 24, 34, 18, 26, 12, 20].map((height, index) => (
+                        <span key={index} style={{ height: `${height}px`, animationDelay: `${(index % 6) * 0.14}s` }} />
+                    ))}
+                </div>
+            </aside>
 
-                <form onSubmit={handleLogin}>
+            <main className="login-panel">
+                <div className="login-card">
+                    <img src={img1} alt="Bio Attend" className="login-card__logo" />
+                    <h2>Welcome back</h2>
+                    <p className="login-card__sub">Sign in with your college account to continue.</p>
+
                     <div className="google-login-block">
-                        <p>Use your NIT Jamshedpur college account</p>
                         <GoogleSignInButton
                             onCredential={handleGoogleCredential}
                             onLoadError={setError}
                             disabled={isLoading}
                         />
-                    </div>
-
-                    <div className="login-divider"><span>Legacy development sign-in</span></div>
-                    <div className="input-group">
-                        <label htmlFor="email">Email</label>
-                        <input
-                            id="email"
-                            type="email"
-                            placeholder="Enter your email"
-                            required
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            disabled={isLoading}
-                        />
-                    </div>
-
-                    <div className="input-group">
-                        <label htmlFor="password">Password</label>
-                        <div className="password-input">
-                            <input
-                                id="password"
-                                type={showPassword ? "text" : "password"}
-                                placeholder="Enter your password"
-                                required
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                disabled={isLoading}
-                            />
-                            <button
-                                type="button"
-                                className="password-toggle"
-                                onClick={() => setShowPassword(!showPassword)}
-                            >
-                                {showPassword ? "👁️" : "👁️🗨️"}
-                            </button>
-                        </div>
+                        {isLoading && (
+                            <p className="login-card__status">
+                                <Spinner /> Signing you in…
+                            </p>
+                        )}
                     </div>
 
                     {error && <div className="error-message">{error}</div>}
 
-                    <button type="submit" className="login-button" disabled={isLoading}>
-                        {isLoading ? (
-                            <div className="spinner"></div>
-                        ) : (
-                            "Sign In"
-                        )}
-                    </button>
-
-                    
-                </form>
-
-                <div className="register-prompt">
-                    Need access? Ask your teacher to add your college email to the class roster.
+                    <p className="login-card__help">
+                        Need access? Ask your teacher to add your college email to the class roster.
+                    </p>
                 </div>
-            </div>
+                <p className="login-foot">Bio Attend · NIT Jamshedpur</p>
+            </main>
         </div>
     );
 };

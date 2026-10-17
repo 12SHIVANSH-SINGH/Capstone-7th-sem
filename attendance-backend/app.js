@@ -39,15 +39,10 @@ app.use(
 app.use(cookieParser());
 app.use(express.json());
 
-const locationRoute = require('./routes/locationRoute');
-app.use("/api/v1", locationRoute);
 app.set('trust proxy', true); // Add this in your main Express config
 
-const notes = require('./routes/userRoute');
-app.use("/api/v1", notes);
-
-const codeRoute = require('./routes/codeRoute');
-app.use("/api/v1", codeRoute);
+const userRoute = require('./routes/userRoute');
+app.use("/api/v1", userRoute);
 
 const classRoute = require('./routes/classRoute');
 app.use("/api/v1", classRoute);

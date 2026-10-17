@@ -1,132 +1,143 @@
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
 import SERVER_URL from "../../config/api";
+import AppShell from "../../ui/AppShell";
+import Badge from "../../ui/Badge";
+import Button from "../../ui/Button";
+import Card from "../../ui/Card";
+import { PageLoader } from "../../ui/Spinner";
+import { useToast } from "../../ui/Toast";
 import "./studentDashboard.css";
 
+const STATUS_VIEW = {
+    approved: {
+        badge: "Approved",
+        variant: "success",
+        icon: "✓",
+        title: "This browser is approved for attendance",
+        text: "When your teacher starts a check-in, this phone will play and listen for the key tones.",
+    },
+    review: {
+        badge: "In review",
+        variant: "warning",
+        icon: "⌛",
+        title: "Waiting for teacher review",
+        text: "This browser was added from a new device. A teacher needs to approve it before you can check in.",
+    },
+    unbound: {
+        badge: "Not bound",
+        variant: "danger",
+        icon: "⚠",
+        title: "This browser isn’t bound yet",
+        text: "Sign in again with your college Google account to bind this browser to your attendance.",
+    },
+    checking: {
+        badge: "Checking…",
+        variant: "neutral",
+        icon: "…",
+        title: "Checking this device…",
+        text: "One moment while we look up this browser’s binding.",
+    },
+};
 
 const StudentDashboard = () => {
     const navigate = useNavigate();
     const location = useLocation();
-    const [studentName, setStudentName] = useState("Loading...");
-
-    const [isAuthorized, setIsAuthorized] = useState(false);
+    const toast = useToast();
+    const [user, setUser] = useState(null);
     const [deviceStatus, setDeviceStatus] = useState(location.state?.deviceStatus || "checking");
 
     useEffect(() => {
         const fetchUser = async () => {
             try {
                 const response = await axios.get(`${SERVER_URL}/islogin`, { withCredentials: true });
-                setStudentName(response.data.user.name || response.data.user.email.split('@')[0]);
+                if (response.data.user.role === "teacher") {
+                    navigate("/teacher-dashboard");
+                    return;
+                }
+                setUser(response.data.user);
                 const bindingResponse = await axios.get(`${SERVER_URL}/device-bindings/status`, { withCredentials: true });
                 setDeviceStatus(bindingResponse.data.status);
-                setIsAuthorized(true);
             } catch (error) {
-                console.error("Failed to fetch user:", error);
+                if (error.response?.status && error.response.status !== 401) {
+                    toast("Could not load your dashboard. Please try again.", "error");
+                }
                 navigate("/login");
             }
         };
         fetchUser();
-    }, [navigate]);
+    }, [navigate, toast]);
 
-    const handleLogout = async () => {
+    const handleLogout = useCallback(async () => {
         try {
             await axios.get(`${SERVER_URL}/logout`, { withCredentials: true });
-            navigate("/");
         } catch (error) {
-            console.error("Logout failed", error);
-            navigate("/");
+            // Sign-out is best-effort; the local session ends either way.
         }
-    };
+        navigate("/");
+        toast("Signed out. See you next class!", "success");
+    }, [navigate, toast]);
 
-    if (!isAuthorized) {
-        return <div style={{ display: 'flex', justifyContent: 'center', marginTop: '20vh' }}><h2>Loading...</h2></div>;
+    if (!user) {
+        return <PageLoader label="Loading your dashboard…" />;
     }
 
-    // Static data for demonstration
-    const upcomingClasses = [
-        { id: 1, course: "Mathematics", time: "09:00 AM", room: "B-204" },
-        { id: 2, course: "Physics", time: "11:00 AM", room: "Lab-3" },
-        { id: 3, course: "Computer Science", time: "02:00 PM", room: "C-101" },
-    ];
-
-    const recentAttendance = [
-        { date: "2024-03-01", status: "Present", course: "Mathematics" },
-        { date: "2024-02-28", status: "Absent", course: "Physics" },
-        { date: "2024-02-25", status: "Present", course: "Computer Science" },
-    ];
+    const info = STATUS_VIEW[deviceStatus] || STATUS_VIEW.checking;
+    const name = user.name || user.email.split("@")[0];
+    const firstName = name.split(" ")[0];
 
     return (
-        <div className="dashboard-container">
-            <header className="dashboard-header">
-                <div className="header-left">
-                    <h1>Student Portal</h1>
-                    <p>Welcome back, {studentName}</p>
+        <AppShell
+            role="student"
+            name={name}
+            email={user.email}
+            onLogout={handleLogout}
+            links={[
+                { to: "/student-dashboard", label: "Dashboard", active: true },
+                { to: "/acoustic-lab", label: "Phone audio test" },
+            ]}
+        >
+            <div className="ui-page-head">
+                <div>
+                    <h1 className="ui-page-head__title">Hi {firstName} 👋</h1>
+                    <p className="ui-page-head__sub">
+                        This is your attendance home. Check-ins happen right here once your teacher starts a session.
+                    </p>
                 </div>
-                <button 
-                    className="logout-btn"
-                    onClick={handleLogout}
-                >
-                    Logout
-                </button>
-            </header>
+            </div>
 
-            <main className="dashboard-main">
-                <div className="quick-actions">
-                    <div className="attendance-card">
-                        <h2>Attendance</h2>
-                        <p className={`device-status ${deviceStatus}`}>
-                            {deviceStatus === "approved" && "✓ This browser is approved for attendance"}
-                            {deviceStatus === "review" && "⌛ This browser is awaiting teacher review"}
-                            {deviceStatus === "unbound" && "⚠ Set up Google sign-in to bind this browser"}
-                            {deviceStatus === "checking" && "Checking attendance device…"}
-                        </p>
-                        <button 
-                            className="mark-attendance-btn"
-                            onClick={() => navigate("/markAttendance")}
-                        >
-                            📅 Mark Attendance
-                        </button>
-                        <button
-                            className="mark-attendance-btn"
-                            onClick={() => navigate("/acoustic-lab")}
-                        >
-                            🔊 Test phone audio
-                        </button>
+            <div className="student-grid">
+                <Card className={`device-card device-card--${deviceStatus}`}>
+                    <div className="device-card__top">
+                        <span className="device-card__icon" aria-hidden="true">{info.icon}</span>
+                        <Badge variant={info.variant} dot>{info.badge}</Badge>
                     </div>
-                </div>
+                    <h2 className="device-card__title">{info.title}</h2>
+                    <p className="device-card__text">{info.text}</p>
+                    <div className="device-card__actions">
+                        <Button variant="soft" onClick={() => navigate("/acoustic-lab")}>🔊 Test phone audio</Button>
+                    </div>
+                </Card>
 
-                <div className="dashboard-content">
-                    <section className="upcoming-classes">
-                        <h2>Upcoming Classes</h2>
-                        <div className="classes-list">
-                            {upcomingClasses.map((cls) => (
-                                <div key={cls.id} className="class-card">
-                                    <h3>{cls.course}</h3>
-                                    <p>⏰ {cls.time}</p>
-                                    <p>📍 {cls.room}</p>
-                                </div>
-                            ))}
-                        </div>
-                    </section>
-
-                    <section className="attendance-overview">
-                        <h2>Recent Attendance</h2>
-                        <div className="attendance-list">
-                            {recentAttendance.map((record, index) => (
-                                <div key={index} className="attendance-record">
-                                    <span className="date">{record.date}</span>
-                                    <span className={`status ${record.status.toLowerCase()}`}>
-                                        {record.status}
-                                    </span>
-                                    <span className="course">{record.course}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </section>
-                </div>
-            </main>
-        </div>
+                <Card title="When your teacher starts a check-in" subtitle="Nothing to tap — the app handles it.">
+                    <ol className="checkin-steps">
+                        <li>
+                            <strong>Keep this page open.</strong>
+                            The app listens for the one-time key tones played in the room.
+                        </li>
+                        <li>
+                            <strong>Wait a few seconds.</strong>
+                            Your phone hears the key through its microphone.
+                        </li>
+                        <li>
+                            <strong>You’re marked present.</strong>
+                            The server records that this device heard the key.
+                        </li>
+                    </ol>
+                </Card>
+            </div>
+        </AppShell>
     );
 };
 

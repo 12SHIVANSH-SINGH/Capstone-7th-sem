@@ -3,7 +3,7 @@ const catchAsyncError = require("../middleware/catchasyncerror");
 const ErrorHandler = require("../utils/errorhandler");
 const CourseClass = require("../models/classModels");
 const Enrollment = require("../models/enrollmentModels");
-const { Location } = require("../models/locationModels");
+const { Room } = require("../models/roomModels");
 const { parseRosterText } = require("../utils/roster");
 
 const getOwnedClass = async (classId, teacherId, next) => {
@@ -20,8 +20,27 @@ const getOwnedClass = async (classId, teacherId, next) => {
 };
 
 exports.listRooms = catchAsyncError(async (req, res) => {
-  const rooms = await Location.find({}).select("roomNo createdAt").sort({ roomNo: 1 });
+  const rooms = await Room.find({}).select("roomNo createdAt").sort({ roomNo: 1 });
   res.status(200).json({ success: true, rooms });
+});
+
+exports.createRoom = catchAsyncError(async (req, res, next) => {
+  const roomNo = String(req.body.roomNo || "").trim();
+
+  if (!roomNo) {
+    return next(new ErrorHandler("Room number is required", 400));
+  }
+  if (roomNo.length > 40) {
+    return next(new ErrorHandler("Room number is too long (max 40 characters)", 400));
+  }
+
+  const existing = await Room.findOne({ roomNo });
+  if (existing) {
+    return next(new ErrorHandler("That room already exists", 409));
+  }
+
+  const room = await Room.create({ roomNo });
+  res.status(201).json({ success: true, room });
 });
 
 exports.createClass = catchAsyncError(async (req, res, next) => {
@@ -31,7 +50,7 @@ exports.createClass = catchAsyncError(async (req, res, next) => {
     return next(new ErrorHandler("Course code, title, and room are required", 400));
   }
 
-  if (!mongoose.isValidObjectId(roomId) || !(await Location.exists({ _id: roomId }))) {
+  if (!mongoose.isValidObjectId(roomId) || !(await Room.exists({ _id: roomId }))) {
     return next(new ErrorHandler("Select an existing room", 400));
   }
 

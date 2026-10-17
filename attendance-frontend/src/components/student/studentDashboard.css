@@ -1,173 +1,85 @@
-/* StudentDashboard.css */
-.dashboard-container {
-    min-height: 100vh;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    padding: 20px;
+/* Student dashboard */
+
+.student-grid {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  gap: 16px;
+  align-items: start;
 }
 
-.dashboard-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 2rem;
-    padding: 1rem 2rem;
-    background: rgba(255, 255, 255, 0.95);
-    border-radius: 15px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+@media (max-width: 860px) {
+  .student-grid { grid-template-columns: 1fr; }
 }
 
-.header-left h1 {
-    margin: 0;
-    color: #2d3748;
-    font-size: 1.8rem;
+/* Device status card */
+.device-card { border-left: 4px solid var(--slate-300); }
+.device-card--approved { border-left-color: var(--success); }
+.device-card--review { border-left-color: var(--warning); }
+.device-card--unbound { border-left-color: var(--danger); }
+
+.device-card__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
 }
 
-.header-left p {
-    color: #718096;
-    margin: 0.5rem 0 0;
+.device-card__icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  font-size: 20px;
+  font-weight: 700;
 }
 
-.logout-btn {
-    padding: 10px 25px;
-    background: #667eea;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.3s ease;
+.device-card--approved .device-card__icon { background: var(--success-soft); color: var(--success); }
+.device-card--review .device-card__icon { background: var(--warning-soft); color: var(--warning); }
+.device-card--unbound .device-card__icon { background: var(--danger-soft); color: var(--danger); }
+.device-card--checking .device-card__icon { background: var(--slate-100); color: var(--slate-500); }
+
+.device-card__title { font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
+.device-card__text { margin-top: 8px; font-size: 14px; line-height: 1.6; color: var(--text-soft); }
+.device-card__actions { margin-top: 18px; display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* Checklist */
+.checkin-steps {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  counter-reset: step;
 }
 
-.logout-btn:hover {
-    background: #5666b3;
-    transform: translateY(-2px);
+.checkin-steps li {
+  position: relative;
+  padding-left: 40px;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--text-soft);
 }
 
-.dashboard-main {
-    display: grid;
-    grid-template-columns: 300px 1fr;
-    gap: 2rem;
+.checkin-steps li strong {
+  display: block;
+  color: var(--text);
+  font-size: 14px;
+  margin-bottom: 2px;
 }
 
-.quick-actions {
-    background: rgba(255, 255, 255, 0.95);
-    padding: 1rem;
-    border-radius: 15px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
-    height: fit-content;
-}
-
-.attendance-card {
-    text-align: center;
-}
-
-.attendance-card h2 {
-    color: #2d3748;
-    margin-bottom: 1.5rem;
-}
-
-.mark-attendance-btn {
-    width: 100%;
-    padding: 15px;
-    background: #48bb78;
-    color: white;
-    border: none;
-    border-radius: 10px;
-    font-size: 1rem;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-}
-
-.mark-attendance-btn:hover {
-    background: #38a169;
-    transform: translateY(-2px);
-}
-
-.dashboard-content {
-    display: flex;
-    margin-left: 4vw;
-    max-width: 70vw;
-    flex-direction: column;
-    gap: 2rem;
-}
-
-.upcoming-classes, .attendance-overview {
-    background: rgba(255, 255, 255, 0.95);
-    padding: 1.5rem;
-    border-radius: 15px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
-}
-
-.classes-list {
-    display: grid;
-    gap: 1rem;
-}
-
-.class-card {
-    padding: 1rem;
-    border: 2px solid #e2e8f0;
-    border-radius: 10px;
-    transition: all 0.3s ease;
-}
-
-.class-card:hover {
-    border-color: #667eea;
-    transform: translateY(-3px);
-}
-
-.attendance-list {
-    display: grid;
-    gap: 1rem;
-}
-
-.attendance-record {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1rem;
-    background: #f7fafc;
-    border-radius: 8px;
-}
-
-.status {
-    padding: 4px 12px;
-    border-radius: 20px;
-    font-weight: 500;
-}
-
-.status.present {
-    background: #c6f6d5;
-    color: #22543d;
-}
-
-.status.absent {
-    background: #fed7d7;
-    color: #742a2a;
-}
-
-.device-status {
-    border-radius: 8px;
-    font-size: 0.9rem;
-    margin: 0.75rem 0 1rem;
-    padding: 0.7rem;
-}
-
-.device-status.approved { background: #e6f5e9; color: #1c6730; }
-.device-status.review { background: #fff4dc; color: #815c10; }
-.device-status.unbound { background: #ffe9e8; color: #8a241e; }
-.device-status.checking { background: #edf3f5; color: #496373; }
-
-@media (max-width: 768px) {
-    .dashboard-main {
-        grid-template-columns: 1fr;
-    }
-    
-    .dashboard-header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 1rem;
-    }
+.checkin-steps li::before {
+  counter-increment: step;
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  top: 1px;
+  width: 26px;
+  height: 26px;
+  border-radius: 9px;
+  background: var(--indigo-50);
+  color: var(--indigo-600);
+  font-weight: 700;
+  font-size: 12.5px;
+  display: grid;
+  place-items: center;
 }

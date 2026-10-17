@@ -52,7 +52,7 @@ exports.googleSignIn = catchAsyncError(async (req, res, next) => {
     return next(new ErrorHandler("Sign in with your NIT Jamshedpur Google Workspace account", 403));
   }
 
-  let user = await User.findOne({ email }).select("+password");
+  let user = await User.findOne({ email });
   // Test students (TEST_STUDENT_EMAILS) skip the roster gate: they exist to
   // exercise the app before the pilot and are never on a college roster.
   const rosterAccess = (await hasRosterAccess(email)) || testAccount;

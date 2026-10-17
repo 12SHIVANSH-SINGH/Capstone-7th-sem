@@ -29,7 +29,7 @@ const classSchema = new mongoose.Schema(
     },
     defaultRoom: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Location",
+      ref: "Room",
       required: true,
     },
   },

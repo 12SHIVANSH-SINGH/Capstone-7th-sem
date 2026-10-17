@@ -1,57 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
+import Brand from '../../ui/Brand';
 import './Navbar.css';
 
-const Navbar = () => {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
-  const toggleMobileMenu = () => {
-    setIsMobileMenuOpen(!isMobileMenuOpen);
-  };
-
-  const closeMobileMenu = () => {
-    setIsMobileMenuOpen(false);
-  };
-
-  useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth > 768 && isMobileMenuOpen) {
-        closeMobileMenu();
-      }
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [isMobileMenuOpen]);
-
-  return (
-    <nav className="navbar">
-      <div className="navbar-container">
-        <Link to="/" className="logo">
-          Bio<span>Attend</span>
-        </Link>
-        
-        <div className={`nav-buttons ${isMobileMenuOpen ? 'show' : ''}`}>
-          <Link to="/login" className="login-btn" onClick={closeMobileMenu}>
-            Login
-          </Link>
-          <Link to="/register" className="signup-btn" onClick={closeMobileMenu}>
-            Sign Up
-          </Link>
-        </div>
-
-        <button 
-          className="hamburger" 
-          onClick={toggleMobileMenu}
-          aria-label="Toggle navigation"
-        >
-          <span className={`hamburger-line ${isMobileMenuOpen ? 'open' : ''}`} />
-          <span className={`hamburger-line ${isMobileMenuOpen ? 'open' : ''}`} />
-          <span className={`hamburger-line ${isMobileMenuOpen ? 'open' : ''}`} />
-        </button>
-      </div>
-    </nav>
-  );
-};
+// Public top bar for the landing page. Two items — no mobile menu needed.
+const Navbar = () => (
+  <nav className="navbar">
+    <div className="navbar__inner">
+      <Brand />
+      <Link to="/login" className="ui-btn ui-btn--primary ui-btn--sm">Sign in</Link>
+    </div>
+  </nav>
+);
 
 export default Navbar;

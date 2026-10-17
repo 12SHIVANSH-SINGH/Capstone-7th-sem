@@ -1,132 +1,82 @@
-/* TeacherDashboard.css */
-.dashboard-container.teacher {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+/* Teacher dashboard */
+
+.teacher-grid {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 16px;
+  align-items: start;
+  margin-top: 16px;
 }
 
-.dashboard-header {
-    background: rgba(255, 255, 255, 0.95);
+@media (max-width: 860px) {
+  .teacher-grid { grid-template-columns: 1fr; }
 }
 
-.admin-card {
-    text-align: center;
-    padding: 1.5rem;
+/* Recent classes list */
+.class-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+
+.class-list__item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border: 0;
+  background: transparent;
+  border-radius: 12px;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.15s ease;
 }
 
-.admin-card h2 {
-    color: #2d3748;
-    margin-bottom: 1.5rem;
+.class-list__item:hover { background: var(--slate-50); }
+
+.class-list__main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+
+.class-list__title {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
 }
 
-.action-btn {
-    width: 100%;
-    padding: 15px;
-    border: none;
-    border-radius: 10px;
-    font-size: 1.1rem;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    margin: 10px 0;
+.class-list__code { font-size: 12px; font-weight: 600; color: var(--indigo-600); letter-spacing: 0.01em; }
+.class-list__meta { font-size: 12.5px; color: var(--text-faint); }
+
+/* Quick actions */
+.quick-actions { display: flex; flex-direction: column; gap: 10px; }
+
+.quick-action {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  width: 100%;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #fff;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
 }
 
-.action-btn.primary {
-    background: #667eea;
-    color: white;
+.quick-action:hover { border-color: var(--indigo-300); box-shadow: var(--shadow-sm); }
+.quick-action:active { transform: translateY(1px); }
+
+.quick-action__icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--indigo-50);
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  flex-shrink: 0;
 }
 
-.action-btn.primary:hover {
-    background: #5666b3;
-    transform: translateY(-2px);
-}
-
-.action-btn.secondary {
-    background: #805ad5;
-    color: white;
-}
-
-.action-btn.secondary:hover {
-    background: #6b46c1;
-    transform: translateY(-2px);
-}
-
-.class-card {
-    position: relative;
-    padding: 1.5rem;
-    background: white;
-    border-radius: 10px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-}
-
-.class-info {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1rem;
-    margin-top: 1rem;
-}
-
-.class-info p {
-    margin: 0;
-    color: #718096;
-    font-size: 0.9rem;
-}
-
-.attendance-record {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1rem;
-    background: white;
-    border-radius: 8px;
-    margin: 0.5rem 0;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-}
-
-.attendance-meta {
-    display: flex;
-    flex-direction: column;
-}
-
-.attendance-meta .date {
-    color: #718096;
-    font-size: 0.9rem;
-}
-
-.attendance-meta .class {
-    font-weight: 500;
-    color: #2d3748;
-}
-
-.attendance-stats {
-    display: flex;
-    gap: 1.5rem;
-}
-
-.attendance-stats span {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-}
-
-.present {
-    color: #48bb78;
-}
-
-.absent {
-    color: #f56565;
-}
-
-/* Responsive Design */
-@media (max-width: 768px) {
-    .class-info {
-        grid-template-columns: 1fr;
-    }
-    
-    .attendance-record {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 0.5rem;
-    }
-}
+.quick-action__body { display: flex; flex-direction: column; gap: 2px; }
+.quick-action__body strong { font-size: 14px; font-weight: 600; }
+.quick-action__body small { font-size: 12.5px; color: var(--text-soft); line-height: 1.45; }

@@ -1,134 +1,19 @@
 .navbar {
-  background-color: white;
-  box-shadow: var(--shadow-sm);
-  position: fixed;
-  width: 100%;
+  position: sticky;
   top: 0;
-  z-index: 1000;
-  height: 70px;
-  display: flex;
-  align-items: center;
+  z-index: 100;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border);
 }
 
-.navbar-container {
+.navbar__inner {
+  max-width: 1120px;
+  margin: 0 auto;
+  height: 64px;
+  padding: 0 20px;
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  align-items: center;
-  width: 100%;
-  padding: 0 8%;
-  position: relative;
-}
-
-.logo {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--primary-color);
-  text-decoration: none;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.logo span {
-  color: var(--secondary-color);
-}
-
-.nav-buttons {
-  display: flex;
-  gap: 1rem;
-  align-items: center;
-}
-
-.login-btn, .signup-btn {
-  padding: 0.6rem 1.2rem;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: 600;
-  transition: all 0.3s ease;
-  text-decoration: none;
-  font-size: 0.95rem;
-}
-
-.login-btn {
-  background-color: transparent;
-  color: var(--primary-color);
-  border: 1px solid var(--primary-color);
-}
-
-.signup-btn {
-  background-color: var(--primary-color);
-  color: white;
-}
-
-.login-btn:hover {
-  background-color: var(--light-bg);
-}
-
-.signup-btn:hover {
-  background-color: var(--accent-color);
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-sm);
-}
-
-.hamburger {
-  display: none;
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0.5rem;
-  z-index: 1001;
-}
-
-.hamburger-line {
-  display: block;
-  width: 25px;
-  height: 2px;
-  background-color: var(--primary-color);
-  margin: 5px 0;
-  transition: all 0.3s ease;
-}
-
-.hamburger-line.open:nth-child(1) {
-  transform: translateY(7px) rotate(45deg);
-}
-
-.hamburger-line.open:nth-child(2) {
-  opacity: 0;
-}
-
-.hamburger-line.open:nth-child(3) {
-  transform: translateY(-7px) rotate(-45deg);
-}
-
-@media (max-width: 768px) {
-  .hamburger {
-    display: block;
-  }
-
-  .nav-buttons {
-    position: absolute;
-    top: 70px;
-    left: 0;
-    right: 0;
-    background-color: white;
-    flex-direction: column;
-    gap: 0;
-    padding: 0 8%;
-    max-height: 0;
-    overflow: hidden;
-    transition: max-height 0.3s ease-out, padding 0.3s ease;
-    box-shadow: 0 10px 15px rgba(0,0,0,0.05);
-  }
-
-  .nav-buttons.show {
-    max-height: 250px;
-    padding: 1rem 8%;
-  }
-
-  .login-btn, .signup-btn {
-    width: 100%;
-    margin: 0.5rem 0;
-    text-align: center;
-  }
 }

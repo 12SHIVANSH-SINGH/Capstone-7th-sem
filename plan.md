@@ -1,117 +1,153 @@
-# Acoustic Presence Check-in: Plan
+# Plan: Acoustic Presence Check-in
 
-Oct 16, 2026 · @Shivansh
+Source of truth for WHAT we are building and WHY. Read this before doing anything.
+Companion files: `agent.md` (how to work), `progress.md` (where we are), `resume-prompt.md` (how to restart a session).
 
-## Goal and constraints
+## 1. Goal
 
-The goal is to mark attendance for 70-120 students by proving each phone was physically inside one 20 m × 20 m classroom, using only student smartphones, a web app and a server.
+Mark attendance for 70-120 students by proving each phone was physically inside one 20 m x 20 m classroom, using only student smartphones, a web app and a server.
 
-- No room hardware: no speaker, screen or beacon. The teacher's phone stays with the teacher and only starts the process.
-- Cheating is expected: fake GPS, forwarded codes, and a friend inside relaying to a friend outside.
-- A server is allowed. When the system is unsure about a student, it rejects them and the teacher can approve by hand.
-- The build is layered: a web app first, a mobile app only if the web demo works.
-- First iteration: Android phones made in 2020 or later, any brand, running Chrome. About 20% of the class uses iOS, which comes in a later iteration.
-- Time target: the teacher starts about 40 minutes into a 50-55 minute class, and the check-in finishes within 5-6 minutes.
+- The room is 20 **metres** (not feet). 120 students in 400 m2 is realistic, and range is a real problem, so the echo cascade is justified.
+- No room hardware: no speaker, screen or beacon installed in the room.
+- The teacher's ordinary phone speaker plays the first signal. The phone stays with the teacher and only starts the process. It is never passed around.
+- Cheating is expected: fake GPS, forwarded codes, a friend inside relaying to a friend outside.
+- A student using another student's phone or account is **out of scope for now**.
+- Build is layered: web app first, mobile app only if the web demo succeeds.
 
-## Core idea
+## 2. Core idea
 
-Sound stays inside a room, so hearing a fresh signal is the proof of presence. Phones pass a signal to each other as near-inaudible tones (18-20 kHz), and the server decides who is present.
+Sound stays inside a room, so hearing a fresh signal is the proof of presence. Phones pass the signal on as near-inaudible tones, and the server decides who is present.
 
-Location itself cannot be the secret. Everyone knows where the classroom is, phone GPS is typically off by 5-10 m even outdoors and worse indoors, and a web app cannot prove its GPS reading is real. So the design splits the job into three parts:
+Location (GPS) cannot be the secret: everyone knows where the room is, phone GPS is typically 5-10 m off and worse indoors, and a web app cannot prove its GPS reading is real. GPS is only a weak secondary check.
 
-- **Student credential:** one unique code per student (70-120), tied to that student's device.
-- **Wave key:** a short-lived key minted by the server for each wave (K0, K1, K2 and so on). A phone gets the next key only after proving it heard the previous one.
+Three parts:
+
+- **Student credential:** one unique identity per student (70-120), tied to the student's device.
+- **Wave key:** a short-lived key minted by the server per wave (K0, K1, K2, ...). A phone gets the next key only after proving it heard the previous one. The "master key" is never typed; it is this chain.
 - **Room channel:** sound carries each key from phones to nearby phones. Anyone outside the walls does not hear it.
 
-The master key is therefore never typed and never derived from coordinates. It is the chain K0 → K1 → K2, and each link is released only to a phone that heard the one before.
+## 3. Decisions (confirmed by the owner)
 
-## Signal design
+| Topic | Decision | Effect |
+| --- | --- | --- |
+| Phones and browsers | Iteration 1: Android, Chrome, phones from 2020 or later, any brand. About 20% of the class uses iOS, which comes in a later iteration | iOS is not part of the Layer 1 test |
+| Band | Lower band is acceptable and preferred if it works | Layer 1 compares 18-20 kHz with a lower band (e.g. 15-17 kHz) and picks the more reliable one |
+| Stored data | GPS reading, IP address, device ID, kept as a secondary verification layer | Browsers cannot read a hardware device ID. "Device ID" = random ID + key pair created on first use and stored in the browser; clearing site data resets it |
+| Retention | Stored data lives for 1 day. Students raise any query that same day; after that it lapses and attendance is locked | Needs a daily expiry job, a same-day query path into the review queue, and a lock on attendance records. Teacher overrides must also happen that day |
+| Teacher override | Only for the review queue (unsure cases) | The teacher cannot change marks outside the queue |
+| Time budget | Class is 50-55 min. Teacher starts about minute 40. Check-in must finish in 5-6 min | Rough on paper: ~5-6 s per wave, a handful of waves ~30 s, ID round ~2 min for 120. Measure in Layers 2 and 3 |
+| Hosting | Free service such as Render, Netlify or Vercel | Layer 1 needs only static HTTPS hosting. From Layer 2 the server must stay awake and hold live connections for 5-6 min, so check each free tier's idle sleep and connection limits first |
+| Student notice | Short in-app notice shown before first check-in and confirmed with a tap (the Join button, which browsers require anyway for mic access), plus one teacher announcement | Notice states what is collected, why, that it is deleted after 1 day, and how to raise a query that day |
+| Student identity | College Google account ending nitjsr.ac.in, one account per student. Example: `2023ugcs059@nitjsr.ac.in` encodes batch, programme, branch, roll number | Google sign-in limited to the nitjsr.ac.in domain, verified on the server. Batch/branch/roll are read from the address for display and grouping only; the roster decides class membership |
+| Teacher phone | Ordinary phone speaker plays K0 | Counts as no room hardware |
 
-Each key travels as a short sequence of tones using frequency-shift keying (FSK). The values below are starting points to be tuned in Layer 1, not final numbers.
+### Assumptions I made (not yet confirmed, change if wrong)
 
-| Setting       | Starting value                                                                      | Reason                                                                        |
-| ------------- | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| Tone range    | 18.0-19.8 kHz                                                                       | Mostly inaudible to adults, inside what 44.1/48 kHz phone audio can represent |
-| Tones         | 17, about 110 Hz apart: 1 start marker + 16 data tones                              | Wide spacing limits leakage between neighbouring tones                        |
-| Symbol length | 120 ms                                                                              | Long enough to ride through echo in a hard-walled room                        |
-| Frame         | Start marker (2 symbols) + 7 data symbols + 2 check symbols, about 1.3 s            | 7 data symbols in base 15 give about 170 million distinct values              |
-| Coding        | Two consecutive tones are never the same                                            | Symbol boundaries come from tone changes, so no silent gaps are needed        |
-| Receiver      | AudioWorklet running Goertzel filters on the 17 tones                               | Cheaper than a full FFT and runs off the main thread                          |
-| Detection     | A tone counts only if it stands about 9 dB above the median of the 17               | Adapts to room noise instead of using a fixed level                           |
-| Capture       | getUserMedia, mono, with echoCancellation, noiseSuppression and autoGainControl off | Phone speech filters would otherwise erase the tones                          |
-| Transmit      | One OscillatorNode per symbol with a 6 ms fade in and out                           | Avoids audible clicks at symbol changes                                       |
+- Roster and final attendance results are kept for the term; only GPS/IP/device data expires after 1 day.
+- Teacher's phone sits at the front of the room. Whether it can sit in the centre is still open.
+- Layer 1 pass target of 95% of frames decoded is a proposal.
 
-Hardware reality to plan for:
+## 4. Roster
 
-- Many phone speakers and microphones fall off above 17-18 kHz. A frequency sweep in Layer 1 measures this per phone model.
-- A lower band is acceptable. Layer 1 also sweeps a lower band (for example 15-17 kHz) and uses it when it decodes more reliably. It is partly audible to younger students, so keep the volume low and the frames short.
-- iOS Safari may ignore the processing switches. The app reads and logs the microphone's actual settings.
-- The audio sample rate must be at least 44.1 kHz; the app refuses to start below that.
+The roster is the list of college emails allowed to check in to this class (one row per enrolled student, 70-120 rows). It decides who can check in and who counts as absent (on the roster but not marked present).
+
+- Source: a CSV the teacher uploads, with a paste-the-list box as the same feature. For the first pilot, paste 10-20 volunteer emails into the same box.
+- One required column: `email`. Name and section are optional.
+- On upload the server lowercases emails, removes duplicates, rejects anything not ending in nitjsr.ac.in, and flags addresses that do not match the `2023ugcs059` pattern for teacher review.
+- Teacher can add or remove rows afterwards (e.g. late joiner).
+- Not needed for Layer 1. First needed in Layer 2.
+
+## 5. Signal design (starting values, tune in Layer 1)
+
+Frequency-shift keying (FSK) with near-ultrasonic tones.
+
+| Setting | Starting value | Reason |
+| --- | --- | --- |
+| Tone range | 18.0-19.8 kHz (also test a lower band, e.g. 15-17 kHz) | Mostly inaudible to adults; within what 44.1/48 kHz audio can represent |
+| Tones | 17, about 110 Hz apart: 1 start marker + 16 data tones | Wide spacing limits leakage between neighbours |
+| Symbol length | 120 ms | Rides through echo in a hard-walled room |
+| Frame | Start marker (2 symbols) + 7 data symbols + 2 check symbols, about 1.3 s | 7 data symbols in base 15 gives ~170 million values |
+| Coding | Two consecutive tones are never the same | Boundaries come from tone changes, no silent gaps |
+| Receiver | AudioWorklet running Goertzel filters on the 17 tones | Cheaper than a full FFT, off the main thread |
+| Detection | A tone counts only if ~9 dB above the median of the 17 | Adapts to room noise; no fixed level |
+| Capture | getUserMedia, mono, echoCancellation / noiseSuppression / autoGainControl all off | Phone speech filters would erase the tones |
+| Transmit | One OscillatorNode per symbol with ~6 ms fade in/out | Avoids audible clicks |
+
+Hardware reality:
+
+- Many phone speakers and mics roll off above 17-18 kHz. A frequency sweep in Layer 1 measures this per phone model.
+- A lower band is partly audible to younger students: keep volume low and frames short.
+- Refuse to start if the audio sample rate is below 44.1 kHz. Log the real applied mic settings.
 - The tab must stay in the foreground with the screen on (Screen Wake Lock), or the browser pauses audio.
+- Mic and audio need a user gesture (the Join button) and HTTPS.
+- Android output latency varies by 50-200 ms: use `osc.start(time)` scheduling, and do not add random backoff (identical synchronised signals reinforce each other).
 
-## Cascade logic
+## 6. Cascade logic
 
-&#91;embedded content: key cascade · the room, then one phone's loop\]
-
-A phone that hears a valid key reports it to the server, receives the next key, plays it, and then stays quiet for that session.
-
-1. The teacher taps Start. The server creates K0 and the teacher's phone plays it repeatedly.
+1. Teacher taps Start. Server creates K0. Teacher's phone plays K0 repeatedly.
 2. A student phone that decodes Kn sends its credential, Kn and a device signature to the server.
-3. The server checks that Kn is valid, fresh and unused by that student, marks the student as heard in wave n+1, and returns K(n+1).
-4. The phone plays K(n+1) two or three times, then stays muted so signals cannot loop.
-5. Phones in the same wave play the identical signal, so their sounds add up instead of colliding.
+3. Server checks Kn is valid, fresh and unused by that student, marks the student heard in wave n+1, returns K(n+1).
+4. The phone plays K(n+1) two or three times, then stays muted for the session (no feedback loops).
+5. Phones in the same wave play the identical signal, so sounds add instead of colliding.
 6. A phone that hears a valid key from any wave joins at the lowest wave it heard.
 7. The cascade ends when a wave adds no new students or the check-in window closes.
 
-Each wave costs one frame (about 1.3 s) plus a server round trip, so a 20 m room should need only a handful of waves. Layer 2 measures the real count.
+Phone state machine: Listening -> Decoding -> Server check -> Transmitting -> Muted. Rejected or expired keys go back to Listening.
 
-## Anti-cheat: the ID round
+The server mints keys; phones never invent them. The wave number is a coarse distance-from-teacher signal.
 
-The cascade proves a phone heard some key, but once decoded a key is only data: a friend inside the room could text it to someone outside. The ID round closes that gap by proving each phone was heard by its neighbours, not just that it heard.
+## 7. Anti-cheat: the ID round
+
+The cascade proves a phone heard some key, but a decoded key is just data and can be texted to someone outside. The ID round proves each phone was heard by its neighbours.
 
 1. After the waves finish, the server gives every student a time slot.
-2. In its own slot, a phone sends a short ID signal. In every other slot it listens.
+2. In its own slot a phone sends a short ID signal. In every other slot it listens.
 3. Each phone reports which IDs it heard.
-4. The server marks a student present only if enough different neighbours heard them. The threshold is set from Layer 2 test data.
+4. Server marks a student present only if enough different neighbours heard them (threshold set from Layer 2 test data).
 
-A student at home or in the corridor has no neighbours in the room to hear them, so a forwarded key alone does not pass.
+Slot length is open until Layer 1 shows the shortest reliable frame (1 s per slot = 2 min for 120). Option to test: slot position identifies the student so the burst can be a plain tone; this needs phone clocks synced to the server within tens of milliseconds.
 
-Slot length is open until Layer 1 shows the shortest frame that decodes reliably: at 1 s per slot, 120 students take 2 minutes. One option to test is letting the slot position itself identify the student, so the burst can be a plain tone. That needs every phone's clock synchronised with the server to within tens of milliseconds.
+Secondary signals (never decide alone): GPS near expected area, same public IP / Wi-Fi, submission time inside key lifetime, wave number.
 
-Other signals add confidence but never decide alone: GPS near the expected area, the same public IP or Wi-Fi network, submission time inside the key's lifetime, and the wave number.
+Policy: strict by default. Borderline cases go to a review queue where the teacher approves or rejects by hand, on the same day.
 
-The system is strict by default. Anything borderline goes into a review list where the teacher approves or rejects each student by hand.
+## 8. Layers and gates
 
-## Layered build plan
+Each layer is built only after the previous gate passes.
 
-&#91;embedded content: build plan · 5 layers, each with a gate\]
+| Layer | Scope | Gate |
+| --- | --- | --- |
+| 1 Physical layer | Web app sends and hears tones | Frames decode at 1 m, 6 m and the far corner. Proposed target: 95% of frames, on phones students actually use |
+| 2 Cascade | Server keys, waves, Google sign-in, roster | A small rehearsal reaches every phone. Waves needed and time per wave are measured |
+| 3 ID round and scoring | Time slots, neighbour reports, review queue | Phones outside the room are rejected; inside phones accepted or queued for teacher review |
+| 4 Class pilot | 70-120 students in the real room | Attendance matches a manual roll call; false accepts and false rejects counted |
+| 5 Mobile app | Native audio, background operation, more functions | Decide after Layer 4 |
 
-Each layer is built only after the previous gate passes. The targets are proposals for you to confirm or change.
+## 9. Risks and honest limits
 
-## Risks and honest limits
+| Risk | Effect | Mitigation |
+| --- | --- | --- |
+| Phones that cannot play or hear 18+ kHz | Those students fail at the physical layer | Per-model sweep in Layer 1; lower band; teacher approval fallback |
+| 100+ phones sounding in a hard-walled room | Garbled symbols | Identical signals per wave, long symbols, measure rather than assume |
+| Key forwarded by text message | Remote student obtains a key | Short key lifetime and the ID round |
+| GPS spoofing | Fake location | GPS is a weak extra check only |
+| Screen locks / tab backgrounded | Audio pauses | Wake Lock, foreground tab |
+| Student outside near an open door | Might hear tones | ID round, strict threshold, teacher review |
+| Younger students hearing the signal | Annoyance | Highest working band at low volume, short frames |
+| Free hosting sleeps or limits connections | Check-in fails mid-class | Check free-tier limits before Layer 2 |
+| Accomplice physically in the room | Gets through | Out of scope for now; made visible to teacher, not impossible |
+| iOS | Not covered in iteration 1 | Later iteration |
 
-A cheater with a physically present accomplice can still get through: the accomplice's phone is really in the room. The design makes this costly and visible to the teacher, not impossible. Other risks:
+## 10. Open items
 
-| Risk                                                                                      | Effect                                    | Mitigation                                                                             |
-| ----------------------------------------------------------------------------------------- | ----------------------------------------- | -------------------------------------------------------------------------------------- |
-| Phones that cannot play or hear 18+ kHz                                                   | Those students fail at the physical layer | Per-model sweep test in Layer 1; fall back to a lower band or teacher approval         |
-| iOS Safari ignores echo and noise settings, or lowers volume while the microphone is open | Tones muted or distorted                  | Log the real microphone settings; test on iPhones students actually own                |
-| 100+ phones sounding in a hard-walled room                                                | Garbled symbols                           | Phones in one wave send the identical signal; long symbols; measure rather than assume |
-| Key forwarded by text message                                                             | Remote student obtains a key              | Short key lifetime and the ID round                                                    |
-| GPS spoofing                                                                              | Fake location                             | GPS is a weak extra check, never the decision                                          |
-| Screen locks or tab goes to background                                                    | Audio pauses                              | Wake Lock and a foreground tab; iOS has no workaround                                  |
-| Student outside near an open door                                                         | Might hear the tones                      | ID round and strict threshold; teacher review                                          |
-| Younger students hearing 18 kHz                                                           | Annoyance                                 | Highest working band at low volume; short frames                                       |
+- Can the teacher's phone sit in the centre of the room, or must it stay at the front?
+- Which Google sign-in setup the college domain allows (confirm it works with a domain-restricted login).
+- Which free host to use for Layer 2 (decide after checking idle sleep and connection limits).
+- Confirm the assumptions listed in section 3.
 
-## Decisions
+## 11. Out of scope (for now)
 
-| Question            | Decision                                                                                                                            | Effect on the plan                                                                                                                                                                                                                                                                  |
-| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Phones and browsers | Android, Chrome, phones from 2020 onward, any brand; about 20% of the class uses iOS                                                | Iteration 1 targets Android with Chrome. iOS is a later iteration and is not part of the Layer 1 test.                                                                                                                                                                              |
-| Band                | A lower band is acceptable, and preferred if it works                                                                               | Layer 1 compares the 18-20 kHz band with a lower band and picks the one that decodes most reliably on 2020+ phones.                                                                                                                                                                 |
-| Stored data         | GPS reading, IP address and device ID, kept as a secondary check                                                                    | Browsers cannot read a hardware device ID. The "device ID" is a random ID plus a key pair created on first use and stored in the browser, so clearing site data resets it.                                                                                                          |
-| Retention           | Stored data lives for one day. A student with a problem raises a query that same day; after that it lapses and attendance is locked | The server needs a daily expiry job, a same-day query path into the teacher's review queue, and a lock on attendance records once the day ends. Teacher overrides therefore also have to happen that day.                                                                           |
-| Teacher override    | Only for the review queue                                                                                                           | The teacher cannot change a student's mark outside the queue of unsure cases.                                                                                                                                                                                                       |
-| Time budget         | Teacher starts at about minute 40; done in 5-6 minutes                                                                              | On paper each wave takes about 5-6 s (frame repeated 2-3 times plus a server trip), so a handful of waves is about 30 s, and the ID round at 1 s per student is about 2 min for 120. These are rough and get measured in Layers 2 and 3.                                            |
-| Hosting             | A free service such as Render, Netlify or Vercel                                                                                    | Layer 1 needs only static hosting over HTTPS. From Layer 2 the server must stay awake and handle live connections for 5-6 minutes, so check each free tier's idle sleep and connection limits before choosing.                                                                      |
-| Student notice      | A short notice in the app, shown before the first check-in and confirmed with a tap, plus one announcement by the teacher           | The Join button, which browsers require before the microphone can be used, also confirms the notice. The text says what is collected (GPS reading, IP address, device ID), why (a backup check on attendance), that it is deleted after one day, and how to raise a query that day. |
+- Student using another student's phone or account.
+- iOS and other browsers.
+- Native mobile app (Layer 5).
+- Any extra room hardware.

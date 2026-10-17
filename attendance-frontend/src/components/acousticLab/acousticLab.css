@@ -1,0 +1,46 @@
+.acoustic-lab {
+  box-sizing: border-box;
+  min-height: 100vh;
+  max-width: 940px;
+  margin: 0 auto;
+  padding: 40px 24px 64px;
+  color: #172033;
+}
+
+.acoustic-lab--loading { display: grid; place-items: center; }
+.acoustic-lab__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
+.acoustic-lab__header h1 { margin: 4px 0 8px; }
+.acoustic-lab__header p { margin: 0; color: #586174; }
+.acoustic-lab__eyebrow { color: #2865d7 !important; font-size: 0.8rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.acoustic-lab__back, .acoustic-lab__controls button { border: 0; border-radius: 8px; cursor: pointer; font: inherit; font-weight: 700; padding: 11px 16px; }
+.acoustic-lab__back { background: #e8edf7; color: #24324a; }
+.acoustic-lab__notice, .acoustic-lab__panel { margin-top: 24px; border: 1px solid #d8e0ed; border-radius: 12px; background: #fff; padding: 20px; }
+.acoustic-lab__notice { border-left: 4px solid #e7a520; background: #fffaf0; }
+.acoustic-lab__notice h2, .acoustic-lab__panel h2 { margin: 0 0 8px; font-size: 1.1rem; }
+.acoustic-lab__notice p, .acoustic-lab__panel p { line-height: 1.55; margin: 0; }
+.acoustic-lab__controls { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
+.acoustic-lab__controls button { background: #2865d7; color: #fff; }
+.acoustic-lab__controls button:disabled { cursor: wait; opacity: 0.65; }
+.acoustic-lab__controls .acoustic-lab__secondary { background: #e8edf7; color: #24324a; }
+.acoustic-lab__error { margin-top: 20px; border-radius: 8px; background: #fee9e7; color: #992015; padding: 12px; }
+.acoustic-lab__device-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin: 0; }
+.acoustic-lab__device-grid div { border-radius: 8px; background: #f4f7fb; padding: 12px; }
+.acoustic-lab__device-grid dt { color: #586174; font-size: 0.85rem; }
+.acoustic-lab__device-grid dd { font-weight: 700; margin: 5px 0 0; }
+.acoustic-lab__baseline { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+.acoustic-lab__baseline span { border-radius: 999px; background: #edf2fa; padding: 7px 10px; font-size: 0.9rem; }
+.acoustic-lab__table-wrap { margin-top: 16px; overflow-x: auto; }
+.acoustic-lab table { border-collapse: collapse; min-width: 560px; width: 100%; }
+.acoustic-lab th, .acoustic-lab td { border-bottom: 1px solid #d8e0ed; padding: 12px; text-align: left; }
+.acoustic-lab th { color: #586174; font-size: 0.85rem; }
+.acoustic-lab__verdict { border-radius: 999px; display: inline-block; font-size: 0.86rem; font-weight: 700; padding: 5px 9px; }
+.acoustic-lab__verdict--strong { background: #dff5e8; color: #14643a; }
+.acoustic-lab__verdict--tentative { background: #fff0ca; color: #785000; }
+.acoustic-lab__verdict--weak { background: #fee6e2; color: #9b281b; }
+.acoustic-lab__recommendation { margin-top: 16px !important; font-weight: 700; }
+
+@media (max-width: 640px) {
+  .acoustic-lab { padding: 24px 16px 48px; }
+  .acoustic-lab__header { flex-direction: column; }
+  .acoustic-lab__device-grid { grid-template-columns: 1fr; }
+}

@@ -18,7 +18,7 @@ const RP_ID = process.env.RP_ID || "attendance-frontend-sage.vercel.app";
 
 // 📌 Traditional Registration (Email + Password)
 exports.registerUser = catchAsyncError(async (req, res, next) => {
-    const { name, email, password, role } = req.body;
+    const { name, email, password } = req.body;
 
     if (!name || !email || !password) {
         return next(new ErrorHandler("Please enter all details", 400));
@@ -34,7 +34,9 @@ exports.registerUser = catchAsyncError(async (req, res, next) => {
         name,
         email,
         password,
-        role,
+        // Public registration can never create a teacher account. Teacher access
+        // is provisioned through verified Google Workspace sign-in instead.
+        role: "student",
     });
 
     sendToken(user, 201, res);

@@ -14,12 +14,31 @@ const userSchema = new mongoose.Schema({
     },
     password: {
         type: String,
-        required: true,
+        required: function () {
+            return !this.googleSubject;
+        },
+        select: false,
     },
     role: {
         type: String,
         enum: ["student", "teacher"],
         default: "student",
+    },
+    authProvider: {
+        type: String,
+        enum: ["password", "google"],
+        default: "password",
+    },
+    googleSubject: {
+        type: String,
+        unique: true,
+        sparse: true,
+    },
+    deviceBinding: {
+        fingerprint: String,
+        publicKeyJwk: mongoose.Schema.Types.Mixed,
+        approvedAt: Date,
+        lastSeenAt: Date,
     },
     passKey: {
         id: String,
@@ -33,7 +52,7 @@ const userSchema = new mongoose.Schema({
 
 // ✅ Hash password before saving
 userSchema.pre("save", async function (next) {
-    if (!this.isModified("password")) return next();
+    if (!this.isModified("password") || !this.password) return next();
     this.password = await bcrypt.hash(this.password, 10);
     next();
 });

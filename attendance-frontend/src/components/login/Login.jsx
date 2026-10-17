@@ -1,8 +1,10 @@
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./Login.css";
 import img1 from "../../assets/logo.png"
 import SERVER_URL from "../../config/api";
+import GoogleSignInButton from "./GoogleSignInButton";
+import { getOrCreateDevicePublicKey } from "../../utils/deviceKey";
 
 const Login = () => {
     const navigate = useNavigate();
@@ -11,6 +13,42 @@ const Login = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState("");
     const [showPassword, setShowPassword] = useState(false);
+
+    const handleGoogleCredential = useCallback(async ({ credential }) => {
+        setError("");
+        setIsLoading(true);
+
+        try {
+            const response = await fetch(`${SERVER_URL}/auth/google`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                body: JSON.stringify({ credential }),
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message || "Google sign-in was not accepted.");
+
+            let deviceStatus = "approved";
+            if (data.user.role === "student") {
+                const publicKeyJwk = await getOrCreateDevicePublicKey();
+                const bindingResponse = await fetch(`${SERVER_URL}/device-bindings/claim`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    credentials: "include",
+                    body: JSON.stringify({ publicKeyJwk }),
+                });
+                const bindingData = await bindingResponse.json();
+                if (!bindingResponse.ok) throw new Error(bindingData.message || "Could not bind this browser to your attendance account.");
+                deviceStatus = bindingData.status;
+            }
+
+            navigate(data.user.role === "teacher" ? "/teacher-dashboard" : "/student-dashboard", { state: { deviceStatus } });
+        } catch (requestError) {
+            setError(requestError.message || "Google sign-in failed. Please try again.");
+        } finally {
+            setIsLoading(false);
+        }
+    }, [navigate]);
 
     const handleLogin = async (e) => {
         e.preventDefault();
@@ -46,6 +84,16 @@ const Login = () => {
                 </div>
 
                 <form onSubmit={handleLogin}>
+                    <div className="google-login-block">
+                        <p>Use your NIT Jamshedpur college account</p>
+                        <GoogleSignInButton
+                            onCredential={handleGoogleCredential}
+                            onLoadError={setError}
+                            disabled={isLoading}
+                        />
+                    </div>
+
+                    <div className="login-divider"><span>Legacy development sign-in</span></div>
                     <div className="input-group">
                         <label htmlFor="email">Email</label>
                         <input
@@ -95,10 +143,7 @@ const Login = () => {
                 </form>
 
                 <div className="register-prompt">
-                    Don't have an account?{" "}
-                    <button type="button" onClick={() => navigate("/register")}>
-                        Create Account
-                    </button>
+                    Need access? Ask your teacher to add your college email to the class roster.
                 </div>
             </div>
         </div>

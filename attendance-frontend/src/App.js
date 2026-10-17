@@ -10,6 +10,7 @@ import TeacherDashboard from './components/teacher/teacherDashboard';
 import AddRoom from './components/teacher/addRoom/addRoom';
 import TakeAttendance from './components/teacher/takeAttendance/takeAttendance';
 import ClassManagement from './components/teacher/classManagement';
+import AcousticLab from './components/acousticLab/AcousticLab';
 export const usercontext = createContext(null);
 function App() {
   return (
@@ -21,6 +22,7 @@ function App() {
             <Route path='/admin/addRoom' element={<AddRoom/>}></Route>
             <Route path='/admin/takeAttendance' element={<TakeAttendance/>}></Route>
             <Route path='/teacher/classes' element={<ClassManagement/>}></Route>
+            <Route path='/acoustic-lab' element={<AcousticLab/>}></Route>
             <Route path={'/markAttendance'} element={<Mark/>}></Route>
             <Route path={'/student-dashboard'} element={<StudentDashboard/>}></Route>
             <Route path={'/teacher-dashboard'} element={<TeacherDashboard/>}></Route>

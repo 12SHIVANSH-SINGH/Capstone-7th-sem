@@ -1,7 +1,12 @@
-# Environment variables
+# Local environment files and secrets. Commit only explicitly safe templates.
 .env
 .env.*
-!.env.example
+*.env
+*.env.*
+!*.env.example
+**/config.env
+**/config.env.*
+!**/config.env.example
 
 # LiteLLM Configuration (contains sensitive keys)
 litellm_config.yaml
@@ -10,7 +15,6 @@ litellm_config.yaml
 .venv/
 env/
 venv/
-
 # Python cache / bytecode
 __pycache__/
 *.py[cod]
@@ -23,3 +27,4 @@ Thumbs.db
 
 
 .provider.env
+attendance-backend/config/config.env

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
 import SERVER_URL from "../../config/api";
 import "./studentDashboard.css";
@@ -7,15 +7,19 @@ import "./studentDashboard.css";
 
 const StudentDashboard = () => {
     const navigate = useNavigate();
+    const location = useLocation();
     const [studentName, setStudentName] = useState("Loading...");
 
     const [isAuthorized, setIsAuthorized] = useState(false);
+    const [deviceStatus, setDeviceStatus] = useState(location.state?.deviceStatus || "checking");
 
     useEffect(() => {
         const fetchUser = async () => {
             try {
                 const response = await axios.get(`${SERVER_URL}/islogin`, { withCredentials: true });
                 setStudentName(response.data.user.name || response.data.user.email.split('@')[0]);
+                const bindingResponse = await axios.get(`${SERVER_URL}/device-bindings/status`, { withCredentials: true });
+                setDeviceStatus(bindingResponse.data.status);
                 setIsAuthorized(true);
             } catch (error) {
                 console.error("Failed to fetch user:", error);
@@ -71,11 +75,23 @@ const StudentDashboard = () => {
                 <div className="quick-actions">
                     <div className="attendance-card">
                         <h2>Attendance</h2>
+                        <p className={`device-status ${deviceStatus}`}>
+                            {deviceStatus === "approved" && "✓ This browser is approved for attendance"}
+                            {deviceStatus === "review" && "⌛ This browser is awaiting teacher review"}
+                            {deviceStatus === "unbound" && "⚠ Set up Google sign-in to bind this browser"}
+                            {deviceStatus === "checking" && "Checking attendance device…"}
+                        </p>
                         <button 
                             className="mark-attendance-btn"
                             onClick={() => navigate("/markAttendance")}
                         >
                             📅 Mark Attendance
+                        </button>
+                        <button
+                            className="mark-attendance-btn"
+                            onClick={() => navigate("/acoustic-lab")}
+                        >
+                            🔊 Test phone audio
                         </button>
                     </div>
                 </div>

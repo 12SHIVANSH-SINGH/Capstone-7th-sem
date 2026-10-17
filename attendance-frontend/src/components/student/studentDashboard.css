@@ -148,6 +148,18 @@
     color: #742a2a;
 }
 
+.device-status {
+    border-radius: 8px;
+    font-size: 0.9rem;
+    margin: 0.75rem 0 1rem;
+    padding: 0.7rem;
+}
+
+.device-status.approved { background: #e6f5e9; color: #1c6730; }
+.device-status.review { background: #fff4dc; color: #815c10; }
+.device-status.unbound { background: #ffe9e8; color: #8a241e; }
+.device-status.checking { background: #edf3f5; color: #496373; }
+
 @media (max-width: 768px) {
     .dashboard-main {
         grid-template-columns: 1fr;

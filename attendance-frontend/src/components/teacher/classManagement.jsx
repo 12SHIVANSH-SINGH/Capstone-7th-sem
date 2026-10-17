@@ -16,18 +16,21 @@ const ClassManagement = () => {
   const [rosterText, setRosterText] = useState("");
   const [preview, setPreview] = useState(null);
   const [roster, setRoster] = useState([]);
+  const [reviews, setReviews] = useState([]);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   const loadData = useCallback(async () => {
-    const [classesResponse, roomsResponse] = await Promise.all([
+    const [classesResponse, roomsResponse, reviewsResponse] = await Promise.all([
       axios.get(`${SERVER_URL}/classes`, requestConfig),
       axios.get(`${SERVER_URL}/rooms`, requestConfig),
+      axios.get(`${SERVER_URL}/device-reviews`, requestConfig),
     ]);
     setClasses(classesResponse.data.classes);
     setRooms(roomsResponse.data.rooms);
+    setReviews(reviewsResponse.data.reviews);
   }, []);
 
   useEffect(() => {
@@ -146,6 +149,20 @@ const ClassManagement = () => {
     reader.readAsText(file);
   };
 
+  const decideReview = async (reviewId, decision) => {
+    setSaving(true);
+    setError("");
+    try {
+      await axios.post(`${SERVER_URL}/device-reviews/${reviewId}`, { decision }, requestConfig);
+      setMessage(`Device ${decision}.`);
+      await loadData();
+    } catch (requestError) {
+      showRequestError(requestError, "Could not update this device review.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (loading) return <div className="class-page-loading">Loading class management…</div>;
 
   return (
@@ -217,6 +234,26 @@ const ClassManagement = () => {
           )}
         </section>
       )}
+
+      <section className="class-management__card class-management__reviews">
+        <div className="class-management__roster-heading">
+          <div><p className="class-management__eyebrow">Attendance safety</p><h2>New-device review queue</h2></div>
+          <span>{reviews.length} pending</span>
+        </div>
+        {reviews.length === 0 ? <p className="class-management__empty">No students are waiting for a device change review.</p> : (
+          <div className="class-management__review-list">
+            {reviews.map((review) => (
+              <article key={review._id} className="class-management__review">
+                <div><strong>{review.student?.name || "Student"}</strong><span>{review.student?.email}</span></div>
+                <div className="class-management__review-actions">
+                  <button onClick={() => decideReview(review._id, "approved")} disabled={saving}>Approve device</button>
+                  <button className="class-management__reject" onClick={() => decideReview(review._id, "rejected")} disabled={saving}>Reject</button>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
     </main>
   );
 };

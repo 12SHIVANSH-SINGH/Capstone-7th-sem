@@ -84,6 +84,12 @@ const TeacherDashboard = () => {
                         >
                             ➕ Add New Room
                         </button>
+                        <button
+                            className="action-btn secondary"
+                            onClick={() => navigate("/acoustic-lab")}
+                        >
+                            🔊 Test Phone Audio
+                        </button>
                     </div>
                 </div>
 

@@ -7,22 +7,26 @@
   "type": "commonjs",
   "main": "backend/index.js",
   "scripts": {
+    "prestart": "node scripts/verify-node-version.js",
     "test": "node --test",
     "start": "node index.js"
   },
+  "engines": {
+    "node": ">=22 <26"
+  },
   "dependencies": {
-    "@simplewebauthn/server": "^13.1.1",
+    "@simplewebauthn/server": "^13.3.3",
     "bcrypt": "^5.1.1",
     "bcryptjs": "^2.4.3",
     "cookie-parser": "^1.4.7",
-    "cors": "^2.8.5",
+    "cors": "^2.8.6",
     "crypto": "^1.0.1",
-    "dotenv": "^16.4.7",
-    "express": "^4.21.2",
+    "dotenv": "^16.6.1",
+    "express": "^4.22.3",
     "geoip-lite": "^1.4.10",
     "google-auth-library": "^10.9.1",
-    "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.10.0",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^8.24.5",
     "node-cron": "^3.0.3",
     "validator": "^13.12.0"
   }

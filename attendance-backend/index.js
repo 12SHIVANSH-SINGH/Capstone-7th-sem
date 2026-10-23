@@ -1,10 +1,21 @@
 //------for port from env file--------
 const dotenv = require('dotenv');
-if (process.env.NODE_ENV !== "PRODUCTION") {
+// Only load the local file outside production, regardless of casing.
+if (String(process.env.NODE_ENV || "").toLowerCase() !== "production") {
     dotenv.config({ path: "./config/config.env" });
 }
 
 // Load environment values before importing routes/controllers that read them.
+const { assertSafeDevConfiguration } = require('./utils/devAuth');
+const { assertProductionEnv } = require('./utils/validateEnv');
+try {
+    assertProductionEnv();
+    assertSafeDevConfiguration();
+} catch (error) {
+    console.error(`Refusing to start: ${error.message}`);
+    process.exit(1);
+}
+
 const app = require('./app');
 const connectdatabase = require("./config/database");
 

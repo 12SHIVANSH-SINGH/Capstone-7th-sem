@@ -7,6 +7,7 @@ const Enrollment = require("../models/enrollmentModels");
 const DeviceBindingRequest = require("../models/deviceBindingRequestModels");
 const CourseClass = require("../models/classModels");
 const { fingerprintPublicKey } = require("../utils/deviceBinding");
+const { isDevAuthEnabled, isDevEmail } = require("../utils/devAuth");
 const {
   WORKSPACE_DOMAIN,
   normaliseEmail,
@@ -46,6 +47,9 @@ exports.googleSignIn = catchAsyncError(async (req, res, next) => {
   }
 
   const email = normaliseEmail(payload?.email);
+  if (isDevEmail(email)) {
+    return next(new ErrorHandler("Dev test identities cannot sign in with Google", 403));
+  }
   const workspaceAccount = Boolean(payload) && payload.hd === WORKSPACE_DOMAIN && isWorkspaceAccount(email);
   const testAccount = isTestStudent(email);
   if (!payload || !payload.email_verified || (!workspaceAccount && !testAccount)) {
@@ -98,6 +102,21 @@ exports.claimDeviceBinding = catchAsyncError(async (req, res, next) => {
   }
 
   const now = new Date();
+  // Dev personas are for fast two-phone testing; every browser they use is
+  // approved without a review. This branch only exists when dev auth is on and
+  // the account was created by the dev login route.
+  if (req.user.authProvider === "dev" && isDevAuthEnabled()) {
+    req.user.deviceBinding = {
+      fingerprint,
+      publicKeyJwk: req.body.publicKeyJwk,
+      approvedAt: now,
+      lastSeenAt: now,
+    };
+    req.user.markModified("deviceBinding");
+    await req.user.save();
+    return res.status(201).json({ success: true, status: "approved", devAutoApproved: true });
+  }
+
   if (!req.user.deviceBinding?.fingerprint) {
     req.user.deviceBinding = {
       fingerprint,

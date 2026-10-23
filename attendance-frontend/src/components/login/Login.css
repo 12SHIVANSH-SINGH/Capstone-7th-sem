@@ -163,6 +163,86 @@
 .login-card__help { margin-top: 22px; font-size: 13px; color: var(--text-faint); line-height: 1.55; }
 .login-foot { font-size: 12.5px; color: var(--text-faint); }
 
+/* Dev-only one-click identities. Rendered only by a development build. */
+.dev-login {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px dashed var(--border);
+  text-align: left;
+}
+
+.dev-login__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--slate-700);
+}
+
+.dev-login__hint {
+  margin-top: 6px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-faint);
+}
+
+.dev-login__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.dev-login__account {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--slate-50);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.dev-login__account:hover:not(:disabled) {
+  border-color: var(--indigo-300);
+  background: var(--indigo-50);
+}
+
+.dev-login__account:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.dev-login__identity {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.dev-login__identity strong { font-size: 13.5px; }
+.dev-login__identity small { font-size: 11.5px; color: var(--text-faint); }
+
+.dev-login__action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--indigo-600);
+}
+
+.dev-login__notice {
+  margin-top: 10px;
+  font-size: 12.5px;
+  color: var(--success);
+}
+
 @media (max-width: 860px) {
   .login-page { grid-template-columns: 1fr; }
   .login-brand { padding: 32px 24px; gap: 24px; }

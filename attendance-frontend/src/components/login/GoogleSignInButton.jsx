@@ -1,6 +1,13 @@
 import React, { useEffect, useRef } from "react";
 
-const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || "690196150991-39rsb4sffjvfl66jt22unp0uulhfgu5m.apps.googleusercontent.com";
+const GOOGLE_CLIENT_ID =
+  process.env.REACT_APP_GOOGLE_CLIENT_ID ||
+  // The local client id is a development convenience only. A production build
+  // must provide its own id so it cannot silently use another deployment's
+  // OAuth client.
+  (process.env.NODE_ENV === "production"
+    ? ""
+    : "690196150991-39rsb4sffjvfl66jt22unp0uulhfgu5m.apps.googleusercontent.com");
 const SCRIPT_ID = "google-identity-services";
 // College-only account chooser by default. Set REACT_APP_GOOGLE_HOSTED_DOMAIN
 // to an empty value while testing so test Gmail accounts stay selectable; the
@@ -12,6 +19,13 @@ const GoogleSignInButton = ({ onCredential, onLoadError, disabled }) => {
 
   useEffect(() => {
     let cancelled = false;
+
+    if (!GOOGLE_CLIENT_ID) {
+      onLoadError(
+        "Google sign-in is not configured for this build. Set REACT_APP_GOOGLE_CLIENT_ID before building the frontend."
+      );
+      return undefined;
+    }
 
     const renderButton = () => {
       if (cancelled || !window.google?.accounts?.id || !buttonRef.current) return;

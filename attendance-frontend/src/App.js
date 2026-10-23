@@ -9,6 +9,8 @@ import StudentDashboard from './components/student/studentDashboard';
 import TeacherDashboard from './components/teacher/teacherDashboard';
 import ClassManagement from './components/teacher/classManagement';
 import AcousticLab from './components/acousticLab/AcousticLab';
+import AcousticTransmit from './components/acousticLab/AcousticTransmit';
+import AcousticReceive from './components/acousticLab/AcousticReceive';
 
 function App() {
   return (
@@ -19,6 +21,8 @@ function App() {
           <Route path={'/login'} element={<Login />} />
           <Route path='/teacher/classes' element={<ClassManagement />} />
           <Route path='/acoustic-lab' element={<AcousticLab />} />
+          <Route path='/acoustic-tx' element={<AcousticTransmit />} />
+          <Route path='/acoustic-rx' element={<AcousticReceive />} />
           <Route path={'/student-dashboard'} element={<StudentDashboard />} />
           <Route path={'/teacher-dashboard'} element={<TeacherDashboard />} />
           <Route path='*' element={<NotFound />} />

@@ -23,13 +23,21 @@ const parseEmailList = (value) =>
     .map((entry) => entry.trim().toLowerCase())
     .filter(Boolean);
 
-const provisionedTeacherEmails = () => parseEmailList(process.env.TEACHER_EMAILS);
+// Dev personas live on @dev.invalid and must never be usable through Google,
+// even if someone pastes one into TEST_STUDENT_EMAILS by mistake.
+const isDevEmail = (email) => normaliseEmail(email).endsWith("@dev.invalid");
 
-const testStudentEmails = () => parseEmailList(process.env.TEST_STUDENT_EMAILS);
+const provisionedTeacherEmails = () =>
+  parseEmailList(process.env.TEACHER_EMAILS).filter((email) => !isDevEmail(email));
 
-const isProvisionedTeacher = (email) => provisionedTeacherEmails().includes(normaliseEmail(email));
+const testStudentEmails = () =>
+  parseEmailList(process.env.TEST_STUDENT_EMAILS).filter((email) => !isDevEmail(email));
 
-const isTestStudent = (email) => testStudentEmails().includes(normaliseEmail(email));
+const isProvisionedTeacher = (email) =>
+  !isDevEmail(email) && provisionedTeacherEmails().includes(normaliseEmail(email));
+
+const isTestStudent = (email) =>
+  !isDevEmail(email) && testStudentEmails().includes(normaliseEmail(email));
 
 const isWorkspaceAccount = (email) => normaliseEmail(email).endsWith(`@${WORKSPACE_DOMAIN}`);
 

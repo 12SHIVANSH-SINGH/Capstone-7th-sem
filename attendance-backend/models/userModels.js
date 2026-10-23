@@ -20,7 +20,7 @@ const userSchema = new mongoose.Schema({
     },
     authProvider: {
         type: String,
-        enum: ["google"],
+        enum: ["google", "dev"],
         default: "google",
     },
     googleSubject: {
@@ -39,7 +39,9 @@ const userSchema = new mongoose.Schema({
 // ✅ Generate JWT token
 userSchema.methods.getJWTtoken = function () {
     return jwt.sign({ id: this._id }, process.env.JWT_SECRET, {
-        expiresIn: process.env.JWT_EXPIRE,
+        // A token without an expiry would outlive its cookie and stay valid
+        // forever if it ever leaked. Default to the documented five days.
+        expiresIn: process.env.JWT_EXPIRE || "5d",
     });
 };
 

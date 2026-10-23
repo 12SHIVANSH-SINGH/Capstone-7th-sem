@@ -31,8 +31,10 @@ The full check-in loop is the next milestone; today the building blocks are in p
 - 🏫 **Classes, rooms and rosters** — teacher creates a class, sets its room, imports the student roster from CSV
 - 📱 **One device per student** — each browser binds to a private key; new devices wait in a teacher **review queue**
 - 🔊 **Phone sound lab** — measures a phone's audio path (sample rate, tone margins) before real check-ins
+- 📡 **Two-phone TX/RX link test** — one phone plays FSK frames, the other decodes them and both export a paired report
 - 🎛️ **Custom FSK tone codec** — 17 tones in the ~18–19.8 kHz band, 120 ms symbols, with automated tests; no audio libraries
 - 🎨 **Modern responsive UI** — a light indigo design system shared across both roles
+- 🧪 **Dev-only one-click sign-in** — passwordless test personas for two-phone work; impossible in production
 
 ## Status
 
@@ -40,8 +42,9 @@ The full check-in loop is the next milestone; today the building blocks are in p
 | --- | --- |
 | Remove legacy flows (GPS rooms, passkeys, codes) and rebuild the foundations | ✅ done |
 | New UI — design system + Home, Login, both dashboards, 404 | ✅ done |
-| Class management and sound lab get the new design, plus lab safety fixes | 🔜 next |
-| Phone-to-phone tone test at 1 m (first real presence proof) | 🔜 |
+| Class management and sound lab get the new design, plus lab safety fixes | ✅ done |
+| Two-phone TX/RX link pages and reports | ✅ built; real measurements pending |
+| Phone-to-phone tone test at 1 m (first real presence proof) | 🔜 owner runs M01 ⇄ M32 |
 | Full check-in flow for a live class | ⏳ |
 
 This is a prototype — not yet used for real attendance.
@@ -72,31 +75,38 @@ progress.md            Build log and current status
 mongod --dbpath ~/data/db-attendance-dev
 
 # 2. Backend — needs config/config.env (ask the owner; it's gitignored)
-cd attendance-backend && npm install && npm start        # :4000
+cd attendance-backend && npm install
+npm run dev                                              # :4000, dev personas on
 
 # 3. Frontend
 cd attendance-frontend && npm install && npm start       # :3000
 ```
 
-Open **http://localhost:3000**. Google sign-in is registered for this address only.
+Open **http://localhost:3000**. In development the login page also shows one-click test
+personas (`teacher`, `student1`…). Google sign-in is registered for
+`http://localhost:3000` only.
+
+Deploying it (one Render service + Atlas + Google OAuth, with verification and rollback):
+**[docs/deployment.md](docs/deployment.md)**.
 
 Testing on real phones (microphone needs HTTPS) and the full walkthrough: **[docs/getting-started.md](docs/getting-started.md)**.
 
 ## Tests
 
 ```bash
-cd attendance-backend && npm test               # 10 tests — sign-in policy, rosters, device binding
-cd attendance-frontend && npm run test:acoustic # 12 tests — the tone codec
+cd attendance-backend && npm test               # 27 tests — auth policy, env guard, rosters, binding, rate limit
+cd attendance-frontend && npm run test:acoustic # 48 tests — codec, lab, worklets, TX/RX link
 ```
 
 ## Documentation
 
 - 📄 **[docs/](docs/)** — what the project is, how to run it, how it works, troubleshooting
+- 🚀 **[docs/deployment.md](docs/deployment.md)** — Render + Atlas + Google OAuth runbook
 - 🗺️ [`plan.md`](plan.md) — signal design and staged engineering plan
 - 📈 [`progress.md`](progress.md) — what's built, measured results, what's next
 
 ## Notes
 
 - The tone band is under active tuning — the top tones measured weak on the oldest test phone, so the band may move lower before live testing.
-- Google sign-in is configured for `http://localhost:3000` during development; temporary Cloudflare tunnels are used for the *sound lab* on phones (no sign-in needed there).
-- The publicly deployed Vercel build is an older version, maintained separately from this repository.
+- Google sign-in is configured for `http://localhost:3000` during development; temporary Cloudflare tunnels are used for the *sound lab* and TX/RX pages on phones (no sign-in needed there).
+- The single-service production layout is documented in [docs/deployment.md](docs/deployment.md); the older standalone Vercel build is not part of this repo's workflow.

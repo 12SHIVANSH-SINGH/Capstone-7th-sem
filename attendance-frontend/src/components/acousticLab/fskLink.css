@@ -1,0 +1,317 @@
+/* Two-phone FSK link pages (Layer 1, slice 1.8) — Indigo UI kit layout. */
+
+.fsk-link {
+  min-height: 100vh;
+  padding: 24px clamp(14px, 4vw, 40px) 48px;
+  background:
+    radial-gradient(900px 340px at 50% -160px, rgba(99, 102, 241, 0.14), transparent 70%),
+    var(--bg);
+}
+
+.fsk-link__shell {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 0 auto;
+  max-width: 1040px;
+}
+
+.fsk-link__topbar {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.fsk-link__topbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fsk-link__hero {
+  align-items: flex-start;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  padding: 6px 2px 2px;
+}
+
+.fsk-link__hero h1 {
+  font-size: clamp(22px, 3.4vw, 30px);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+  margin: 4px 0 8px;
+}
+
+.fsk-link__hero p {
+  color: var(--text-soft);
+  font-size: 14px;
+  line-height: 1.6;
+  max-width: 66ch;
+}
+
+.fsk-link__eyebrow {
+  color: var(--indigo-600);
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.fsk-link__hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fsk-link__grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  align-items: start;
+}
+
+.fsk-link__form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.fsk-link__form-row {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.fsk-link__inline {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.fsk-link__inline .ui-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.fsk-link__run-input {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.fsk-link__range {
+  accent-color: var(--indigo-600);
+  width: 100%;
+}
+
+.fsk-link__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 2px;
+}
+
+.fsk-link__stats {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+}
+
+.fsk-link__stats > div {
+  background: var(--slate-50);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 12px;
+}
+
+.fsk-link__stats span {
+  color: var(--text-faint);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.fsk-link__stats strong {
+  color: var(--slate-900);
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.fsk-link__muted {
+  color: var(--text-soft);
+  font-size: 12.5px;
+  line-height: 1.55;
+  margin-top: 10px;
+}
+
+.fsk-link__copy-status {
+  color: var(--success);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.fsk-link__report-fallback p {
+  color: var(--text-soft);
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.fsk-link__report-fallback textarea {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  min-height: 220px;
+  padding: 10px;
+  width: 100%;
+}
+
+.fsk-link__alert {
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  font-size: 13.5px;
+  line-height: 1.5;
+  padding: 11px 14px;
+}
+
+.fsk-link__alert--success {
+  background: var(--success-soft);
+  border-color: var(--success-border);
+  color: #065f46;
+}
+
+.fsk-link__alert--error {
+  background: var(--danger-soft);
+  border-color: var(--danger-border);
+  color: #991b1b;
+}
+
+.fsk-link__level {
+  background: var(--indigo-50);
+  border: 1px solid var(--indigo-100);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+}
+
+.fsk-link__level-head {
+  align-items: center;
+  color: var(--slate-700);
+  display: flex;
+  font-size: 12.5px;
+  font-weight: 600;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.fsk-link__level-head strong {
+  color: var(--indigo-700);
+  font-variant-numeric: tabular-nums;
+}
+
+.fsk-link__level-track {
+  background: var(--indigo-100);
+  border-radius: 999px;
+  height: 8px;
+  overflow: hidden;
+}
+
+.fsk-link__level-track span {
+  background: linear-gradient(90deg, var(--indigo-400), var(--indigo-600));
+  border-radius: 999px;
+  display: block;
+  height: 100%;
+  transition: width 0.12s linear;
+}
+
+.fsk-link__last-frame {
+  align-items: center;
+  background: var(--success-soft);
+  border: 1px solid var(--success-border);
+  border-radius: var(--radius-sm);
+  color: #065f46;
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 13px;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 10px 12px;
+}
+
+.fsk-link__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.fsk-link__chips span {
+  background: var(--slate-100);
+  border: 1px solid var(--slate-200);
+  border-radius: 999px;
+  color: var(--slate-600);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11.5px;
+  padding: 3px 9px;
+}
+
+.fsk-link__steps {
+  color: var(--slate-700);
+  display: flex;
+  flex-direction: column;
+  font-size: 13.5px;
+  gap: 8px;
+  line-height: 1.55;
+  margin: 0;
+  padding-left: 20px;
+}
+
+.fsk-link__warning {
+  background: var(--warning-soft);
+  border: 1px solid var(--warning-border);
+  border-radius: var(--radius-sm);
+  color: #78350f;
+  font-size: 12.5px;
+  line-height: 1.55;
+  margin-top: 14px;
+  padding: 10px 12px;
+}
+
+.fsk-link__footer {
+  color: var(--text-faint);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 12px;
+  gap: 6px 18px;
+  justify-content: space-between;
+  padding: 4px 2px 0;
+}
+
+@media (max-width: 620px) {
+  .fsk-link {
+    padding-top: 18px;
+  }
+
+  .fsk-link__hero {
+    flex-direction: column;
+  }
+
+  .fsk-link__topbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .fsk-link__stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

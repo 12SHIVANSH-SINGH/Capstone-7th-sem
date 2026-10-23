@@ -8,6 +8,7 @@
   "main": "index.js",
   "scripts": {
     "prestart": "node scripts/verify-node-version.js",
+    "dev": "NODE_ENV=development DEV_AUTH_ENABLED=true node index.js",
     "test": "node --test",
     "start": "node index.js"
   },

@@ -142,7 +142,7 @@ const TeacherDashboard = () => {
                     )}
                 </Card>
 
-                <Card title="Quick actions" subtitle="The two things you’ll do most often.">
+                <Card title="Quick actions" subtitle="The things you’ll do most often.">
                     <div className="quick-actions">
                         <button type="button" className="quick-action" onClick={() => navigate("/teacher/classes")}>
                             <span className="quick-action__icon" aria-hidden="true">👥</span>
@@ -156,6 +156,13 @@ const TeacherDashboard = () => {
                             <span className="quick-action__body">
                                 <strong>Phone audio test</strong>
                                 <small>Check that a phone can play and hear the key tones</small>
+                            </span>
+                        </button>
+                        <button type="button" className="quick-action" onClick={() => navigate("/acoustic-tx")}>
+                            <span className="quick-action__icon" aria-hidden="true">📡</span>
+                            <span className="quick-action__body">
+                                <strong>Two-phone link test</strong>
+                                <small>Send frames on one phone and decode them on the other</small>
                             </span>
                         </button>
                     </div>

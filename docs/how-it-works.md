@@ -11,7 +11,11 @@ The frontend asks the backend for data; the backend talks to MongoDB and to Goog
 
 ## Signing in
 
-Sign-in uses Google only — no passwords. Only college accounts are accepted, plus a couple of test Gmail accounts during development.
+Sign-in uses Google only — no passwords. Only college accounts are accepted. While the
+pilot is being prepared, the server can also allow a few exact Gmail addresses listed in
+`TEST_STUDENT_EMAILS` (students) and `TEST_TEACHER_EMAILS` (teachers). Those lists live in
+the server environment, are validated at startup, and are never sent to the browser.
+There is no separate admin password: an env-listed Google account is the admin/test login.
 
 On a student's first sign-in, the website quietly creates a private key in that browser and the server remembers it. This is the **device binding**. If the same student signs in from a *different* phone, the new device lands in a **review queue** — the teacher approves or rejects it first. That is what stops one student checking in for a group of friends.
 

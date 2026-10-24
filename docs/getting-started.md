@@ -81,7 +81,7 @@ Real Google accounts:
 ## Run the tests
 
 ```bash
-cd attendance-backend && npm test               # 35 tests
+cd attendance-backend && npm test               # 39 tests
 cd attendance-frontend && npm run test:acoustic # 51 tests
 cd attendance-frontend && npm run test:checkin  # 7 tests
 ```

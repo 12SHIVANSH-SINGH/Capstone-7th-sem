@@ -9,11 +9,10 @@ const CourseClass = require("../models/classModels");
 const { fingerprintPublicKey } = require("../utils/deviceBinding");
 const { isDevAuthEnabled, isDevEmail } = require("../utils/devAuth");
 const {
-  WORKSPACE_DOMAIN,
   normaliseEmail,
-  isProvisionedTeacher,
+  isAllowedGoogleSignIn,
+  resolveSignInRole,
   isTestStudent,
-  isWorkspaceAccount,
   testStudentEmails,
 } = require("../utils/signInPolicy");
 
@@ -50,40 +49,55 @@ exports.googleSignIn = catchAsyncError(async (req, res, next) => {
   if (isDevEmail(email)) {
     return next(new ErrorHandler("Dev test identities cannot sign in with Google", 403));
   }
-  const workspaceAccount = Boolean(payload) && payload.hd === WORKSPACE_DOMAIN && isWorkspaceAccount(email);
-  const testAccount = isTestStudent(email);
-  if (!payload || !payload.email_verified || (!workspaceAccount && !testAccount)) {
+  if (
+    !payload ||
+    !isAllowedGoogleSignIn({
+      email,
+      emailVerified: Boolean(payload.email_verified),
+      hostedDomain: payload.hd,
+    })
+  ) {
     return next(new ErrorHandler("Sign in with your NIT Jamshedpur Google Workspace account", 403));
   }
 
   let user = await User.findOne({ email });
-  // Test students (TEST_STUDENT_EMAILS) skip the roster gate: they exist to
-  // exercise the app before the pilot and are never on a college roster.
-  const rosterAccess = (await hasRosterAccess(email)) || testAccount;
 
   if (user?.googleSubject && user.googleSubject !== payload.sub) {
     return next(new ErrorHandler("This account is already linked to a different Google identity", 403));
   }
 
-  const teacherAccess = user?.role === "teacher" || isProvisionedTeacher(email);
-  if (user?.role === "student" && !rosterAccess) {
-    return next(new ErrorHandler("Your account is not on an active class roster", 403));
-  }
-  if (!user && !rosterAccess && !teacherAccess) {
+  // Test accounts (TEST_STUDENT_EMAILS / TEST_TEACHER_EMAILS) skip the roster
+  // gate: they exist to exercise the app before the pilot and are never on a
+  // college roster.
+  const roleDecision = resolveSignInRole({
+    email,
+    existingRole: user?.role || null,
+    hasRosterAccess: await hasRosterAccess(email),
+  });
+  if (!roleDecision.allowed) {
     return next(new ErrorHandler("Your college account is not on an active class roster", 403));
+  }
+
+  if (roleDecision.testAccount) {
+    console.info(`[auth] test ${roleDecision.role} sign-in: ${email}`);
   }
 
   if (!user) {
     user = await User.create({
       name: payload.name || email.split("@")[0],
       email,
-      role: teacherAccess ? "teacher" : "student",
+      role: roleDecision.role,
       authProvider: "google",
       googleSubject: payload.sub,
     });
   } else {
     user.googleSubject = payload.sub;
     user.authProvider = "google";
+    // An allowlisted test teacher is promoted once; roles are never demoted
+    // automatically, so a typo in the environment cannot lock out a teacher.
+    if (roleDecision.role === "teacher" && user.role !== "teacher") {
+      user.role = "teacher";
+    }
     if (!user.name && payload.name) user.name = payload.name;
     await user.save();
   }

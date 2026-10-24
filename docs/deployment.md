@@ -60,7 +60,7 @@ git ls-files | grep -E '(^|/)config\.env$|(^|/)\.env$'
 ### 1.2 Run the full local gate
 
 ```bash
-# Backend: 35 tests (auth policy, dev gate, env guard, cookie, rate limit, rosters, binding, session core)
+# Backend: 39 tests (auth policy, dev gate, env guard, cookie, rate limit, rosters, binding, session core, test allowlists)
 cd attendance-backend && npm test
 
 # Acoustic: 50 tests (codec, lab, worklets, TX/RX link, PCM worklet, pairing)
@@ -214,9 +214,9 @@ Render assigns the port through `PORT`, so the number in the log is not always 1
      **Test users**. Testing-mode refresh tokens expire after 7 days, but this app uses
      the ID-token flow, so a fresh sign-in still works.
    - Publish the app when you are ready for real users. The backend accepts only
-     `nitjsr.ac.in` accounts (plus any addresses in `TEST_STUDENT_EMAILS`); the
-     `hosted_domain` hint in the button is only a convenience, so server enforcement is
-     what actually protects the app.
+     `nitjsr.ac.in` accounts (plus any addresses in `TEST_STUDENT_EMAILS` or
+     `TEST_TEACHER_EMAILS`); the `hosted_domain` hint in the button is only a
+     convenience, so server enforcement is what actually protects the app.
 3. **APIs & Services → Credentials → Create Credentials → OAuth client ID**
    - Application type: **Web application**.
    - Name: `Bio Attend web`.
@@ -235,6 +235,30 @@ Render assigns the port through `PORT`, so the number in the log is not always 1
 > The backend verifies the Google ID token audience with `GOOGLE_CLIENT_ID`. The
 > frontend uses `REACT_APP_GOOGLE_CLIENT_ID` to render the button. They must be the
 > same client, or sign-in fails with an audience/401 error.
+
+### Test accounts without a college Workspace account
+
+Use this to sign in as a teacher or student with an ordinary Gmail address before a
+NIT Jamshedpur account is available. **Both layers below are required** — Google rejects
+an account that is not a consent-screen test user before the app ever sees it.
+
+1. Google Cloud → **OAuth consent screen → Test users**: add each Gmail address.
+2. Render → **Environment**: add one or both variables (exact addresses, comma separated,
+   no wildcards). An address may appear in only one list.
+   - `TEST_STUDENT_EMAILS=student.tester@gmail.com` — student role, skips the roster gate.
+   - `TEST_TEACHER_EMAILS=owner.tester@gmail.com` — teacher role; use this for the
+     owner/admin test login and to open `/teacher/check-in` on production.
+3. **Manual Deploy** (or wait for the auto-deploy if you changed the repo).
+4. Sign in normally with the Google button. There is no separate password form and no
+   visible admin door; the allowlist is the control.
+
+The server validates both lists at startup: a malformed address, a duplicate, an
+`@dev.invalid` address, an overlap between the two lists, or more than 10 entries in one
+list stops the service with a clear error instead of silently failing at sign-in.
+Every test-account sign-in writes `[auth] test <role> sign-in: <email>` to the Render log.
+
+To revoke test access, remove the address from the Render environment **and rotate
+`JWT_SECRET`** — an already-issued five-day cookie stays valid until it expires.
 
 ---
 
@@ -519,7 +543,7 @@ session cookie becomes third-party, which Safari and some Chrome modes block.
 Copy this into your notes and tick each line.
 
 - [ ] `config.env` is ignored; no secrets in `git ls-files`
-- [ ] Backend tests pass (35/35)
+- [ ] Backend tests pass (39/39)
 - [ ] Acoustic tests pass (50/50)
 - [ ] `CI=true` production build passes locally
 - [ ] Code pushed to GitHub `main`

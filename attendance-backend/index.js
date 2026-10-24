@@ -7,10 +7,12 @@ if (String(process.env.NODE_ENV || "").toLowerCase() !== "production") {
 
 // Load environment values before importing routes/controllers that read them.
 const { assertSafeDevConfiguration } = require('./utils/devAuth');
+const { assertSafeTestAccountConfig } = require('./utils/signInPolicy');
 const { assertProductionEnv } = require('./utils/validateEnv');
 try {
     assertProductionEnv();
     assertSafeDevConfiguration();
+    assertSafeTestAccountConfig();
 } catch (error) {
     console.error(`Refusing to start: ${error.message}`);
     process.exit(1);

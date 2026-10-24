@@ -99,7 +99,7 @@ Testing on real phones (microphone needs HTTPS) and the full walkthrough: **[doc
 ## Tests
 
 ```bash
-cd attendance-backend && npm test               # 35 tests — auth policy, env guard, rosters, binding, rate limit, session core
+cd attendance-backend && npm test               # 39 tests — auth policy, env guard, rosters, binding, rate limit, session core, test allowlists
 cd attendance-frontend && npm run test:acoustic # 51 tests — codec, lab, worklets, TX/RX link, key handoff
 cd attendance-frontend && npm run test:checkin  # 7 tests — active-session view, key countdown, history durations
 ```

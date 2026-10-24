@@ -26,6 +26,7 @@ import ReportCard from "./ReportCard";
 import {
   copyText,
   formatClock,
+  initialConditions,
   initialRunId,
   linkFor,
   releaseWakeLock,
@@ -68,7 +69,8 @@ const disposeRx = (engine) => {
 };
 
 const AcousticReceive = () => {
-  const [runId, setRunId] = useState(() => initialRunId() || generateRunId());
+  const [linkedRunId] = useState(() => initialRunId());
+  const [runId, setRunId] = useState(() => linkedRunId || generateRunId());
   const [planned, setPlanned] = useState(10);
   const [phase, setPhase] = useState("idle");
   const [decoded, setDecoded] = useState(0);
@@ -80,7 +82,12 @@ const AcousticReceive = () => {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [hasRun, setHasRun] = useState(false);
-  const [conditions, setConditions] = useState({ distance: "1 m", room: "", notes: "" });
+  const [conditions, setConditions] = useState(() => ({
+    distance: "1 m",
+    room: "",
+    notes: "",
+    ...initialConditions(),
+  }));
 
   const engineRef = useRef(null);
   const sessionRef = useRef(0);
@@ -140,7 +147,10 @@ const AcousticReceive = () => {
     framesRef.current = [
       ...framesRef.current,
       ...found.map((frame) => ({
-        atMs: Math.round(engine.elapsedMs()),
+        // Audio time, not detection time: decode passes may run late and in
+        // batches, which made the old wall-clock timestamps non-monotonic
+        // relative to the frame's actual position in the captured stream.
+        atMs: Math.round((frame.frameStartSample / engine.context.sampleRate) * 1000),
         frameStartSample: frame.frameStartSample,
         key: digitsToValue(frame.dataDigits),
         marginDb: Number(frame.margin.toFixed(1)),
@@ -449,6 +459,14 @@ const AcousticReceive = () => {
                 </Button>
               </div>
             </Field>
+
+            {!linkedRunId && (
+              <div className="fsk-link__warning">
+                No run ID came with this link, so this page generated its own. Open the
+                transmitter's <strong>Copy receiver link</strong> on this phone so both reports
+                share the same ID and conditions.
+              </div>
+            )}
 
             <Field
               label="Planned frames from the transmitter"

@@ -25,10 +25,10 @@ Nothing to install: it runs in the phone's browser.
 | One device per student + teacher approval queue | ✅ working |
 | "Sound lab" page that tests a phone's speaker and microphone | ✅ working |
 | Modern UI for both roles | ✅ done |
-| Live phone-to-phone tone test at 1 m | 🔜 next milestone |
+| Live phone-to-phone tone test | ✅ 10/10 at 1 m, 20/20 at 5 m (Oct 2026); reverse direction, control and far range still being tested |
 | Full check-in flow for a real class | ⏳ after that |
 
-This is a capstone prototype — not yet used for real attendance.
+This is a capstone prototype — not yet used for real attendance. The live deployment is at <https://bio-attend.onrender.com>.
 
 ## Learn more
 

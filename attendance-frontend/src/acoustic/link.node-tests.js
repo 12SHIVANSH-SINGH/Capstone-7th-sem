@@ -40,6 +40,39 @@ test("run IDs are short, unambiguous and validated", () => {
   assert.equal(link.validateRunId("O0I1"), false);
 });
 
+test("receiver link carries the run ID and the transmitter conditions", () => {
+  const search = link.buildReceiverSearch("ab12cd", {
+    distance: "5 m",
+    room: "Room A",
+    notes: "M01 TX, volume 60%",
+  });
+  const params = new URLSearchParams(search);
+  assert.equal(params.get("run"), "AB12CD");
+  assert.equal(params.get("distance"), "5 m");
+  assert.equal(params.get("room"), "Room A");
+  assert.equal(params.get("notes"), "M01 TX, volume 60%");
+
+  assert.deepEqual(link.readReceiverConditions(`?${search}`), {
+    distance: "5 m",
+    room: "Room A",
+    notes: "M01 TX, volume 60%",
+  });
+
+  assert.equal(link.buildReceiverSearch("AB12CD"), "run=AB12CD");
+  assert.deepEqual(link.readReceiverConditions(""), {});
+  assert.deepEqual(link.readReceiverConditions("?run=AB12CD&distance=%20%20"), {});
+  assert.deepEqual(link.readReceiverConditions("?run=AB12CD&room=Lab&notes="), { room: "Lab" });
+});
+
+test("TX reports normalise a string amplitude from the range input", () => {
+  const plan = link.buildTransmissionPlan({ key: 42, repeats: 2, gapMs: 450 });
+  const json = link.buildTxReportJson({ runId: "ABC234", plan, amplitude: "0.9" });
+  assert.equal(json.amplitude, 0.9);
+
+  const text = link.formatTxReport({ runId: "ABC234", plan, amplitude: "0.9" });
+  assert.match(text, /Amplitude setting: 0.9/);
+});
+
 test("key, repeats and gap validation cover both boundaries", () => {
   assert.equal(link.validateKey(0), true);
   assert.equal(link.validateKey(link.MAX_KEY_VALUE), true);

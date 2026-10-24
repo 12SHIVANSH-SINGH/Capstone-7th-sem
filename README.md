@@ -13,6 +13,8 @@ Capstone project · NIT Jamshedpur
 
 </div>
 
+**Live prototype:** [https://bio-attend.onrender.com](https://bio-attend.onrender.com) — teacher sign-in and class/roster management work; the two-phone acoustic link is under test.
+
 ## Why
 
 Roll calls and QR codes are easy to fake — a friend answers "present", or a QR code gets photographed and shared. Bio Attend aims to prove *physical presence*: students' own phones play and listen for short near-ultrasonic tone sequences, and the server verifies who actually heard the room's one-time key.
@@ -43,8 +45,8 @@ The full check-in loop is the next milestone; today the building blocks are in p
 | Remove legacy flows (GPS rooms, passkeys, codes) and rebuild the foundations | ✅ done |
 | New UI — design system + Home, Login, both dashboards, 404 | ✅ done |
 | Class management and sound lab get the new design, plus lab safety fixes | ✅ done |
-| Two-phone TX/RX link pages and reports | ✅ built; real measurements pending |
-| Phone-to-phone tone test at 1 m (first real presence proof) | 🔜 owner runs M01 ⇄ M32 |
+| Two-phone TX/RX link pages and reports | ✅ deployed; physical link passes 1 m and 5 m |
+| Phone-to-phone tone test at 1 m (first real presence proof) | ✅ 10/10 at 1 m, 20/20 at 5 m (2026-10-24); reverse/control/far-corner pending |
 | Full check-in flow for a live class | ⏳ |
 
 This is a prototype — not yet used for real attendance.
@@ -95,7 +97,7 @@ Testing on real phones (microphone needs HTTPS) and the full walkthrough: **[doc
 
 ```bash
 cd attendance-backend && npm test               # 27 tests — auth policy, env guard, rosters, binding, rate limit
-cd attendance-frontend && npm run test:acoustic # 48 tests — codec, lab, worklets, TX/RX link
+cd attendance-frontend && npm run test:acoustic # 50 tests — codec, lab, worklets, TX/RX link
 ```
 
 ## Documentation

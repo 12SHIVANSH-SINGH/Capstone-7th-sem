@@ -63,7 +63,7 @@ git ls-files | grep -E '(^|/)config\.env$|(^|/)\.env$'
 # Backend: 27 tests (auth policy, dev gate, env guard, cookie, rate limit, rosters, binding)
 cd attendance-backend && npm test
 
-# Acoustic: 48 tests (codec, lab, worklets, TX/RX link, PCM worklet)
+# Acoustic: 50 tests (codec, lab, worklets, TX/RX link, PCM worklet, pairing)
 cd ../attendance-frontend && npm run test:acoustic
 
 # Production build, same API path the deployed site will use
@@ -174,7 +174,7 @@ case-sensitive.
 | `REACT_APP_API_URL` | `/api/v1` |
 | `REACT_APP_GOOGLE_CLIENT_ID` | the same value as `GOOGLE_CLIENT_ID` |
 | `REACT_APP_GOOGLE_HOSTED_DOMAIN` | `nitjsr.ac.in` (a chooser hint; set empty to let test Gmails appear) |
-| `REACT_APP_VERSION` | `1.8.0` (optional; appears in report JSON) |
+| `REACT_APP_VERSION` | `1.9.0` (optional; appears in report JSON) |
 
 **Never set `DEV_AUTH_ENABLED` on Render.** If it is set to `true` with
 `NODE_ENV=production`, the server refuses to start on purpose. The dev persona routes
@@ -321,9 +321,10 @@ classroom range.
 
 ### Run
 
-1. Phone A: open `/acoustic-tx`. Keep the generated 6-character run ID.
-2. Tap **Copy receiver link** and open it on phone B, or type the same run ID on
-   `/acoustic-rx`.
+1. Phone A: open `/acoustic-tx`. Fill in distance, room and notes (phone models and
+   media volume) first; keep the generated 6-character run ID.
+2. Tap **Copy receiver link** and open it on phone B. The link carries the run ID and
+   those conditions, so both reports agree. Typing the same run ID manually also works.
 3. Phone B: confirm **Planned frames** matches the transmitter (default 10), tap
    **Start listening**, and allow the microphone.
 4. Phone A: tap **Start transmitting**. Ten frames with 450 ms gaps take about 17 s.
@@ -335,12 +336,17 @@ classroom range.
 
 ### Matrix and controls
 
-- Distances: 0.5 m, 1 m, 2 m, 5 m.
+- Distances: 0.5 m, 1 m, 2 m, 5 m, 6 m, and the far corner (about 20 m).
+- **Test the reverse direction too** (swap TX/RX). The M32 speaker was weak at 19.5 kHz
+  in the lab, so one direction passing does not prove the other.
+- Use the same settings for every distance in a series (amplitude, repeats, gap, media
+  volume), otherwise the numbers are not comparable.
 - Three runs per distance, rotating which phone transmits.
 - Control: repeat once with the transmitter muted (or in another room). Expected
   decoded count is **0**. A false decode in the control is a serious finding.
-- Proposed Layer 1 gate: **≥95% decoded at 1 m**. Do not write a pass/fail claim until
-  the numbers are in `progress.md`.
+- Proposed Layer 1 gate: **≥95% decoded at 1 m, 6 m and the far corner**. The forward
+  1 m and 5 m runs passed 100% on 2026-10-24; the gate is not complete until the reverse,
+  control and far-corner runs are recorded in `progress.md`.
 
 Safety: the 18–19.8 kHz band is near ultrasound. Some people, especially children, may
 hear it. Keep runs short, volume moderate, and stop if anyone reports discomfort. Do not
@@ -496,7 +502,7 @@ Copy this into your notes and tick each line.
 
 - [ ] `config.env` is ignored; no secrets in `git ls-files`
 - [ ] Backend tests pass (27/27)
-- [ ] Acoustic tests pass (48/48)
+- [ ] Acoustic tests pass (50/50)
 - [ ] `CI=true` production build passes locally
 - [ ] Code pushed to GitHub `main`
 - [ ] Atlas cluster, user and network access created

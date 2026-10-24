@@ -52,6 +52,37 @@ const validateAmplitude = (value) => {
   return Number.isFinite(amplitude) && amplitude > 0 && amplitude <= 1;
 };
 
+const CONDITION_KEYS = ["distance", "room", "notes"];
+const MAX_CONDITION_LENGTH = 500;
+
+const cleanCondition = (value) => String(value || "").trim().slice(0, MAX_CONDITION_LENGTH);
+
+// The receiver link carries the run ID and the TX's test conditions. Without
+// this the RX report can say "1 m" while the TX report says "5 m" simply
+// because nobody retyped the distance on the second phone.
+const buildReceiverSearch = (runId, conditions = {}) => {
+  const params = new URLSearchParams();
+  const id = normaliseRunId(runId);
+  if (id) params.set("run", id);
+
+  for (const key of CONDITION_KEYS) {
+    const value = cleanCondition(conditions[key]);
+    if (value) params.set(key, value);
+  }
+
+  return params.toString();
+};
+
+const readReceiverConditions = (search = "") => {
+  const params = new URLSearchParams(String(search || ""));
+  const conditions = {};
+  for (const key of CONDITION_KEYS) {
+    const value = cleanCondition(params.get(key));
+    if (value) conditions[key] = value;
+  }
+  return conditions;
+};
+
 const buildTransmissionPlan = ({ key, repeats, gapMs = 450 } = {}) => {
   if (!validateKey(key)) {
     throw new RangeError(`key must be an integer from 0 to ${MAX_KEY_VALUE}`);
@@ -156,7 +187,7 @@ const formatTxReport = (report = {}) => {
       `- Gap between frames: ${plan.gapMs} ms`,
       `- Planned frames: ${plan.repeats}`,
       `- Planned duration: ${seconds(plan.totalDurationMs)}`,
-      `- Amplitude setting: ${Number.isFinite(report.amplitude) ? report.amplitude : "not reported"}`,
+      `- Amplitude setting: ${Number.isFinite(Number(report.amplitude)) ? Number(report.amplitude) : "not reported"}`,
       `- Frames played: ${Number.isFinite(report.played) ? report.played : 0}`
     );
   } else {
@@ -220,7 +251,7 @@ const buildTxReportJson = (report = {}) => ({
   gapMs: report.plan?.gapMs ?? null,
   repeats: report.plan?.repeats ?? null,
   plannedDurationMs: report.plan?.totalDurationMs ?? null,
-  amplitude: report.amplitude ?? null,
+  amplitude: Number.isFinite(Number(report.amplitude)) ? Number(report.amplitude) : null,
   played: report.played ?? 0,
 });
 
@@ -262,6 +293,8 @@ module.exports = {
   validateRepeats,
   validateGapMs,
   validateAmplitude,
+  buildReceiverSearch,
+  readReceiverConditions,
   buildTransmissionPlan,
   countStartedFrames,
   decodeRate,

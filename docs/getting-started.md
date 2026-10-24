@@ -80,5 +80,5 @@ Real Google accounts:
 
 ```bash
 cd attendance-backend && npm test               # 27 tests
-cd attendance-frontend && npm run test:acoustic # 48 tests
+cd attendance-frontend && npm run test:acoustic # 50 tests
 ```

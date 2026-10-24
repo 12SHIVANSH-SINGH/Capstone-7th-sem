@@ -312,8 +312,8 @@ const AcousticTransmit = () => {
   };
 
   const copyReceiverLink = async () => {
-    const copied = await copyText(linkFor("/acoustic-rx", runId));
-    setNotice(copied ? "Receiver link copied. Open it on the other phone." : "Could not copy the link; type the run ID on the other phone.");
+    const copied = await copyText(linkFor("/acoustic-rx", runId, conditions));
+    setNotice(copied ? "Receiver link copied with the run ID and conditions. Open it on the other phone." : "Could not copy the link; type the run ID and conditions on the other phone.");
   };
 
   const reportText = useMemo(

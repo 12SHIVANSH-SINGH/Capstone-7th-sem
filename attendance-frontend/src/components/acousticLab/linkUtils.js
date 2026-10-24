@@ -1,3 +1,5 @@
+import { buildReceiverSearch, readReceiverConditions } from "../../acoustic/transmitPlan";
+
 export const copyText = async (text) => {
   if (navigator.clipboard?.writeText) {
     try {
@@ -58,10 +60,15 @@ export const initialRunId = () => {
   return String(new URLSearchParams(window.location.search).get("run") || "").toUpperCase();
 };
 
-export const linkFor = (path, runId) => {
+export const initialConditions = () => {
+  if (typeof window === "undefined") return {};
+  return readReceiverConditions(window.location.search);
+};
+
+export const linkFor = (path, runId, conditions = {}) => {
   if (typeof window === "undefined") return path;
-  const safe = String(runId || "").trim().toUpperCase();
-  return `${window.location.origin}${path}${safe ? `?run=${encodeURIComponent(safe)}` : ""}`;
+  const search = buildReceiverSearch(runId, conditions);
+  return `${window.location.origin}${path}${search ? `?${search}` : ""}`;
 };
 
 export const formatClock = (milliseconds) => {

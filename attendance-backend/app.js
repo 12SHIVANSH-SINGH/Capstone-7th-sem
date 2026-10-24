@@ -67,6 +67,9 @@ app.use("/api/v1", userRoute);
 const classRoute = require('./routes/classRoute');
 app.use("/api/v1", classRoute);
 
+const checkInSessionRoute = require('./routes/checkInSessionRoute');
+app.use("/api/v1", checkInSessionRoute);
+
 const googleAuthRoute = require('./routes/googleAuthRoute');
 app.use("/api/v1", googleAuthRoute);
 

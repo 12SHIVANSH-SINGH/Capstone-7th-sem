@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "testType": "cross-phone",
+  "role": "tx",
+  "runId": "A75QP7",
+  "generatedAt": "2026-10-24T01:36:26.202Z",
+  "appVersion": "1.8.0",
+  "device": {
+    "role": "tx",
+    "contextSampleRate": 48000,
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Mobile Safari/537.36"
+  },
+  "conditions": {
+    "distance": "1 m",
+    "room": null,
+    "notes": null
+  },
+  "key": 88666047,
+  "dataDigits": [
+    7,
+    11,
+    11,
+    6,
+    6,
+    4,
+    12
+  ],
+  "toneSequence": [
+    0,
+    0,
+    8,
+    4,
+    16,
+    7,
+    14,
+    3,
+    16,
+    10,
+    14
+  ],
+  "symbolDurationMs": 120,
+  "frameDurationMs": 1320,
+  "gapMs": 450,
+  "repeats": 10,
+  "plannedDurationMs": 17250,
+  "amplitude": 0.5,
+  "played": 10
+}

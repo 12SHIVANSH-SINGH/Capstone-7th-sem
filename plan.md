@@ -39,12 +39,12 @@ Three parts:
 | Hosting | Free service such as Render, Netlify or Vercel | Layer 1 needs only static HTTPS hosting. From Layer 2 the server must stay awake and hold live connections for 5-6 min, so check each free tier's idle sleep and connection limits first |
 | Student notice | Short in-app notice shown before first check-in and confirmed with a tap (the Join button, which browsers require anyway for mic access), plus one teacher announcement | Notice states what is collected, why, that it is deleted after 1 day, and how to raise a query that day |
 | Student identity | College Google account ending nitjsr.ac.in, one account per student. Example: `2023ugcs059@nitjsr.ac.in` encodes batch, programme, branch, roll number | Google sign-in limited to the nitjsr.ac.in domain, verified on the server. Batch/branch/roll are read from the address for display and grouping only; the roster decides class membership |
-| Teacher phone | Ordinary phone speaker plays K0 | Counts as no room hardware |
+| Teacher phone | Ordinary phone speaker plays K0 and stays at the front of the room; it is never passed around | Counts as no room hardware. Students are 1-10 m away; if one phone captures poorly, the teacher may move the phone closer for that wave |
 
 ### Assumptions I made (not yet confirmed, change if wrong)
 
 - Roster and final attendance results are kept for the term; only GPS/IP/device data expires after 1 day.
-- Teacher's phone sits at the front of the room. Whether it can sit in the centre is still open.
+- The teacher's phone stays at the front of the room, 1-10 m from the nearest student phones. Moving closer is a fallback for a phone that captures poorly, not part of the normal flow.
 - Layer 1 pass target of 95% of frames decoded is a proposal.
 
 ## 4. Roster
@@ -113,11 +113,11 @@ Policy: strict by default. Borderline cases go to a review queue where the teach
 
 ## 8. Layers and gates
 
-Each layer is built only after the previous gate passes.
+Each layer is built only after the previous gate passes, unless the owner explicitly allows a band-independent slice to proceed in parallel. Layer 2.1 (session core) was allowed on 2026-10-24 while the remaining Layer 1 range tests were still running; scoring and the ID round still wait for the Layer 1 gate decision.
 
 | Layer | Scope | Gate |
 | --- | --- | --- |
-| 1 Physical layer | Web app sends and hears tones | Frames decode at 1 m, 6 m and the far corner. Proposed target: 95% of frames, on phones students actually use |
+| 1 Physical layer | Web app sends and hears tones | Frames decode at 1 m, 5 m and 10 m from the teacher's phone at the front. Proposed target: 95% of frames, on phones students actually use |
 | 2 Cascade | Server keys, waves, Google sign-in, roster | A small rehearsal reaches every phone. Waves needed and time per wave are measured |
 | 3 ID round and scoring | Time slots, neighbour reports, review queue | Phones outside the room are rejected; inside phones accepted or queued for teacher review |
 | 4 Class pilot | 70-120 students in the real room | Attendance matches a manual roll call; false accepts and false rejects counted |
@@ -140,10 +140,9 @@ Each layer is built only after the previous gate passes.
 
 ## 10. Open items
 
-- Can the teacher's phone sit in the centre of the room, or must it stay at the front?
-- Which Google sign-in setup the college domain allows (confirm it works with a domain-restricted login).
-- Which free host to use for Layer 2 (decide after checking idle sleep and connection limits).
-- Confirm the assumptions listed in section 3.
+- Confirm student Google sign-in on production with a real student account; teacher Google sign-in is verified.
+- Confirm Render free-plan behaviour during a live 5-6 minute check-in, including idle sleep and connection limits.
+- A real Layer 2 pilot will need a CSRF review for the split-hosting cookie mode and a shared-store rate limiter if the service scales past one instance.
 
 ## 11. Out of scope (for now)
 

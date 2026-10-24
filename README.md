@@ -35,6 +35,7 @@ The full check-in loop is the next milestone; today the building blocks are in p
 - 🔊 **Phone sound lab** — measures a phone's audio path (sample rate, tone margins) before real check-ins
 - 📡 **Two-phone TX/RX link test** — one phone plays FSK frames, the other decodes them and both export a paired report
 - 🎛️ **Custom FSK tone codec** — 17 tones in the ~18–19.8 kHz band, 120 ms symbols, with automated tests; no audio libraries
+- 🗝️ **Check-in session core** — server-minted 15^7 keys, wave 0, teacher start/close and enrolled-student state endpoints (teacher UI next)
 - 🎨 **Modern responsive UI** — a light indigo design system shared across both roles
 - 🧪 **Dev-only one-click sign-in** — passwordless test personas for two-phone work; impossible in production
 
@@ -46,7 +47,8 @@ The full check-in loop is the next milestone; today the building blocks are in p
 | New UI — design system + Home, Login, both dashboards, 404 | ✅ done |
 | Class management and sound lab get the new design, plus lab safety fixes | ✅ done |
 | Two-phone TX/RX link pages and reports | ✅ deployed; physical link passes 1 m and 5 m |
-| Phone-to-phone tone test at 1 m (first real presence proof) | ✅ 10/10 at 1 m, 20/20 at 5 m (2026-10-24); reverse/control/far-corner pending |
+| Phone-to-phone tone test at 1 m (first real presence proof) | ✅ 10/10 at 1 m, 20/20 at 5 m (2026-10-24); reverse/control/10 m pending |
+| Server check-in session core (Layer 2.1) | ✅ built and tested; teacher UI next |
 | Full check-in flow for a live class | ⏳ |
 
 This is a prototype — not yet used for real attendance.
@@ -96,7 +98,7 @@ Testing on real phones (microphone needs HTTPS) and the full walkthrough: **[doc
 ## Tests
 
 ```bash
-cd attendance-backend && npm test               # 27 tests — auth policy, env guard, rosters, binding, rate limit
+cd attendance-backend && npm test               # 35 tests — auth policy, env guard, rosters, binding, rate limit, session core
 cd attendance-frontend && npm run test:acoustic # 50 tests — codec, lab, worklets, TX/RX link
 ```
 

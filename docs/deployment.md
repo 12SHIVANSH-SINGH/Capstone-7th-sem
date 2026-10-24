@@ -60,7 +60,7 @@ git ls-files | grep -E '(^|/)config\.env$|(^|/)\.env$'
 ### 1.2 Run the full local gate
 
 ```bash
-# Backend: 27 tests (auth policy, dev gate, env guard, cookie, rate limit, rosters, binding)
+# Backend: 35 tests (auth policy, dev gate, env guard, cookie, rate limit, rosters, binding, session core)
 cd attendance-backend && npm test
 
 # Acoustic: 50 tests (codec, lab, worklets, TX/RX link, PCM worklet, pairing)
@@ -244,6 +244,8 @@ Run these from your laptop. Replace `BASE` with your Render URL.
 
 ```bash
 BASE=https://YOUR-SERVICE.onrender.com
+# No trailing slash. With one, "$BASE//api/v1/health" becomes a double-slash
+# path that the SPA fallback answers with index.html and HTTP 200.
 
 # 1. Health
 curl -s "$BASE/api/v1/health"
@@ -257,7 +259,11 @@ curl -sI "$BASE/" | grep -Ei 'x-content-type-options|x-frame-options|permissions
 curl -s -o /dev/null -w '%{http_code}\n' "$BASE/api/v1/auth/dev/accounts"
 # 404
 
-# 4. The SPA is served for deep links
+# 4. The new session route is mounted but still requires a teacher cookie
+curl -s -o /dev/null -w '%{http_code}\n' "$BASE/api/v1/classes/000000000000000000000000/check-in-sessions"
+# 401
+
+# 5. The SPA is served for deep links
 curl -s -o /dev/null -w '%{http_code}\n' "$BASE/acoustic-tx"
 # 200
 ```
@@ -332,11 +338,12 @@ classroom range.
 6. Record, for both phones: run ID, decoded/planned, decode rate, last margin, distance,
    room, phone models, Chrome versions, and volume.
 7. Copy both reports with **Copy report** and download the JSON files. Keep the pair in
-   `measurements/` (create the folder; it is not committed unless you choose to).
+   `measurements/YYYY-MM-DD/`; the protocol and folder layout are in
+   `measurements/README.md`.
 
 ### Matrix and controls
 
-- Distances: 0.5 m, 1 m, 2 m, 5 m, 6 m, and the far corner (about 20 m).
+- Distances: 1 m, 2 m, 5 m and 10 m. The gate needs 1 m, 5 m and 10 m.
 - **Test the reverse direction too** (swap TX/RX). The M32 speaker was weak at 19.5 kHz
   in the lab, so one direction passing does not prove the other.
 - Use the same settings for every distance in a series (amplitude, repeats, gap, media
@@ -344,9 +351,13 @@ classroom range.
 - Three runs per distance, rotating which phone transmits.
 - Control: repeat once with the transmitter muted (or in another room). Expected
   decoded count is **0**. A false decode in the control is a serious finding.
-- Proposed Layer 1 gate: **≥95% decoded at 1 m, 6 m and the far corner**. The forward
-  1 m and 5 m runs passed 100% on 2026-10-24; the gate is not complete until the reverse,
-  control and far-corner runs are recorded in `progress.md`.
+- Proposed Layer 1 gate: **≥95% decoded at 1 m, 5 m and 10 m**, both directions, on
+  phones students actually use. The forward 1 m and 5 m runs passed 100% on 2026-10-24;
+  the gate is not complete until the reverse, control and 10 m runs are recorded in
+  `progress.md`.
+
+The teacher's phone stays at the **front**; students are 1-10 m away. If one phone captures
+poorly, the teacher may move the phone closer for that wave. Never pass the phone around.
 
 Safety: the 18–19.8 kHz band is near ultrasound. Some people, especially children, may
 hear it. Keep runs short, volume moderate, and stop if anyone reports discomfort. Do not
@@ -501,7 +512,7 @@ session cookie becomes third-party, which Safari and some Chrome modes block.
 Copy this into your notes and tick each line.
 
 - [ ] `config.env` is ignored; no secrets in `git ls-files`
-- [ ] Backend tests pass (27/27)
+- [ ] Backend tests pass (35/35)
 - [ ] Acoustic tests pass (50/50)
 - [ ] `CI=true` production build passes locally
 - [ ] Code pushed to GitHub `main`

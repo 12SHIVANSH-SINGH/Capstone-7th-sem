@@ -1,0 +1,170 @@
+{
+  "version": 1,
+  "testType": "cross-phone",
+  "role": "rx",
+  "runId": "PUEVEN",
+  "generatedAt": "2026-10-24T01:41:04.778Z",
+  "appVersion": "1.8.0",
+  "device": {
+    "role": "rx",
+    "contextSampleRate": 48000,
+    "trackSampleRate": 48000,
+    "warning": null,
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Mobile Safari/537.36"
+  },
+  "conditions": {
+    "distance": "1 m",
+    "room": null,
+    "notes": null
+  },
+  "planned": 20,
+  "decoded": 20,
+  "decodeRate": 1,
+  "elapsedMs": 63258.20000000298,
+  "keys": [
+    45021576,
+    45021576,
+    45021576,
+    45021576,
+    45021576,
+    45021576,
+    45021576,
+    45021576,
+    45021576,
+    45021576,
+    45021576,
+    45021576,
+    45021576,
+    45021576,
+    45021576,
+    45021576,
+    45021576,
+    45021576,
+    45021576,
+    45021576
+  ],
+  "lastKey": 45021576,
+  "lastMargin": 36.62839244709041,
+  "frames": [
+    {
+      "atMs": 10313,
+      "frameStartSample": 401264,
+      "key": 45021576,
+      "marginDb": 29.1
+    },
+    {
+      "atMs": 12072,
+      "frameStartSample": 476912,
+      "key": 45021576,
+      "marginDb": 33.9
+    },
+    {
+      "atMs": 13886,
+      "frameStartSample": 552560,
+      "key": 45021576,
+      "marginDb": 35.7
+    },
+    {
+      "atMs": 15683,
+      "frameStartSample": 627728,
+      "key": 45021576,
+      "marginDb": 32
+    },
+    {
+      "atMs": 16572,
+      "frameStartSample": 702896,
+      "key": 45021576,
+      "marginDb": 33.8
+    },
+    {
+      "atMs": 18397,
+      "frameStartSample": 778544,
+      "key": 45021576,
+      "marginDb": 32.6
+    },
+    {
+      "atMs": 20165,
+      "frameStartSample": 853952,
+      "key": 45021576,
+      "marginDb": 36
+    },
+    {
+      "atMs": 21049,
+      "frameStartSample": 929360,
+      "key": 45021576,
+      "marginDb": 36.2
+    },
+    {
+      "atMs": 22876,
+      "frameStartSample": 1004768,
+      "key": 45021576,
+      "marginDb": 34.9
+    },
+    {
+      "atMs": 24698,
+      "frameStartSample": 1079936,
+      "key": 45021576,
+      "marginDb": 33.6
+    },
+    {
+      "atMs": 26467,
+      "frameStartSample": 1155104,
+      "key": 45021576,
+      "marginDb": 32.7
+    },
+    {
+      "atMs": 27353,
+      "frameStartSample": 1230272,
+      "key": 45021576,
+      "marginDb": 34.1
+    },
+    {
+      "atMs": 29156,
+      "frameStartSample": 1306160,
+      "key": 45021576,
+      "marginDb": 35.8
+    },
+    {
+      "atMs": 30988,
+      "frameStartSample": 1381328,
+      "key": 45021576,
+      "marginDb": 33
+    },
+    {
+      "atMs": 32808,
+      "frameStartSample": 1462736,
+      "key": 45021576,
+      "marginDb": 36.6
+    },
+    {
+      "atMs": 33641,
+      "frameStartSample": 1537904,
+      "key": 45021576,
+      "marginDb": 33.2
+    },
+    {
+      "atMs": 35455,
+      "frameStartSample": 1613312,
+      "key": 45021576,
+      "marginDb": 34.5
+    },
+    {
+      "atMs": 37270,
+      "frameStartSample": 1688480,
+      "key": 45021576,
+      "marginDb": 36.8
+    },
+    {
+      "atMs": 39096,
+      "frameStartSample": 1763888,
+      "key": 45021576,
+      "marginDb": 34.2
+    },
+    {
+      "atMs": 39960,
+      "frameStartSample": 1839296,
+      "key": 45021576,
+      "marginDb": 36.6
+    }
+  ]
+}

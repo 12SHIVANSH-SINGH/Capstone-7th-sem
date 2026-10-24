@@ -1,0 +1,100 @@
+{
+  "version": 1,
+  "testType": "cross-phone",
+  "role": "rx",
+  "runId": "YMBT86",
+  "generatedAt": "2026-10-24T01:36:37.550Z",
+  "appVersion": "1.8.0",
+  "device": {
+    "role": "rx",
+    "contextSampleRate": 48000,
+    "trackSampleRate": 48000,
+    "warning": null,
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Mobile Safari/537.36"
+  },
+  "conditions": {
+    "distance": "1 m",
+    "room": null,
+    "notes": null
+  },
+  "planned": 10,
+  "decoded": 10,
+  "decodeRate": 1,
+  "elapsedMs": 29271.40000000596,
+  "keys": [
+    88666047,
+    88666047,
+    88666047,
+    88666047,
+    88666047,
+    88666047,
+    88666047,
+    88666047,
+    88666047,
+    88666047
+  ],
+  "lastKey": 88666047,
+  "lastMargin": 39.573052789429276,
+  "frames": [
+    {
+      "atMs": 3065,
+      "frameStartSample": 61008,
+      "key": 88666047,
+      "marginDb": 28
+    },
+    {
+      "atMs": 4816,
+      "frameStartSample": 147696,
+      "key": 88666047,
+      "marginDb": 37
+    },
+    {
+      "atMs": 6610,
+      "frameStartSample": 232464,
+      "key": 88666047,
+      "marginDb": 38.4
+    },
+    {
+      "atMs": 8418,
+      "frameStartSample": 317472,
+      "key": 88666047,
+      "marginDb": 38.6
+    },
+    {
+      "atMs": 10212,
+      "frameStartSample": 402240,
+      "key": 88666047,
+      "marginDb": 37.8
+    },
+    {
+      "atMs": 12027,
+      "frameStartSample": 487248,
+      "key": 88666047,
+      "marginDb": 39.5
+    },
+    {
+      "atMs": 13835,
+      "frameStartSample": 574176,
+      "key": 88666047,
+      "marginDb": 38.6
+    },
+    {
+      "atMs": 15650,
+      "frameStartSample": 659184,
+      "key": 88666047,
+      "marginDb": 39.3
+    },
+    {
+      "atMs": 17419,
+      "frameStartSample": 744192,
+      "key": 88666047,
+      "marginDb": 39.3
+    },
+    {
+      "atMs": 19245,
+      "frameStartSample": 829200,
+      "key": 88666047,
+      "marginDb": 39.6
+    }
+  ]
+}

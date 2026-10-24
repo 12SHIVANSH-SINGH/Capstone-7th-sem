@@ -2,15 +2,16 @@
 
 Update this at the end of every session. If it disagrees with the real code, the code wins: fix this file and tell the owner.
 
-Last updated: 2026-10-24 (session 7: deployed; real 1 m / 5 m link measurements pass; report-pairing fixes)
+Last updated: 2026-10-24 (session 8: teacher-front 1-10 m decision; Layer 2.1 session core; measurement archive)
 
 ## Status
 
-- Current layer: **Layer 1, Physical layer** (web app sends and hears tones)
-- Current slice: **1.8 physical link passed at 1 m and 5 m on 2026-10-24** — 10/10 and 20/20 frames, 100% decode, margins 28.0–39.6 dB. **The full Layer 1 gate is not yet passed:** reverse direction (M32 as TX), muted control, 6 m and the far corner are still pending. The first two reports were paired by key, not run ID, and the 5 m RX report kept the default 1 m condition; 1.9a now carries conditions in the receiver link.
-- Last gate passed: none (Layer 1 gate = frames decode at 1 m, 6 m and the far corner on real phones)
-- Setup done: **deployed at https://bio-attend.onrender.com**; teacher Google sign-in, room/class creation and roster save verified on production. Acoustic **50/50**, backend **27/27**, `CI=true` build green.
-- Next action: **owner runs the reverse direction (M32 TX → M01 RX), a muted control, 6 m and the far corner**; then decide 1.10. Build continues with the Layer 2 session core once the gate decision is in.
+- Current layer: **Layer 1 gate still open; Layer 2 build started in parallel** (owner chose not to halt the build cycle)
+- Current slice: **1.8 physical link passed at 1 m and 5 m on 2026-10-24** — 10/10 and 20/20 frames, 100% decode, margins 28.0–39.6 dB. **The full Layer 1 gate is not yet passed:** reverse direction (M32 as TX), muted control and 10 m are still pending. The teacher's phone stays at the **front**, with student phones **1-10 m** away; moving closer is a fallback for a phone that captures poorly. The old 20 m far-corner target is withdrawn.
+- **Layer 2.1 is built:** `CheckInSession` model, 15^7 server-side key minting, wave-0 state, teacher create/list/get/close endpoints, and an enrolled-student active-session endpoint. No key is exposed to students. Backend **35/35**; local MongoDB smoke passed create/list/get/close/restart, role and ownership guards, idempotent close, and the one-active-session-per-class index.
+- Last gate passed: none (Layer 1 gate = ≥95% frames at 1 m, 5 m and 10 m on real phones, both directions, plus a muted control)
+- Setup done: **deployed at https://bio-attend.onrender.com**; teacher Google sign-in, room/class creation and roster save verified on production. Acoustic **50/50**, backend **35/35**, `CI=true` build green.
+- Next action: **owner/friend runs the reverse direction (M32 TX → M01 RX), a muted control and a 10 m run**, then decide 1.10. Code continues with the teacher check-in screen (2.2); scoring and the ID round stay blocked until the Layer 1 gate decision.
 
 
 ## Done: planning (no code)
@@ -83,10 +84,19 @@ Status key: `todo`, `built, needs test`, `partial (built with gaps, needs test)`
 | 1.6 | FSK frame encoder (start marker, 7 data symbols, 2 check symbols, no repeated adjacent tone) | Node test: encode then decode a synthetic buffer, 1000 random keys, all correct | **passed (2026-10-17)** — `src/acoustic/fsk.js` + `src/acoustic/fsk.node-tests.js`; 1000/1000 keys at 48 kHz, 200/200 at 44.1 kHz, 1000/1000 tone-level. Files: `attendance-frontend/src/acoustic/fsk.js`, tests `fsk.node-tests.js`, script `npm run test:acoustic` |
 | 1.7 | Frame decoder tested on synthetic audio with added noise and echo | Node test: decode rate and false-positive rate reported at several noise levels | **passed (2026-10-17)** — noise 100/100 at 30/20/10/0 dB; echo (30/60/90 ms, gain 0.5) 50/50 each; echo+noise 50/50; false positives 0/100 + 0/30; single tone flips rejected 200/200; double flips 2/200 (checksum collisions ~1/225). Full numbers in "Codec evidence" |
 | 1.8 | Live send and receive between two phones at 1 m | Frames sent vs decoded recorded; at least 95% | **physical link passed 2026-10-24** — 1 m: **10/10 (100%)**, 5 m: **20/20 (100%)**, margins 28.0–39.6 dB; keys matched the TX report exactly. Caveats: TX/RX run IDs differed on both pairs (paired by key), the 5 m RX condition stayed at 1 m, and no muted control was run. `/acoustic-tx` plays planned frames with 6 ms fades, run ID, conditions and copy/JSON report; `/acoustic-rx` captures PCM via an AudioWorklet, decodes with `fsk.decodeFrame`, shows counters/rate/margin and exports a report |
-| 1.9 | Range test at 6 m and at the far corner (about 20 m) | Same record at each distance; at least 95% (proposed target) | **partial** — 1 m 100% and 5 m 100% on 2026-10-24; 6 m, far corner, muted control and the reverse direction still pending. 5 m used a different setting (90% amplitude, 20 repeats, 250 ms gap) from 1 m (50%, 10 repeats, 450 ms) |
+| 1.9 | Range test at 1 m, 5 m and 10 m from the teacher's phone at the front | Same record at each distance; at least 95% (proposed target) | **partial** — 1 m 100% and 5 m 100% on 2026-10-24; 10 m, muted control and the reverse direction still pending. 5 m used a different setting (90% amplitude, 20 repeats, 250 ms gap) from 1 m (50%, 10 repeats, 450 ms) |
 | 1.10 | Choose the band (18–20 kHz or lower) from the measurements; decide whether Layer 1 gate passes | Decision written here with the numbers behind it | todo — the 18–19.76 kHz band works in the tested direction; the M32 speaker was weak at 19.5 kHz in the lab, so the reverse direction is the deciding risk |
 
-Layer 1 gate (from `plan.md`): frames decode at 1 m, 6 m and the far corner, proposed target 95% of frames on phones students actually use.
+Layer 1 gate (from `plan.md`): frames decode at **1 m, 5 m and 10 m** from the teacher's phone at the front, proposed target 95% of frames on phones students actually use, in both directions, plus a muted control.
+
+## Layer 2: slice list
+
+Layer 2 work is allowed to proceed in parallel with the remaining physical tests. Scoring and the ID round are **not** allowed until 1.10 decides the Layer 1 gate.
+
+| # | Slice | Pass/fail test | Status |
+| --- | --- | --- | --- |
+| 2.1 | Check-in session core | Create/list/get/close a session; students get active state without the key; one active session per class; ownership and role guards | **built 2026-10-24** — `CheckInSession` model, `utils/checkInSession.js` (15^7 key space, minting, 2-minute key TTL, state views), teacher endpoints under `/classes/:classId/check-in-sessions` and `/check-in-sessions/:id`, student `.../active` endpoint. Backend **35/35** + local MongoDB HTTP smoke. No audio integration, scoring or ID round |
+
 
 ## Approved plan: cleanup + redesign before 1.8 (owner, 2026-10-17)
 
@@ -102,28 +112,31 @@ Owner decisions: **Indigo modern SaaS** palette · **light theme only** for now 
 
 ## Next slice (owner tests; build continues in parallel)
 
-- **Finish the Layer 1 proof.** Highest priority is the **reverse direction (M32 TX → M01 RX)** at 1 m and 5–6 m, because the M32 lab measured only 0.7 dB at 19.5 kHz. Then run a **muted-transmitter control** (expect 0), a **6 m** run and the **far corner**. Use the transmitter's **Copy receiver link** so the run ID and conditions match; put phone models, media volume and room in Notes. Pass = ≥95% decoded per distance.
+- **Finish the Layer 1 proof.** Highest priority is the **reverse direction (M32 TX → M01 RX)** at 1 m and 5 m, because the M32 lab measured only 0.7 dB at 19.5 kHz. Then run a **muted-transmitter control** (expect 0) and a **10 m** run. Use the transmitter's **Copy receiver link** so the run ID and conditions match; put phone models, media volume and Chrome versions in Notes. Pass = ≥95% decoded per distance.
 - **Re-run the lab** (`/acoustic-lab`) on M01 + M32 after the 3a restyle and record the seven probe margins. This closes 1.1/1.2 and fills the 1.5 table.
-- **Deploy 1.9a** before the next runs: receiver link carries run ID + conditions, audio-time frame stamps, numeric amplitude, and an RX pairing warning.
-- **Build next:** Layer 2 session core is band-independent and can start in parallel as soon as the owner approves; do not claim the Layer 1 gate or build scoring until the reverse/control/far-corner runs are in.
-- If the reverse or far-corner run fails, fix the physical layer (lower band / parameterize the codec) before Layer 2 scoring. The M32 speaker is the known risk.
+- **Next code slice: 2.2 teacher check-in screen** — choose a class, start/close a session, show wave 0 and the key for playback, and display the old session history. No student proof submission or scoring yet.
+- **Deploy 2.1** after commit/push so the session endpoints exist on production; the UI arrives in 2.2.
+- If the reverse or 10 m run fails, fix the physical layer (lower band / parameterize the codec) before Layer 2 scoring. The M32 speaker is the known risk.
 
-## Later layers (not started; do not begin before the previous gate passes)
+## Later layers (not started or gated)
 
-- Layer 2: Cascade. Server mints keys, waves, domain-restricted Google sign-in, roster upload, free-host check. Gate: small rehearsal reaches every phone; waves and time per wave measured.
+- Layer 2: Cascade. Server keys, waves, domain-restricted Google sign-in, roster upload. Slice 2.1 session core is built; the teacher screen and cascade proof are next. Gate: a small rehearsal reaches every phone; waves and time per wave measured.
 - Layer 3: ID round and scoring. Time slots, neighbour reports, review queue, same-day override, 1-day expiry job and attendance lock. Gate: outside phones rejected; inside phones accepted or queued.
 - Layer 4: Class pilot with 70–120 students. Gate: attendance matches manual roll call; false accepts and rejects counted.
 - Layer 5: Mobile app, decided after Layer 4.
 
 Each of these must be broken into slices like Layer 1 before work starts.
 
-**Note (2026-10-17):** two Layer 2-shaped pieces were already built early (roster/classes; Google sign-in/device binding — see audit table). They are untested end-to-end, do not count toward any gate, and must be re-sliced and tested when Layer 2 starts. No **new** Layer 2 work until the Layer 1 gate passes.
+**Note (2026-10-17):** two Layer 2-shaped pieces were already built early (roster/classes; Google sign-in/device binding — see audit table). They are untested end-to-end, do not count toward any gate, and must be re-sliced and tested when Layer 2 starts. **Owner decision 2026-10-24:** band-independent Layer 2 work proceeds in parallel so the build cycle does not stall; Layer 2 scoring and the ID round still wait for the Layer 1 gate decision.
+
 
 ## Measurements log
 
 Record real results here (phone model, Android version, Chrome version, band, distance, frames sent, frames decoded, notes).
 
 First test phones (owner, 2026-10-17): **Samsung M01** and **Samsung M32** (more phones later).
+
+The four raw 2026-10-24 JSON reports are archived in `measurements/2026-10-24/`; new results should follow `measurements/README.md`.
 
 | Date | Phone | Android / Chrome | Band | Distance | Sent | Decoded | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -149,22 +162,22 @@ First test phones (owner, 2026-10-17): **Samsung M01** and **Samsung M32** (more
 | 2026-10-23 | Dev auth (one-click, no passwords) | `utils/devAuth.js` gate (`NODE_ENV=development\|test` **and** `DEV_AUTH_ENABLED=true`, never production), `controllers/devAuthController.js`, `routes/devAuthRoute.js` mounted conditionally; `authProvider: "dev"`; `@dev.invalid` rejected by Google/test-student policy; dev devices auto-approve; startup guard refuses `DEV_AUTH_ENABLED=true` in production; Login persona picker; `npm run dev`. | Backend **17/17**. Live smoke: teacher login → room/class → roster preview/save → student login → auto-approved device binding. | 1.8 |
 | 2026-10-23 | 1.8: two-phone TX/RX | Added `transmitPlan.js` (run IDs, key/repeat/gap validation, frame plan, counters, text/JSON reports), `receiver.js` (rolling PCM buffer, frame extraction), `public/pcm-capture-worklet.js`, `/acoustic-tx` + `/acoustic-rx` pages, shared `LinkShell`, `ReportCard`, `linkUtils`, `fskLink.css`; routes + entry links from the lab and teacher dashboard. RX decodes with the existing tested `fsk.decodeFrame`, never a second decoder. | Acoustic **48/48** (first run 47/48; one PCM-worklet test had an invalid chunk fixture, fixed). Backend **17/17**. `CI=true` build green. Node end-to-end: 3 chunked frames decode exactly once each; partial frame and noise decode 0. Headless Chrome renders both pages. Physical two-phone test still pending. | Deploy readiness |
 | 2026-10-23 | Deploy readiness + runbook | Removed the JWT from the `sendToken` JSON body (cookie only); added `utils/validateEnv.js` production guard (JWT/DB/cookie lifetime), `JWT_EXPIRE`/`COOKIE_EXPIRE` defaults, security headers, production-only CORS defaults, auth rate limiting, Node/Mongo error handling; frontend production build now refuses to fall back to the dev Google client; docs and env examples updated; wrote `docs/deployment.md` (Render single service + Atlas + Google OAuth, exact env vars, verification, two-phone procedure, rollback, Vercel alternative). | Backend **27/27**, acoustic **48/48**, `CI=true` build green. Production-mode smoke on port 4100: `/api/v1/health` 200, `/api/v1/auth/dev/accounts` 404, SPA deep link 200, unknown API 404; startup refused `DEV_AUTH_ENABLED=true` and placeholder `JWT_SECRET`. Dev-mode smoke: login response has no token, cookie session works, backend serves the built SPA. | Owner: measure + deploy |
-| 2026-10-24 | 1.8 physical measurement + 1.9a report integrity | Deployed to https://bio-attend.onrender.com (Render + Atlas + Google OAuth); teacher login, room/class creation and roster save verified. Real TX/RX runs: **1 m 10/10, 5 m 20/20**, keys matched the TX reports. 1.9a: the receiver link now carries distance/room/notes and the RX pre-fills them; frame timestamps use audio-sample time; TX reports store a numeric amplitude; the RX warns when no run ID came from the link. | Acoustic **50/50**, backend **27/27**, `CI=true` build green. Caveats: both TX/RX run IDs differed (paired by key), the 5 m RX report kept the default 1 m condition before 1.9a, and no muted control/reverse/far-corner run exists yet. | Reverse direction + control + far corner; then decide 1.10 and start Layer 2 |
+| 2026-10-24 | 1.8 physical measurement + 1.9a report integrity | Deployed to https://bio-attend.onrender.com (Render + Atlas + Google OAuth); teacher login, room/class creation and roster save verified. Real TX/RX runs: **1 m 10/10, 5 m 20/20**, keys matched the TX reports. 1.9a: the receiver link now carries distance/room/notes and the RX pre-fills them; frame timestamps use audio-sample time; TX reports store a numeric amplitude; the RX warns when no run ID came from the link. | Acoustic **50/50**, backend **27/27**, `CI=true` build green. Caveats: both TX/RX run IDs differed (paired by key), the 5 m RX report kept the default 1 m condition before 1.9a, and no muted control, reverse-direction or 10 m run exists yet. | Reverse direction + control + 10 m; then decide 1.10 and continue Layer 2 |
+| 2026-10-24 | 2.1 check-in session core + measurement archive | Added `models/checkInSessionModels.js`, `utils/checkInSession.js`, `controllers/checkInSessionController.js`, `routes/checkInSessionRoute.js`, mounted in `app.js`. Teacher can create/list/get/close sessions; an enrolled student can read only the active session metadata (no key). Sessions mint keys in the same 15^7 space as FSK, start at wave 0, keep a 2-minute key TTL, and have one active session per class via a partial unique index. Archived the four 1 m/5 m JSON reports under `measurements/2026-10-24/` and added `measurements/README.md`. Recorded the owner's teacher-at-front **1-10 m** decision in `plan.md`. | Backend **35/35**. Local MongoDB HTTP smoke: create 201, duplicate 409, list/get 200, student active 200 without `key`, close 200 and idempotent, restart 201, student no-session 200/null; student create 403, teacher on student route 403, unauth 401, unenrolled 403, other teacher 404, invalid id 404; `Cache-Control: no-store`; unique partial index rejected a direct duplicate active insert with 11000. | 2.2 teacher check-in screen; owner/friend runs reverse, control and 10 m |
+
 
 ## Open items (from `plan.md`)
 
-- Can the teacher's phone sit in the centre, or must it stay at the front?
-- Confirm the college Google domain sign-in setup.
-- Deployment is documented but not executed: the owner must create GitHub, Atlas, Render and Google OAuth resources (`docs/deployment.md`).
-- Check the Google OAuth client (in Google Cloud Console) allows `http://localhost:3000` as an authorized JavaScript origin, and later add the Render origin. If the consent screen is in "Testing" status, add the accounts in "Test accounts" as test users.
-- Decide whether more Google test accounts are needed; dev personas already cover two-phone login without passwords.
+- Confirm student Google sign-in on production with a real student account.
+- Confirm Render free-plan behaviour during a live 5-6 minute check-in.
+- Re-run the lab (`/acoustic-lab`) on M01 + M32 and record the seven probe margins.
+- Add the teacher check-in UI (2.2), then a cascade proof submission endpoint; scoring and the ID round remain gated.
 - A real Layer 2 pilot will need a CSRF review for the split-hosting cookie mode and a shared-store rate limiter if the service scales past one instance.
 
 ## Blockers
 
-- **Layer 1 gate incomplete:** the forward link passes at 1 m (10/10) and 5 m (20/20), but the reverse direction (M32 TX), muted control, 6 m and far corner are not measured. Do not call the gate passed yet.
+- **Layer 1 gate incomplete:** the forward link passes at 1 m (10/10) and 5 m (20/20), but the reverse direction (M32 TX), muted control and 10 m are not measured. Do not call the gate passed yet.
 - **Student Google sign-in on production not tested:** teacher login, classes and rosters work, but the tester does not have access to the student email accounts. Dev personas are local-only (production disables them), so this stays pending until a real student account is available.
-- **Measurement records not archived yet:** the four JSON reports are in the 2026-10-24 chat/session log; create `measurements/2026-10-24/` when convenient. The summary numbers are in the Measurements log above.
 - **Old MongoDB data dir `~/data/db` is partially root-owned (13 files):** cannot be opened by the current user. A fresh dev dir is in use instead. Only relevant if the old data matters — `sudo chown shivanshsingh:staff ~/data/db/*` would reclaim it.
 - **Resolved 2026-10-17 — Node version:** the old `>=22 <26` restriction came from an unused, broken native `bcrypt` dependency. It was removed, the guard and `engines` widened to `>=22`, and the whole auth flow verified on Node 26.11.1. Plain `npm start` works now.
 
@@ -186,6 +199,6 @@ cloudflared tunnel --url http://localhost:3000                          # new UR
 # lab: /acoustic-lab   transmitter: /acoustic-tx   receiver: /acoustic-rx
 
 # Tests
-cd attendance-backend && npm test                                       # 27/27 (auth policy, env guard, cookie, rate limit, rosters, binding)
+cd attendance-backend && npm test                                       # 35/35 (auth policy, env guard, cookie, rate limit, rosters, binding, session core)
 cd attendance-frontend && npm run test:acoustic                         # 50/50 (codec, lab, worklets, TX/RX link, PCM worklet, pairing)
 ```

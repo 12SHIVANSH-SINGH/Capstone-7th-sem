@@ -2,6 +2,8 @@ const userModels = require('../models/userModels');
 const ErrorHandler = require('../utils/errorhandler');
 const catchasyncerror = require('./catchasyncerror')
 const jwt = require('jsonwebtoken')
+const { isSessionAllowed } = require('../utils/signInPolicy');
+const { isDevAuthEnabled } = require('../utils/devAuth');
 
 const isaunthenticated = catchasyncerror(async (req, resp, next) => {
     const { token } = req.cookies;
@@ -15,6 +17,11 @@ const isaunthenticated = catchasyncerror(async (req, resp, next) => {
     req.user = await userModels.findById(decoded.id);
     if (!req.user) {
         return next(new ErrorHandler("User account no longer exists", 401));
+    }
+    // Re-check eligibility on every request, not just at sign-in. Removing a
+    // Gmail test account from the environment must end its live session too.
+    if (!isSessionAllowed(req.user, { devAuthEnabled: isDevAuthEnabled() })) {
+        return next(new ErrorHandler("please login to access it", 401));
     }
     // console.log(req.user);
     next();

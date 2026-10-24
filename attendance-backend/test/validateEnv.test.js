@@ -66,8 +66,10 @@ test("a complete production environment passes and warns about missing Google", 
   assert.match(warnings[0], /GOOGLE_CLIENT_ID/);
 });
 
-test("production detection is case-insensitive", () => {
+test("production detection is case-insensitive and trims whitespace", () => {
   assert.equal(envCheck.isProduction({ NODE_ENV: "PRODUCTION" }), true);
   assert.equal(envCheck.isProduction({ NODE_ENV: "production" }), true);
+  assert.equal(envCheck.isProduction({ NODE_ENV: "  production  " }), true);
   assert.equal(envCheck.isProduction({ NODE_ENV: "staging" }), false);
+  assert.equal(envCheck.isProduction({ NODE_ENV: "production-ish" }), false);
 });

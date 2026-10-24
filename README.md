@@ -23,13 +23,13 @@ Roll calls and QR codes are easy to fake — a friend answers "present", or a QR
 
 1. **Teacher starts a check-in** — the server mints a one-time key for that class.
 2. **Phones play and listen** — student phones emit and listen for near-ultrasonic tones (inaudible to most people). No app to install.
-3. **The server verifies** — phones that decoded the key are marked present. Playing the tone from outside the room doesn't help: the sound only carries inside.
+3. **The server verifies** — in the full flow, phones that decoded the key will be marked present. Playing the tone from outside the room doesn't help: the sound only carries inside.
 
 The full check-in loop is the next milestone; today the building blocks are in place and tested.
 
 ## What works today
 
-- 🔐 **Google-only sign-in** with a college-domain gate (plus test accounts for development)
+- 🔐 **Google-only sign-in** with a college-domain gate (plus env-gated test accounts during rehearsal)
 - 🏫 **Classes, rooms and rosters** — teacher creates a class, sets its room, imports the student roster from CSV
 - 📱 **One device per student** — each browser binds to a private key; new devices wait in a teacher **review queue**
 - 🔊 **Phone sound lab** — measures a phone's audio path (sample rate, tone margins) before real check-ins
@@ -50,7 +50,7 @@ The full check-in loop is the next milestone; today the building blocks are in p
 | Phone-to-phone tone test at 1 m (first real presence proof) | ✅ 10/10 at 1 m, 20/20 at 5 m (2026-10-24); reverse/control/10 m pending |
 | Server check-in session core (Layer 2.1) | ✅ built and tested |
 | Teacher check-in screen (Layer 2.2) | ✅ built and tested; starts/closes sessions and hands the key to the transmitter |
-| Full check-in flow for a live class | ⏳ — student proof submission, waves and scoring are not built |
+| Full check-in flow for a live class | ⏳ — student proof submission, wave advancement and scoring are not built |
 
 This is a prototype — not yet used for real attendance.
 
@@ -99,7 +99,7 @@ Testing on real phones (microphone needs HTTPS) and the full walkthrough: **[doc
 ## Tests
 
 ```bash
-cd attendance-backend && npm test               # 39 tests — auth policy, env guard, rosters, binding, rate limit, session core, test allowlists
+cd attendance-backend && npm test               # 72 tests — auth policy, controller, middleware, startup, env guard, rosters, binding, rate limit, session core, test allowlists
 cd attendance-frontend && npm run test:acoustic # 51 tests — codec, lab, worklets, TX/RX link, key handoff
 cd attendance-frontend && npm run test:checkin  # 7 tests — active-session view, key countdown, history durations
 ```
@@ -113,6 +113,6 @@ cd attendance-frontend && npm run test:checkin  # 7 tests — active-session vie
 
 ## Notes
 
-- The tone band is under active tuning — the top tones measured weak on the oldest test phone, so the band may move lower before live testing.
+- The tone band is under active tuning — the top tones measured weak on the oldest test phone, so the band may move lower before the remaining 10 m and reverse-direction runs.
 - Google sign-in is configured for `http://localhost:3000` during development; temporary Cloudflare tunnels are used for the *sound lab* and TX/RX pages on phones (no sign-in needed there).
 - The single-service production layout is documented in [docs/deployment.md](docs/deployment.md); the older standalone Vercel build is not part of this repo's workflow.

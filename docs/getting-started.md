@@ -47,7 +47,7 @@ Open http://localhost:3000 in Chrome. After creating a class and roster, the tea
 continues at http://localhost:3000/teacher/check-in: choose the class, start a session, and
 open the transmitter from the live key.
 
-Heads-up: **Google sign-in only works from http://localhost:3000** — that is the address registered with Google. It won't work from a LAN IP or a tunnel URL.
+Heads-up: with this project's local OAuth client, **Google sign-in only works from http://localhost:3000** — that is the address registered with Google. It won't work from a LAN IP or a tunnel URL. The deployed site uses its own authorized origin.
 
 ## 4. Test on real phones (audio needs HTTPS)
 
@@ -63,7 +63,7 @@ cloudflared tunnel --url http://localhost:3000
 
 Open the printed `https://….trycloudflare.com/acoustic-lab` link on each phone. Keep the laptop awake while testing — the tunnel dies with it. The two-phone pages are `/acoustic-tx` and `/acoustic-rx` on the same tunnel origin.
 
-For every phone, note down: model, Android version, Chrome version, reported sample rate, and the five signal margins shown on the lab page.
+For every phone, note down: model, Android version, Chrome version, reported sample rate, and the seven signal margins shown on the lab page (five coarse plus two codec-edge).
 
 ## Test accounts
 
@@ -74,14 +74,23 @@ In development, the login page has a **dev-only** section with one-click persona
 
 Real Google accounts:
 
-- Teacher: `2023ugcs059@nitjsr.ac.in`
-- Test students: the two Gmail addresses in the backend's `TEST_STUDENT_EMAILS` setting
-  (development only — they are never part of a real roster).
+- Teacher: `2023ugcs059@nitjsr.ac.in` (in `TEACHER_EMAILS`)
+- Test students: the Gmail addresses in the backend's `TEST_STUDENT_EMAILS` setting
+  (rehearsal only — they are never part of a real roster).
+- Test teacher: the Gmail address in `TEST_TEACHER_EMAILS`, if one is configured. It signs
+  in with the teacher role and can open `/teacher/check-in`; there is no separate admin
+  role.
+
+For a Gmail test account, the server allowlist is only one of three gates: the address must
+also be on the Google OAuth consent screen's **Test users** list while the app is in
+Testing, and the frontend must be built with `REACT_APP_GOOGLE_HOSTED_DOMAIN` set to an
+**empty value** (unset falls back to `nitjsr.ac.in`, which hides Gmail accounts in the
+chooser). Rebuild after changing it.
 
 ## Run the tests
 
 ```bash
-cd attendance-backend && npm test               # 39 tests
+cd attendance-backend && npm test               # 72 tests
 cd attendance-frontend && npm run test:acoustic # 51 tests
 cd attendance-frontend && npm run test:checkin  # 7 tests
 ```

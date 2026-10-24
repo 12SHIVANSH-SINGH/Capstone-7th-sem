@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 // Production uses real environment variables only, whatever the casing.
-if (String(process.env.NODE_ENV || "").toLowerCase() !== "production") {
+if (String(process.env.NODE_ENV || "").trim().toLowerCase() !== "production") {
 dotenv.config({ path: "./config/config.env" });
 }
 

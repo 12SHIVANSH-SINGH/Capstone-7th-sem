@@ -12,7 +12,9 @@ const {
   normaliseEmail,
   isAllowedGoogleSignIn,
   resolveSignInRole,
+  isTestAccount,
   isTestStudent,
+  isWorkspaceAccount,
   testStudentEmails,
 } = require("../utils/signInPolicy");
 
@@ -22,6 +24,15 @@ const getGoogleClient = () => {
 };
 
 const hasRosterAccess = async (email) => Enrollment.exists({ email, status: "active" });
+
+// MongoDB reports which unique index lost the race. Only an email collision is
+// a retryable first-sign-in race; a googleSubject collision means a different
+// local account already claims this Google identity.
+const duplicateKeyField = (error) => {
+  if (error?.keyPattern) return Object.keys(error.keyPattern)[0] || null;
+  if (error?.keyValue) return Object.keys(error.keyValue)[0] || null;
+  return null;
+};
 
 exports.googleSignIn = catchAsyncError(async (req, res, next) => {
   const { credential } = req.body;
@@ -51,9 +62,11 @@ exports.googleSignIn = catchAsyncError(async (req, res, next) => {
   }
   if (
     !payload ||
+    typeof payload.sub !== "string" ||
+    !payload.sub ||
     !isAllowedGoogleSignIn({
       email,
-      emailVerified: Boolean(payload.email_verified),
+      emailVerified: payload.email_verified === true,
       hostedDomain: payload.hd,
     })
   ) {
@@ -78,28 +91,87 @@ exports.googleSignIn = catchAsyncError(async (req, res, next) => {
     return next(new ErrorHandler("Your college account is not on an active class roster", 403));
   }
 
-  if (roleDecision.testAccount) {
-    console.info(`[auth] test ${roleDecision.role} sign-in: ${email}`);
-  }
+  let created = false;
+  let promoted = false;
+  let demoted = false;
 
   if (!user) {
-    user = await User.create({
-      name: payload.name || email.split("@")[0],
-      email,
-      role: roleDecision.role,
-      authProvider: "google",
-      googleSubject: payload.sub,
-    });
-  } else {
+    try {
+      user = await User.create({
+        name: payload.name || email.split("@")[0],
+        email,
+        role: roleDecision.role,
+        authProvider: "google",
+        googleSubject: payload.sub,
+      });
+      created = true;
+    } catch (error) {
+      // Two tabs can race the first sign-in. The unique email index picks one
+      // winner; the loser re-reads and continues instead of returning a
+      // confusing duplicate-key 400. A duplicated Google subject is not a
+      // race with the same account: refuse it instead of retrying by email.
+      if (error?.code !== 11000) throw error;
+      const field = duplicateKeyField(error);
+      if (field === "googleSubject") {
+        return next(
+          new ErrorHandler("This Google identity is already linked to another account", 403)
+        );
+      }
+      if (field !== "email") throw error;
+      user = await User.findOne({ email });
+      if (!user) {
+        return next(
+          new ErrorHandler("This account is already linked to a different Google identity", 403)
+        );
+      }
+      if (user.googleSubject && user.googleSubject !== payload.sub) {
+        return next(
+          new ErrorHandler("This account is already linked to a different Google identity", 403)
+        );
+      }
+    }
+  }
+
+  if (!created) {
     user.googleSubject = payload.sub;
     user.authProvider = "google";
-    // An allowlisted test teacher is promoted once; roles are never demoted
-    // automatically, so a typo in the environment cannot lock out a teacher.
     if (roleDecision.role === "teacher" && user.role !== "teacher") {
       user.role = "teacher";
+      promoted = true;
+    }
+    // A Gmail account that has been moved out of TEST_TEACHER_EMAILS and into
+    // TEST_STUDENT_EMAILS should lose the old teacher role. Never demote a
+    // college teacher; TEACHER_EMAILS removal is not meant to remove a person.
+    if (roleDecision.role === "student" && user.role === "teacher" && !isWorkspaceAccount(email)) {
+      user.role = "student";
+      demoted = true;
     }
     if (!user.name && payload.name) user.name = payload.name;
-    await user.save();
+    try {
+      await user.save();
+    } catch (error) {
+      if (error?.code === 11000 && duplicateKeyField(error) === "googleSubject") {
+        return next(
+          new ErrorHandler("This Google identity is already linked to another account", 403)
+        );
+      }
+      throw error;
+    }
+  }
+
+  // Audit only after persistence: a failed create/save must not leave a line
+  // claiming a sign-in that never happened.
+  if (isTestAccount(email)) {
+    const details = [
+      created ? "new" : null,
+      promoted ? "promoted" : null,
+      demoted ? "demoted" : null,
+    ]
+      .filter(Boolean)
+      .join(", ");
+    console.info(
+      `[auth] test ${roleDecision.role} sign-in: ${email} user=${user._id}${details ? ` (${details})` : ""}`
+    );
   }
 
   sendToken(user, 200, res);

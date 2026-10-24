@@ -11,18 +11,19 @@ module.exports = (err, req, resp, next) => {
     }
     //mongoose duplicate key error
     if (err.code === 11000) {
-        const message = `Duplicate ${Object.keys(err.keyValue)} entered`
+        const fields = Object.keys(err.keyValue || err.keyPattern || {});
+        const message = fields.length
+            ? `Duplicate ${fields.join(", ")} entered`
+            : "Duplicate value entered";
         err = new ErrorHandler(message, 400);
     }
-    //wrong jwt error
+    // A missing/invalid/expired session is an authentication failure, not a
+    // malformed request: return 401 so the frontend sends the user to login.
     if (err.name === "JsonWebTokenError") {
-        const message = `Json web token is invalid, try again`
-        err = new ErrorHandler(message, 400);
+        err = new ErrorHandler("Json web token is invalid, please login again", 401);
     }
-    //jwt expire error
-    if (err.name === "TokenExpireError") {
-        const message = `Json web token is expired, try again`
-        err = new ErrorHandler(message, 400);
+    if (err.name === "TokenExpiredError") {
+        err = new ErrorHandler("Json web token is expired, please login again", 401);
     }
 
     resp.status(err.statuscode).json({

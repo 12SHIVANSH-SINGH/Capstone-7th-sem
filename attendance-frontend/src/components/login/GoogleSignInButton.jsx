@@ -11,7 +11,8 @@ const GOOGLE_CLIENT_ID =
 const SCRIPT_ID = "google-identity-services";
 // College-only account chooser by default. Set REACT_APP_GOOGLE_HOSTED_DOMAIN
 // to an empty value while testing so test Gmail accounts stay selectable; the
-// server still gates every sign-in by domain or TEST_STUDENT_EMAILS.
+// server still gates every sign-in by domain or TEST_STUDENT_EMAILS /
+// TEST_TEACHER_EMAILS.
 const HOSTED_DOMAIN = process.env.REACT_APP_GOOGLE_HOSTED_DOMAIN ?? "nitjsr.ac.in";
 
 const GoogleSignInButton = ({ onCredential, onLoadError, disabled }) => {

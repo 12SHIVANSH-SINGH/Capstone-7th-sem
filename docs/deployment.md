@@ -60,11 +60,14 @@ git ls-files | grep -E '(^|/)config\.env$|(^|/)\.env$'
 ### 1.2 Run the full local gate
 
 ```bash
-# Backend: 39 tests (auth policy, dev gate, env guard, cookie, rate limit, rosters, binding, session core, test allowlists)
+# Backend: 72 tests (auth policy, controller, middleware, startup, dev gate, env guard, cookie, rate limit, rosters, binding, session core)
 cd attendance-backend && npm test
 
-# Acoustic: 50 tests (codec, lab, worklets, TX/RX link, PCM worklet, pairing)
+# Acoustic: 51 tests (codec, lab, worklets, TX/RX link, PCM worklet, pairing)
 cd ../attendance-frontend && npm run test:acoustic
+
+# Check-in view: 7 tests (session view helpers and duration formatting)
+npm run test:checkin
 
 # Production build, same API path the deployed site will use
 CI=true REACT_APP_API_URL=/api/v1 \
@@ -72,7 +75,7 @@ CI=true REACT_APP_API_URL=/api/v1 \
   npm run build
 ```
 
-All three must pass before you push. The build command mirrors Render's build step;
+All four must pass before you push. The build command mirrors Render's build step;
 if it fails locally, fix it before deploying.
 
 ### 1.3 Commit and push
@@ -169,11 +172,12 @@ case-sensitive.
 | `COOKIE_EXPIRE` | `7` |
 | `GOOGLE_CLIENT_ID` | the Web client ID from step 4 |
 | `CLIENT_URL` | `https://YOUR-SERVICE.onrender.com` |
-| `TEACHER_EMAILS` | comma-separated college emails allowed to be teachers, e.g. `2023ugcs059@nitjsr.ac.in` |
-| `TEST_STUDENT_EMAILS` | leave **empty** for the pilot, or the test Gmails during rehearsal |
+| `TEACHER_EMAILS` | comma-separated college emails provisioned as teachers on first sign-in, e.g. `2023ugcs059@nitjsr.ac.in` (college domain only; removing one does not demote an existing teacher) |
+| `TEST_STUDENT_EMAILS` | leave **empty** for the pilot, or the test Gmail(s) during rehearsal (non-college only) |
+| `TEST_TEACHER_EMAILS` | leave **empty** for the pilot, or the test Gmail(s) that need teacher access during rehearsal (non-college only) |
 | `REACT_APP_API_URL` | `/api/v1` |
 | `REACT_APP_GOOGLE_CLIENT_ID` | the same value as `GOOGLE_CLIENT_ID` |
-| `REACT_APP_GOOGLE_HOSTED_DOMAIN` | `nitjsr.ac.in` (a chooser hint; set empty to let test Gmails appear) |
+| `REACT_APP_GOOGLE_HOSTED_DOMAIN` | `nitjsr.ac.in` (a chooser hint; set it to an **empty value** and rebuild to let Gmail test accounts appear — deleting it falls back to the college domain) |
 | `REACT_APP_VERSION` | `1.9.0` (optional; appears in report JSON) |
 
 **Never set `DEV_AUTH_ENABLED` on Render.** If it is set to `true` with
@@ -186,7 +190,8 @@ Notes:
 - `REACT_APP_*` values are baked into the React bundle **at build time**. Changing one
   requires a redeploy, not just a restart.
 - `JWT_SECRET` must stay stable across restarts and rollbacks. Changing it signs every
-  user out. Rotate it only if it leaks.
+  user out. Rotate it if it leaks, or deliberately when you need to invalidate all
+  sessions (see the test-account revocation note in section 4).
 - The server also accepts `MONGODB_URI` as an alias for `DB_URI`, but use `DB_URI` so
   every document and script agrees.
 
@@ -239,26 +244,44 @@ Render assigns the port through `PORT`, so the number in the log is not always 1
 ### Test accounts without a college Workspace account
 
 Use this to sign in as a teacher or student with an ordinary Gmail address before a
-NIT Jamshedpur account is available. **Both layers below are required** — Google rejects
-an account that is not a consent-screen test user before the app ever sees it.
+NIT Jamshedpur account is available. **Three gates — the first applies only while the
+consent screen is in Testing:**
 
-1. Google Cloud → **OAuth consent screen → Test users**: add each Gmail address.
-2. Render → **Environment**: add one or both variables (exact addresses, comma separated,
-   no wildcards). An address may appear in only one list.
+1. **Google Cloud → OAuth consent screen → Test users**: while the consent screen is in
+   **Testing**, add each Gmail address. After the app is published, any Google account can
+   authorize; the server allowlists below still decide who gets in.
+2. **Render → Environment**: add one or both variables (exact addresses, comma separated,
+   no wildcards). An address may appear in only one list, and both test lists accept
+   non-college addresses only.
    - `TEST_STUDENT_EMAILS=student.tester@gmail.com` — student role, skips the roster gate.
-   - `TEST_TEACHER_EMAILS=owner.tester@gmail.com` — teacher role; use this for the
-     owner/admin test login and to open `/teacher/check-in` on production.
-3. **Manual Deploy** (or wait for the auto-deploy if you changed the repo).
-4. Sign in normally with the Google button. There is no separate password form and no
-   visible admin door; the allowlist is the control.
+   - `TEST_TEACHER_EMAILS=owner.tester@gmail.com` — teacher role; use this for the owner
+     test login and to open `/teacher/check-in` on production. It is an ordinary teacher,
+     not a separate admin role.
+3. **Frontend build**: set `REACT_APP_GOOGLE_HOSTED_DOMAIN` to an **empty value** (not
+   unset) and rebuild/redeploy. Unset falls back to `nitjsr.ac.in`, and the Google account
+   chooser then offers only Workspace accounts, so the Gmail test account never appears.
+   An empty string is the only value that omits the `hosted_domain` hint; the server still
+   enforces the allowlists. On the Vercel layout this is the frontend variable, not the
+   backend.
 
-The server validates both lists at startup: a malformed address, a duplicate, an
-`@dev.invalid` address, an overlap between the two lists, or more than 10 entries in one
-list stops the service with a clear error instead of silently failing at sign-in.
-Every test-account sign-in writes `[auth] test <role> sign-in: <email>` to the Render log.
+Then **Manual Deploy** (or let the auto-deploy from the commit run), and sign in normally
+with the Google button. There is no separate password form and no separate admin role:
+a `TEST_TEACHER_EMAILS` account is an ordinary teacher account; the allowlists are the
+only control.
 
-To revoke test access, remove the address from the Render environment **and rotate
-`JWT_SECRET`** — an already-issued five-day cookie stays valid until it expires.
+The server validates all three lists at startup. A malformed address, a duplicate, an
+`@dev.invalid` address, an overlap between any two lists, more than 10 entries in a test
+list, a non-college address in `TEACHER_EMAILS`, or a college address in a test list
+stops the service with a clear error. Every test-account sign-in writes
+`[auth] test <role> sign-in: <email> user=…` to the Render log after the account row is
+saved; a promotion or demotion is marked in the same line.
+
+To revoke test access, remove the address from whichever single test list contains it
+(an address may not be in two lists; startup rejects that). The auth middleware re-checks
+the lists on every request, so a live session for a removed Gmail test account is rejected
+on its next call as well as at the next sign-in. The stored user row keeps its role; delete
+it or set `role: "student"` if that matters. Rotating `JWT_SECRET` revokes every session,
+including real college accounts, and is not needed for a single test account.
 
 ---
 
@@ -303,9 +326,11 @@ Then in a browser:
 3. Create a room, create a class, paste a roster, preview it, and save it. Refresh the
    page: the class and roster are still there.
 4. Sign in on a second browser/profile as a student whose email is on that roster.
-   The device should appear as **pending review**.
-5. Sign back in as the teacher and approve the device from the review queue.
-6. Refresh the student session; the dashboard should show an approved device.
+   The first device binding is approved automatically.
+5. Sign in as the same student from a different browser/profile. That changed device
+   should appear as **pending review**.
+6. Sign back in as the teacher and approve it from the review queue, then refresh the
+   student session; the dashboard should show an approved device.
 7. Open `BASE/teacher/check-in`, choose the class, and start a check-in. Confirm the key
    and two-minute countdown appear. Click **Open transmitter**: the key field on
    `BASE/acoustic-tx` must match. Click **Back to check-in**, close the session, and confirm
@@ -500,7 +525,11 @@ Restore with `mongorestore`. Store backups outside the repo.
 | MongoDB connection timeout | Atlas Network Access does not include Render, or the password is not URL-encoded, or the URI lacks `/attendance`. |
 | `429 Too many … attempts` | Sign-in rate limit. Wait ten minutes; do not loop retries. |
 | Teacher sees no classes | Classes are scoped to the signed-in teacher. Create them with that account. |
-| Student is rejected at sign-in | Their email is not on an active roster and is not in `TEST_STUDENT_EMAILS`. Add them to the roster first. |
+| Student is rejected at sign-in | Their email is not on an active roster and is not in `TEST_STUDENT_EMAILS`. Add a college account to the roster, or for a Gmail test account add it to `TEST_STUDENT_EMAILS`; for the chooser to show it, also set `REACT_APP_GOOGLE_HOSTED_DOMAIN` to an empty value and rebuild. |
+| Google account chooser does not list the Gmail test account | `REACT_APP_GOOGLE_HOSTED_DOMAIN` is still `nitjsr.ac.in`, or it was deleted and the code fell back to that default. Set it to an **empty value** and redeploy; the value is baked in at build time. |
+| Test teacher still gets student access | The address is in `TEST_STUDENT_EMAILS`, not `TEST_TEACHER_EMAILS`. Move it to the teacher list and redeploy; startup rejects an address that is in both lists. |
+| Removed test account still has access | Removing it from `TEST_*_EMAILS` blocks new sign-ins and the middleware rejects the old session on its next request. If it still appears, delete/demote the user row or rotate `JWT_SECRET`. |
+| Server refuses to start with a `*_EMAILS` error | A list has a malformed, duplicate or `@dev.invalid` address, an overlap, a college address in a test list, a Gmail in `TEACHER_EMAILS`, or more than 10 entries in a test list. Fix the Render variable and redeploy. |
 | Microphone does not start | Needs HTTPS (or localhost), Chrome, and microphone permission. Close other audio apps; keep the tab visible. |
 | Receiver decodes 0 frames at 1 m | Raise transmitter volume, check the run IDs match, confirm both pages are the same deployment, retry at 0.5 m. Use the lab to confirm the phone can hear 18–19.8 kHz. |
 | Render free instance is slow on first load | Cold start after sleep. Use Starter for a session, or warm it up first. |
@@ -520,13 +549,14 @@ session cookie becomes third-party, which Safari and some Chrome modes block.
      `JWT_EXPIRE=5d`, `COOKIE_EXPIRE=7`, `GOOGLE_CLIENT_ID`,
      `CLIENT_URL=https://YOUR-APP.vercel.app`,
      `CLIENT_URLS=https://YOUR-APP.vercel.app`, `TEACHER_EMAILS`,
-     `TEST_STUDENT_EMAILS`.
+     `TEST_STUDENT_EMAILS`, `TEST_TEACHER_EMAILS`.
 2. **Vercel frontend**
    - Root Directory: `attendance-frontend`
    - Framework preset: Create React App
    - Build: `npm run build`; output: `build`
    - Env: `REACT_APP_API_URL=https://YOUR-BACKEND.onrender.com/api/v1`,
-     `REACT_APP_GOOGLE_CLIENT_ID`, `REACT_APP_GOOGLE_HOSTED_DOMAIN`.
+     `REACT_APP_GOOGLE_CLIENT_ID`, `REACT_APP_GOOGLE_HOSTED_DOMAIN` (empty for Gmail
+     test accounts; otherwise `nitjsr.ac.in`).
 3. **Google origins**: add both `https://YOUR-APP.vercel.app` and
    `https://YOUR-BACKEND.onrender.com` (the second is only needed if you open the API
    origin directly).
@@ -543,18 +573,24 @@ session cookie becomes third-party, which Safari and some Chrome modes block.
 Copy this into your notes and tick each line.
 
 - [ ] `config.env` is ignored; no secrets in `git ls-files`
-- [ ] Backend tests pass (39/39)
-- [ ] Acoustic tests pass (50/50)
+- [ ] Backend tests pass (72/72)
+- [ ] Acoustic tests pass (51/51)
 - [ ] `CI=true` production build passes locally
 - [ ] Code pushed to GitHub `main`
 - [ ] Atlas cluster, user and network access created
 - [ ] Render Web Service created with build/start commands and health path
 - [ ] All Render environment variables set; `DEV_AUTH_ENABLED` absent
+- [ ] Rehearsal only: `TEST_STUDENT_EMAILS` / `TEST_TEACHER_EMAILS` set, test users added
+      while the consent screen is in Testing, and `REACT_APP_GOOGLE_HOSTED_DOMAIN` empty
+      in the rebuilt frontend
+- [ ] Production build restores `REACT_APP_GOOGLE_HOSTED_DOMAIN=nitjsr.ac.in` and empties
+      both `TEST_*` lists (keep `TEACHER_EMAILS` for real college teachers)
 - [ ] Google OAuth Web client created with the Render origin
 - [ ] `GOOGLE_CLIENT_ID` and `REACT_APP_GOOGLE_CLIENT_ID` match; redeployed
 - [ ] `/api/v1/health` returns 200
 - [ ] `/api/v1/auth/dev/accounts` returns 404
 - [ ] Teacher Google sign-in works on the deployed URL
+- [ ] Test teacher (if configured) signs in and opens `/teacher/check-in`
 - [ ] Room, class, roster preview/save work and survive a refresh
 - [ ] Student sign-in creates a pending device; teacher approves it
 - [ ] TX/RX pages render over HTTPS and two phones complete a run

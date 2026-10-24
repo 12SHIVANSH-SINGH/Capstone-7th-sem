@@ -1,4 +1,5 @@
 const cookieOptions = require("./cookieOptions");
+const presentUser = require("./presentUser");
 
 const sendToken = (user, statusCode, res) => {
   const token = user.getJWTtoken();
@@ -13,7 +14,7 @@ const sendToken = (user, statusCode, res) => {
   // page scripts read and exfiltrate it, which defeats the cookie flags.
   return res.status(statusCode).cookie("token", token, options).json({
     success: true,
-    user: user.toObject ? user.toObject() : user,
+    user: presentUser(user),
   });
 };
 

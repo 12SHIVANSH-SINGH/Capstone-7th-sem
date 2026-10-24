@@ -7,6 +7,7 @@ test("dev auth requires both a non-production environment and the explicit flag"
   const cases = [
     [{ NODE_ENV: "production", DEV_AUTH_ENABLED: "true" }, false],
     [{ NODE_ENV: "PRODUCTION", DEV_AUTH_ENABLED: "true" }, false],
+    [{ NODE_ENV: " production ", DEV_AUTH_ENABLED: "true" }, false],
     [{ NODE_ENV: "development", DEV_AUTH_ENABLED: "false" }, false],
     [{ NODE_ENV: "development" }, false],
     [{ DEV_AUTH_ENABLED: "true" }, false],
@@ -23,6 +24,10 @@ test("dev auth requires both a non-production environment and the explicit flag"
 test("production refuses DEV_AUTH_ENABLED instead of silently ignoring it", () => {
   assert.throws(
     () => dev.assertSafeDevConfiguration({ NODE_ENV: "production", DEV_AUTH_ENABLED: "true" }),
+    /refused when NODE_ENV=production/
+  );
+  assert.throws(
+    () => dev.assertSafeDevConfiguration({ NODE_ENV: " production ", DEV_AUTH_ENABLED: "true" }),
     /refused when NODE_ENV=production/
   );
   assert.doesNotThrow(() =>
@@ -104,14 +109,17 @@ test("dev account API exists only when dev auth is on and never returns emails",
 
   await new Promise((resolve) => server.once("listening", resolve));
   const { port } = server.address();
-  const response = await fetch(`http://127.0.0.1:${port}/api/v1/auth/dev/accounts`);
-  const body = await response.json();
 
-  assert.equal(response.status, 200);
-  assert.deepEqual(body.accounts, [{ key: "student1", role: "student", name: "Demo Student" }]);
-  assert.equal(JSON.stringify(body).includes("student1@dev.invalid"), false);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/v1/auth/dev/accounts`);
+    const body = await response.json();
 
-  delete process.env.NODE_ENV;
-  delete process.env.DEV_AUTH_ENABLED;
-  delete process.env.DEV_AUTH_ACCOUNTS;
+    assert.equal(response.status, 200);
+    assert.deepEqual(body.accounts, [{ key: "student1", role: "student", name: "Demo Student" }]);
+    assert.equal(JSON.stringify(body).includes("student1@dev.invalid"), false);
+  } finally {
+    delete process.env.NODE_ENV;
+    delete process.env.DEV_AUTH_ENABLED;
+    delete process.env.DEV_AUTH_ACCOUNTS;
+  }
 });

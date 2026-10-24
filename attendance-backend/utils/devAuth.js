@@ -26,13 +26,13 @@ const DEFAULT_DEV_ACCOUNTS = [
 ].join(",");
 
 const isProduction = (env = process.env) =>
-  String(env.NODE_ENV || "").toLowerCase() === "production";
+  String(env.NODE_ENV || "").trim().toLowerCase() === "production";
 
 const flagIsOn = (env = process.env) =>
   String(env.DEV_AUTH_ENABLED || "").trim().toLowerCase() === "true";
 
 const isDevAuthEnabled = (env = process.env) => {
-  const environment = String(env.NODE_ENV || "").toLowerCase();
+  const environment = String(env.NODE_ENV || "").trim().toLowerCase();
   return (environment === "development" || environment === "test") && flagIsOn(env);
 };
 

@@ -17,7 +17,7 @@ app.use((req, res, next) => {
 
 // Browser origins allowed to call this API with cookies.
 // Add exact origins (deployments) with CLIENT_URLS=origin1,origin2 in config.env.
-const isProduction = String(process.env.NODE_ENV || "").toLowerCase() === "production";
+const isProduction = String(process.env.NODE_ENV || "").trim().toLowerCase() === "production";
 // Localhost is a development origin. A production process must list its
 // frontend origin explicitly; single-service hosting needs no origin at all.
 const defaultOrigins = isProduction

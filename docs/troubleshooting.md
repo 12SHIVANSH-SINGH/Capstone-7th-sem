@@ -10,7 +10,7 @@ Check that MongoDB is running (step 1 of [getting started](getting-started.md)) 
 The backend needs Node 22 or newer. Check with `node -v` and update if needed.
 
 **Google says "Access blocked" for a test account**
-That Gmail is not on the Google Cloud OAuth consent screen's test-user list. Add it there, or sign in with the college account. Also remember: sign-in only works from `http://localhost:3000`.
+That Gmail is not on the Google Cloud OAuth consent screen's test-user list. Add it there, or sign in with the college account. Also remember: with the local OAuth client, sign-in only works from `http://localhost:3000`; the deployed site uses its own authorized origin.
 
 **The sound lab page stays silent / no microphone prompt**
 Microphone access requires HTTPS. Don't open the laptop's LAN IP on the phone — use the Cloudflare tunnel (see getting started) and open the `https://….trycloudflare.com` link.

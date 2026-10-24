@@ -22,7 +22,7 @@ const PLACEHOLDER_SECRETS = new Set([
 ]);
 
 const isProduction = (env = process.env) =>
-  String(env.NODE_ENV || "").toLowerCase() === "production";
+  String(env.NODE_ENV || "").trim().toLowerCase() === "production";
 
 const isPlaceholder = (value) => {
   const normalised = String(value || "").trim().toLowerCase();

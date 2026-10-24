@@ -3,6 +3,9 @@ const User = require("../models/userModels");
 const ErrorHandler = require("../utils/errorhandler");
 const jwt = require("jsonwebtoken");
 const cookieOptions = require("../utils/cookieOptions");
+const presentUser = require("../utils/presentUser");
+const { isSessionAllowed } = require("../utils/signInPolicy");
+const { isDevAuthEnabled } = require("../utils/devAuth");
 
 // 📌 Logout User
 exports.logout = catchAsyncError(async (req, res, next) => {
@@ -28,9 +31,14 @@ exports.isAuth = catchAsyncError(async (req, res, next) => {
     if (!req.user) {
         return next(new ErrorHandler("User account no longer exists", 401));
     }
+    // Keep /islogin consistent with the protected routes: a revoked test
+    // account must not look signed in to the frontend.
+    if (!isSessionAllowed(req.user, { devAuthEnabled: isDevAuthEnabled() })) {
+        return next(new ErrorHandler("Please login to access this resource", 401));
+    }
 
     res.status(200).json({
         success: true,
-        user: req.user,
+        user: presentUser(req.user),
     });
 });

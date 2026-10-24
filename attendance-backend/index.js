@@ -1,7 +1,7 @@
 //------for port from env file--------
 const dotenv = require('dotenv');
 // Only load the local file outside production, regardless of casing.
-if (String(process.env.NODE_ENV || "").toLowerCase() !== "production") {
+if (String(process.env.NODE_ENV || "").trim().toLowerCase() !== "production") {
     dotenv.config({ path: "./config/config.env" });
 }
 

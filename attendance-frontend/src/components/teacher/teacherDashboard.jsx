@@ -80,6 +80,7 @@ const TeacherDashboard = () => {
             links={[
                 { to: "/teacher-dashboard", label: "Dashboard", active: true },
                 { to: "/teacher/classes", label: "Classes & rosters" },
+                { to: "/teacher/check-in", label: "Check-in" },
                 { to: "/acoustic-lab", label: "Phone audio test" },
             ]}
         >
@@ -91,7 +92,10 @@ const TeacherDashboard = () => {
                     </p>
                 </div>
                 <div className="ui-page-head__actions">
-                    <Button onClick={() => navigate("/teacher/classes")}>Manage classes & rosters</Button>
+                    <Button variant="secondary" onClick={() => navigate("/teacher/classes")}>
+                        Manage classes &amp; rosters
+                    </Button>
+                    <Button onClick={() => navigate("/teacher/check-in")}>Run a check-in</Button>
                 </div>
             </div>
 
@@ -144,6 +148,13 @@ const TeacherDashboard = () => {
 
                 <Card title="Quick actions" subtitle="The things you’ll do most often.">
                     <div className="quick-actions">
+                        <button type="button" className="quick-action" onClick={() => navigate("/teacher/check-in")}>
+                            <span className="quick-action__icon" aria-hidden="true">📣</span>
+                            <span className="quick-action__body">
+                                <strong>Run a check-in</strong>
+                                <small>Start a session and play its wave-0 key from the front</small>
+                            </span>
+                        </button>
                         <button type="button" className="quick-action" onClick={() => navigate("/teacher/classes")}>
                             <span className="quick-action__icon" aria-hidden="true">👥</span>
                             <span className="quick-action__body">

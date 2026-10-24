@@ -266,6 +266,8 @@ curl -s -o /dev/null -w '%{http_code}\n' "$BASE/api/v1/classes/00000000000000000
 # 5. The SPA is served for deep links
 curl -s -o /dev/null -w '%{http_code}\n' "$BASE/acoustic-tx"
 # 200
+curl -s -o /dev/null -w '%{http_code}\n' "$BASE/teacher/check-in"
+# 200 (the page itself still requires a teacher sign-in in the browser)
 ```
 
 Then in a browser:
@@ -280,9 +282,14 @@ Then in a browser:
    The device should appear as **pending review**.
 5. Sign back in as the teacher and approve the device from the review queue.
 6. Refresh the student session; the dashboard should show an approved device.
-7. Open `BASE/acoustic-tx` on one phone and `BASE/acoustic-rx` on the other and run the
+7. Open `BASE/teacher/check-in`, choose the class, and start a check-in. Confirm the key
+   and two-minute countdown appear. Click **Open transmitter**: the key field on
+   `BASE/acoustic-tx` must match. Click **Back to check-in**, close the session, and confirm
+   it moves into **Session history**. This is UI wiring only; no student proof or
+   attendance is recorded yet.
+8. Open `BASE/acoustic-tx` on one phone and `BASE/acoustic-rx` on the other and run the
    procedure in section 7. No sign-in is needed for the link test.
-8. In browser devtools → Application → Cookies, confirm the `token` cookie is
+9. In browser devtools → Application → Cookies, confirm the `token` cookie is
    `HttpOnly`, `Secure`, and `SameSite=None` (the production setting; it still works on
    a single HTTPS origin).
 

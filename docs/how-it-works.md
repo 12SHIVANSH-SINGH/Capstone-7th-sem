@@ -21,10 +21,16 @@ On a student's first sign-in, the website quietly creates a private key in that 
 - A **class** has a course code, title, a default room, and a **roster** — the list of student emails (imported from the college CSV).
 - Only emails on the roster can check in for that class.
 
-The server can now start a **check-in session** for a class. It mints a short-lived
-seven-symbol key, starts at wave 0, and only the owning teacher can read or close it. An
-enrolled student can read the active session's wave and expiry, but never the key: a key
-is earned by hearing the previous one. The teacher screen and the sound cascade come next.
+The teacher can now open **Check-in** (`/teacher/check-in`), choose a class, and start a
+server-minted **check-in session**. It begins at wave 0 with a fresh seven-symbol key that
+expires after two minutes. The screen shows the key, a live countdown, the room and the
+session history, and closes the session when the teacher confirms.
+
+Only the owning teacher can read or close a session. An enrolled student can read the
+active session's wave and expiry, but never the key: a key is earned by hearing the
+previous one. **Open transmitter** passes the key to the tested `/acoustic-tx` page with
+the value pre-filled, so the teacher does not retype it. Student proof submission, wave
+advancement and scoring are the next Layer 2 slices.
 
 ## The tones (the actual trick)
 
@@ -42,6 +48,7 @@ What we measured so far (Samsung M32): tones up to 18.5 kHz came back loud and c
 | Google sign-in + device review | `attendance-backend/controllers/googleAuthController.js` |
 | Classes, rosters, rooms | `attendance-backend/controllers/classController.js` |
 | Check-in sessions, keys and waves | `attendance-backend/controllers/checkInSessionController.js`, `attendance-backend/utils/checkInSession.js` |
+| Teacher check-in screen | `attendance-frontend/src/components/teacher/checkInSessions.jsx`, `checkInSessionView.js` |
 | Shared UI pieces (buttons, cards, toasts) | `attendance-frontend/src/ui/` |
 | Pages (Home, Login, dashboards, sound lab, class management) | `attendance-frontend/src/components/` |
 

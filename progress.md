@@ -2,16 +2,17 @@
 
 Update this at the end of every session. If it disagrees with the real code, the code wins: fix this file and tell the owner.
 
-Last updated: 2026-10-24 (session 8: teacher-front 1-10 m decision; Layer 2.1 session core; measurement archive)
+Last updated: 2026-10-24 (session 9: Layer 2.2 teacher check-in screen; key handoff to the tested transmitter)
 
 ## Status
 
 - Current layer: **Layer 1 gate still open; Layer 2 build started in parallel** (owner chose not to halt the build cycle)
 - Current slice: **1.8 physical link passed at 1 m and 5 m on 2026-10-24** — 10/10 and 20/20 frames, 100% decode, margins 28.0–39.6 dB. **The full Layer 1 gate is not yet passed:** reverse direction (M32 as TX), muted control and 10 m are still pending. The teacher's phone stays at the **front**, with student phones **1-10 m** away; moving closer is a fallback for a phone that captures poorly. The old 20 m far-corner target is withdrawn.
 - **Layer 2.1 is built:** `CheckInSession` model, 15^7 server-side key minting, wave-0 state, teacher create/list/get/close endpoints, and an enrolled-student active-session endpoint. No key is exposed to students. Backend **35/35**; local MongoDB smoke passed create/list/get/close/restart, role and ownership guards, idempotent close, and the one-active-session-per-class index.
+- **Layer 2.2 is built:** `/teacher/check-in` lets the teacher choose a class, start or close a session, see wave 0 with a live two-minute key countdown, open `/acoustic-tx` with the key pre-filled and validated, and review closed-session history. It does not submit student proofs or score attendance. Frontend **check-in 7/7**, acoustic **51/51**, backend **35/35**; production build green.
 - Last gate passed: none (Layer 1 gate = ≥95% frames at 1 m, 5 m and 10 m on real phones, both directions, plus a muted control)
-- Setup done: **deployed at https://bio-attend.onrender.com**; teacher Google sign-in, room/class creation and roster save verified on production. Acoustic **50/50**, backend **35/35**, `CI=true` build green.
-- Next action: **owner/friend runs the reverse direction (M32 TX → M01 RX), a muted control and a 10 m run**, then decide 1.10. Code continues with the teacher check-in screen (2.2); scoring and the ID round stay blocked until the Layer 1 gate decision.
+- Setup done: **deployed at https://bio-attend.onrender.com**; teacher Google sign-in, room/class creation and roster save verified on production. Acoustic **51/51**, check-in view **7/7**, backend **35/35**, `CI=true` build green.
+- Next action: **owner/friend runs the reverse direction (M32 TX → M01 RX), a muted control and a 10 m run**, then decide 1.10. The next band-independent code slice is the cascade proof transport (store what a student decoded, still without scoring); scoring and the ID round stay blocked until the Layer 1 gate decision.
 
 
 ## Done: planning (no code)
@@ -96,6 +97,7 @@ Layer 2 work is allowed to proceed in parallel with the remaining physical tests
 | # | Slice | Pass/fail test | Status |
 | --- | --- | --- | --- |
 | 2.1 | Check-in session core | Create/list/get/close a session; students get active state without the key; one active session per class; ownership and role guards | **built 2026-10-24** — `CheckInSession` model, `utils/checkInSession.js` (15^7 key space, minting, 2-minute key TTL, state views), teacher endpoints under `/classes/:classId/check-in-sessions` and `/check-in-sessions/:id`, student `.../active` endpoint. Backend **35/35** + local MongoDB HTTP smoke. No audio integration, scoring or ID round |
+| 2.2 | Teacher check-in screen | Pick a class; start/close a session; show wave 0, key and lifetime; open the tested transmitter without retyping; show closed-session history | **built + browser-verified 2026-10-24** — `/teacher/check-in` with class picker, guarded start (one active session), live key panel with two-minute countdown, copy, `/acoustic-tx?key=…&from=checkin` handoff, close confirmation and history. Check-in view **7/7**, acoustic **51/51**, backend **35/35**, build green. Local headless Chrome: start → key shown → transmitter key matched → back link returned to the live session → close → history row. No proof submission, scoring or ID round |
 
 
 ## Approved plan: cleanup + redesign before 1.8 (owner, 2026-10-17)
@@ -114,13 +116,13 @@ Owner decisions: **Indigo modern SaaS** palette · **light theme only** for now 
 
 - **Finish the Layer 1 proof.** Highest priority is the **reverse direction (M32 TX → M01 RX)** at 1 m and 5 m, because the M32 lab measured only 0.7 dB at 19.5 kHz. Then run a **muted-transmitter control** (expect 0) and a **10 m** run. Use the transmitter's **Copy receiver link** so the run ID and conditions match; put phone models, media volume and Chrome versions in Notes. Pass = ≥95% decoded per distance.
 - **Re-run the lab** (`/acoustic-lab`) on M01 + M32 after the 3a restyle and record the seven probe margins. This closes 1.1/1.2 and fills the 1.5 table.
-- **Next code slice: 2.2 teacher check-in screen** — choose a class, start/close a session, show wave 0 and the key for playback, and display the old session history. No student proof submission or scoring yet.
-- **Deploy 2.1** after commit/push so the session endpoints exist on production; the UI arrives in 2.2.
+- **2.2 is built** — the teacher screen starts/closes sessions, shows the wave-0 key and countdown, opens the transmitter pre-filled, and lists history. No student proof submission or scoring yet.
+- **Next code slice: 2.3 cascade proof transport** — accept and store what a student decoded (session, wave, key evidence) without deciding attendance. Scoring and the ID round remain gated on 1.10.
 - If the reverse or 10 m run fails, fix the physical layer (lower band / parameterize the codec) before Layer 2 scoring. The M32 speaker is the known risk.
 
 ## Later layers (not started or gated)
 
-- Layer 2: Cascade. Server keys, waves, domain-restricted Google sign-in, roster upload. Slice 2.1 session core is built; the teacher screen and cascade proof are next. Gate: a small rehearsal reaches every phone; waves and time per wave measured.
+- Layer 2: Cascade. Server keys, waves, domain-restricted Google sign-in, roster upload. Slices 2.1 (session core) and 2.2 (teacher screen) are built; the cascade proof transport is next. Gate: a small rehearsal reaches every phone; waves and time per wave measured.
 - Layer 3: ID round and scoring. Time slots, neighbour reports, review queue, same-day override, 1-day expiry job and attendance lock. Gate: outside phones rejected; inside phones accepted or queued.
 - Layer 4: Class pilot with 70–120 students. Gate: attendance matches manual roll call; false accepts and rejects counted.
 - Layer 5: Mobile app, decided after Layer 4.
@@ -164,6 +166,7 @@ The four raw 2026-10-24 JSON reports are archived in `measurements/2026-10-24/`;
 | 2026-10-23 | Deploy readiness + runbook | Removed the JWT from the `sendToken` JSON body (cookie only); added `utils/validateEnv.js` production guard (JWT/DB/cookie lifetime), `JWT_EXPIRE`/`COOKIE_EXPIRE` defaults, security headers, production-only CORS defaults, auth rate limiting, Node/Mongo error handling; frontend production build now refuses to fall back to the dev Google client; docs and env examples updated; wrote `docs/deployment.md` (Render single service + Atlas + Google OAuth, exact env vars, verification, two-phone procedure, rollback, Vercel alternative). | Backend **27/27**, acoustic **48/48**, `CI=true` build green. Production-mode smoke on port 4100: `/api/v1/health` 200, `/api/v1/auth/dev/accounts` 404, SPA deep link 200, unknown API 404; startup refused `DEV_AUTH_ENABLED=true` and placeholder `JWT_SECRET`. Dev-mode smoke: login response has no token, cookie session works, backend serves the built SPA. | Owner: measure + deploy |
 | 2026-10-24 | 1.8 physical measurement + 1.9a report integrity | Deployed to https://bio-attend.onrender.com (Render + Atlas + Google OAuth); teacher login, room/class creation and roster save verified. Real TX/RX runs: **1 m 10/10, 5 m 20/20**, keys matched the TX reports. 1.9a: the receiver link now carries distance/room/notes and the RX pre-fills them; frame timestamps use audio-sample time; TX reports store a numeric amplitude; the RX warns when no run ID came from the link. | Acoustic **50/50**, backend **27/27**, `CI=true` build green. Caveats: both TX/RX run IDs differed (paired by key), the 5 m RX report kept the default 1 m condition before 1.9a, and no muted control, reverse-direction or 10 m run exists yet. | Reverse direction + control + 10 m; then decide 1.10 and continue Layer 2 |
 | 2026-10-24 | 2.1 check-in session core + measurement archive | Added `models/checkInSessionModels.js`, `utils/checkInSession.js`, `controllers/checkInSessionController.js`, `routes/checkInSessionRoute.js`, mounted in `app.js`. Teacher can create/list/get/close sessions; an enrolled student can read only the active session metadata (no key). Sessions mint keys in the same 15^7 space as FSK, start at wave 0, keep a 2-minute key TTL, and have one active session per class via a partial unique index. Archived the four 1 m/5 m JSON reports under `measurements/2026-10-24/` and added `measurements/README.md`. Recorded the owner's teacher-at-front **1-10 m** decision in `plan.md`. | Backend **35/35**. Local MongoDB HTTP smoke: create 201, duplicate 409, list/get 200, student active 200 without `key`, close 200 and idempotent, restart 201, student no-session 200/null; student create 403, teacher on student route 403, unauth 401, unenrolled 403, other teacher 404, invalid id 404; `Cache-Control: no-store`; unique partial index rejected a direct duplicate active insert with 11000. | 2.2 teacher check-in screen; owner/friend runs reverse, control and 10 m |
+| 2026-10-24 | 2.2 teacher check-in screen + key handoff | Added `teacher/checkInSessions.jsx`/`.css`, pure `checkInSessionView.js` helpers, route `/teacher/check-in`, nav/quick-action entries, and `readTransmitKey`/`buildTransmitSearch` in `transmitPlan.js`. The screen auto-selects the first owned class, refuses to show Start until that class's sessions are confirmed, starts/closes with the 2.1 endpoints, shows wave 0 with a live key countdown and copy button, opens `/acoustic-tx?key=…&from=checkin`, and lists closed sessions. The transmitter validates decimal keys only, shows a "loaded from check-in" notice, and offers a back link placed in the action row after a toast-overlap check. Added `npm run test:checkin`. | Backend **35/35**, acoustic **51/51**, check-in view **7/7**, `CI=true` build green (main 125.70 kB gz, CSS 8.42 kB gz). Local built app + Mongo + headless Chrome: chose CS301, start → session live, key `92980571`, countdown `2:00`; transmitter URL/key matched and notice shown; **Back to check-in** returned to the live session; closed → "No live session" + history row. No proof submission, scoring or ID round. | Owner/friend physical runs (reverse, control, 10 m); then decide 1.10 and next Layer 2 slice |
 
 
 ## Open items (from `plan.md`)
@@ -171,7 +174,7 @@ The four raw 2026-10-24 JSON reports are archived in `measurements/2026-10-24/`;
 - Confirm student Google sign-in on production with a real student account.
 - Confirm Render free-plan behaviour during a live 5-6 minute check-in.
 - Re-run the lab (`/acoustic-lab`) on M01 + M32 and record the seven probe margins.
-- Add the teacher check-in UI (2.2), then a cascade proof submission endpoint; scoring and the ID round remain gated.
+- Build the cascade proof submission endpoint (2.3); scoring and the ID round remain gated.
 - A real Layer 2 pilot will need a CSRF review for the split-hosting cookie mode and a shared-store rate limiter if the service scales past one instance.
 
 ## Blockers
@@ -181,7 +184,7 @@ The four raw 2026-10-24 JSON reports are archived in `measurements/2026-10-24/`;
 - **Old MongoDB data dir `~/data/db` is partially root-owned (13 files):** cannot be opened by the current user. A fresh dev dir is in use instead. Only relevant if the old data matters — `sudo chown shivanshsingh:staff ~/data/db/*` would reclaim it.
 - **Resolved 2026-10-17 — Node version:** the old `>=22 <26` restriction came from an unused, broken native `bcrypt` dependency. It was removed, the guard and `engines` widened to `>=22`, and the whole auth flow verified on Node 26.11.1. Plain `npm start` works now.
 
-## Local commands (verified 2026-10-23)
+## Local commands (verified 2026-10-24)
 
 ```bash
 # 1. MongoDB (fresh dev data dir; keep running in its own terminal)
@@ -197,8 +200,10 @@ cd attendance-frontend && npm start                                     # http:/
 cd attendance-frontend && npm run start:shared                          # binds 0.0.0.0 + same-origin API proxy
 cloudflared tunnel --url http://localhost:3000                          # new URL each run; open it on the phones
 # lab: /acoustic-lab   transmitter: /acoustic-tx   receiver: /acoustic-rx
+# teacher check-in: /teacher/check-in
 
 # Tests
 cd attendance-backend && npm test                                       # 35/35 (auth policy, env guard, cookie, rate limit, rosters, binding, session core)
-cd attendance-frontend && npm run test:acoustic                         # 50/50 (codec, lab, worklets, TX/RX link, PCM worklet, pairing)
+cd attendance-frontend && npm run test:acoustic                         # 51/51 (codec, lab, worklets, TX/RX link, key handoff, PCM worklet)
+cd attendance-frontend && npm run test:checkin                          # 7/7 (active session, key countdown, history durations)
 ```

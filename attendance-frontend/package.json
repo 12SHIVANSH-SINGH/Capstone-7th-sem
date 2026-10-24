@@ -16,6 +16,7 @@
     "build": "react-scripts build",
     "test": "react-scripts test",
     "test:acoustic": "node --test src/acoustic/fsk.node-tests.js src/acoustic/lab.node-tests.js src/acoustic/worklet.node-tests.js src/acoustic/link.node-tests.js src/acoustic/pcm-worklet.node-tests.js",
+    "test:checkin": "node --test src/components/teacher/checkInSessionView.node-tests.js",
     "eject": "react-scripts eject"
   },
   "eslintConfig": {

@@ -43,7 +43,9 @@ npm install
 npm start          # http://localhost:3000
 ```
 
-Open http://localhost:3000 in Chrome.
+Open http://localhost:3000 in Chrome. After creating a class and roster, the teacher flow
+continues at http://localhost:3000/teacher/check-in: choose the class, start a session, and
+open the transmitter from the live key.
 
 Heads-up: **Google sign-in only works from http://localhost:3000** — that is the address registered with Google. It won't work from a LAN IP or a tunnel URL.
 
@@ -80,5 +82,6 @@ Real Google accounts:
 
 ```bash
 cd attendance-backend && npm test               # 35 tests
-cd attendance-frontend && npm run test:acoustic # 50 tests
+cd attendance-frontend && npm run test:acoustic # 51 tests
+cd attendance-frontend && npm run test:checkin  # 7 tests
 ```

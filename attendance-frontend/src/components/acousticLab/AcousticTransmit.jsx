@@ -12,6 +12,7 @@ import {
   formatTxReport,
   generateRunId,
   normaliseRunId,
+  readTransmitKey,
   validateAmplitude,
   validateGapMs,
   validateKey,
@@ -38,6 +39,16 @@ import {
 import "./fskLink.css";
 
 const randomKey = () => Math.floor(Math.random() * (MAX_KEY_VALUE + 1));
+
+const readInitialKey = () => {
+  if (typeof window === "undefined") return null;
+  return readTransmitKey(window.location.search);
+};
+
+const launchedFromCheckIn = () => {
+  if (typeof window === "undefined") return false;
+  return new URLSearchParams(window.location.search).get("from") === "checkin";
+};
 
 const disposeTx = (engine) => {
   if (!engine || engine.disposed) return;
@@ -74,7 +85,10 @@ const disposeTx = (engine) => {
 
 const AcousticTransmit = () => {
   const [runId, setRunId] = useState(() => initialRunId() || generateRunId());
-  const [key, setKey] = useState(() => randomKey());
+  const [key, setKey] = useState(() => {
+    const prefill = readInitialKey();
+    return prefill === null ? randomKey() : prefill;
+  });
   const [repeats, setRepeats] = useState(10);
   const [gapMs, setGapMs] = useState(450);
   const [amplitude, setAmplitude] = useState(0.5);
@@ -85,7 +99,11 @@ const AcousticTransmit = () => {
   const [startedAt, setStartedAt] = useState(null);
   const [device, setDevice] = useState(null);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
+  const [notice, setNotice] = useState(() =>
+    readInitialKey() !== null && launchedFromCheckIn()
+      ? "Session key loaded from the check-in screen. Start the transmitter when students are ready."
+      : ""
+  );
   const [conditions, setConditions] = useState({ distance: "1 m", room: "", notes: "" });
 
   const engineRef = useRef(null);
@@ -352,6 +370,7 @@ const AcousticTransmit = () => {
   const busy = phase === "preparing" || phase === "playing";
   const canStart = !busy && previewPlan && validateRunId(runId);
   const frameDurationSeconds = (SYMBOL_COUNT * SYMBOL_DURATION_MS) / 1000;
+  const fromCheckIn = launchedFromCheckIn();
 
   return (
     <LinkShell
@@ -359,6 +378,7 @@ const AcousticTransmit = () => {
       title="Send acoustic frames"
       description="This phone plays repeated FSK frames through its speaker. Keep the receiver phone listening nearby, then compare the two reports by run ID. The transmitter cannot hear or verify the receiver."
       status={<Badge variant={phaseBadge} dot>{phase}</Badge>}
+      backLink={fromCheckIn ? { to: "/teacher/check-in", label: "Back to check-in" } : null}
       actions={
         <Button variant="secondary" onClick={copyReceiverLink}>
           <FiCopy aria-hidden="true" /> Copy receiver link

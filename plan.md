@@ -113,7 +113,7 @@ Policy: strict by default. Borderline cases go to a review queue where the teach
 
 ## 8. Layers and gates
 
-Each layer is built only after the previous gate passes, unless the owner explicitly allows a band-independent slice to proceed in parallel. Layer 2.1 (session core) was allowed on 2026-10-24 while the remaining Layer 1 range tests were still running; scoring and the ID round still wait for the Layer 1 gate decision.
+Each layer is built only after the previous gate passes, unless the owner explicitly allows a band-independent slice to proceed in parallel. Layer 2.1 (session core) and 2.2 (teacher check-in screen) were allowed on 2026-10-24 while the remaining Layer 1 range tests were still running; scoring and the ID round still wait for the Layer 1 gate decision.
 
 | Layer | Scope | Gate |
 | --- | --- | --- |

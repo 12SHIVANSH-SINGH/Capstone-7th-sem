@@ -8,6 +8,7 @@ import Login from './components/login/Login';
 import StudentDashboard from './components/student/studentDashboard';
 import TeacherDashboard from './components/teacher/teacherDashboard';
 import ClassManagement from './components/teacher/classManagement';
+import CheckInSessions from './components/teacher/checkInSessions';
 import AcousticLab from './components/acousticLab/AcousticLab';
 import AcousticTransmit from './components/acousticLab/AcousticTransmit';
 import AcousticReceive from './components/acousticLab/AcousticReceive';
@@ -20,6 +21,7 @@ function App() {
           <Route path={'/'} element={<Home />} />
           <Route path={'/login'} element={<Login />} />
           <Route path='/teacher/classes' element={<ClassManagement />} />
+          <Route path='/teacher/check-in' element={<CheckInSessions />} />
           <Route path='/acoustic-lab' element={<AcousticLab />} />
           <Route path='/acoustic-tx' element={<AcousticTransmit />} />
           <Route path='/acoustic-rx' element={<AcousticReceive />} />

@@ -442,6 +442,7 @@ const ClassManagement = () => {
       links={[
         { to: "/teacher-dashboard", label: "Dashboard" },
         { to: "/teacher/classes", label: "Classes & rosters", active: true },
+        { to: "/teacher/check-in", label: "Check-in" },
         { to: "/acoustic-lab", label: "Phone audio test" },
       ]}
     >

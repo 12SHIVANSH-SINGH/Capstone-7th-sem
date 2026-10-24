@@ -2,7 +2,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 import Brand from "../../ui/Brand";
 
-const LinkShell = ({ eyebrow, title, description, status, actions, children }) => (
+const LinkShell = ({ eyebrow, title, description, status, actions, backLink, children }) => (
   <main className="fsk-link">
     <div className="fsk-link__shell">
       <div className="fsk-link__topbar">
@@ -26,7 +26,16 @@ const LinkShell = ({ eyebrow, title, description, status, actions, children }) =
         {status}
       </header>
 
-      {actions && <div className="fsk-link__hero-actions">{actions}</div>}
+      {(actions || backLink) && (
+        <div className="fsk-link__hero-actions">
+          {backLink && (
+            <Link to={backLink.to} className="ui-btn ui-btn--secondary">
+              {backLink.label}
+            </Link>
+          )}
+          {actions}
+        </div>
+      )}
       {children}
 
       <footer className="fsk-link__footer">

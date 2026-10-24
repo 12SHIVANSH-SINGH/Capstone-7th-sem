@@ -83,6 +83,32 @@ const readReceiverConditions = (search = "") => {
   return conditions;
 };
 
+// The check-in screen opens the transmitter with the server-minted key already
+// filled in. Reading is deliberately strict: a malformed or out-of-range value
+// becomes "no prefill" rather than a broken transmission.
+const readTransmitKey = (search = "") => {
+  const params = new URLSearchParams(String(search || ""));
+  const raw = params.get("key");
+  if (raw === null) return null;
+  const text = raw.trim();
+  // Accept decimal digits only. Number() alone would also accept hex, exponent
+  // and signed forms that no session key ever uses.
+  if (!/^\d+$/.test(text)) return null;
+  const key = Number(text);
+  return validateKey(key) ? key : null;
+};
+
+const buildTransmitSearch = (key, source = "") => {
+  if (!validateKey(key)) {
+    throw new RangeError(`key must be an integer from 0 to ${MAX_KEY_VALUE}`);
+  }
+  const params = new URLSearchParams();
+  params.set("key", String(Number(key)));
+  const origin = cleanCondition(source);
+  if (origin) params.set("from", origin);
+  return params.toString();
+};
+
 const buildTransmissionPlan = ({ key, repeats, gapMs = 450 } = {}) => {
   if (!validateKey(key)) {
     throw new RangeError(`key must be an integer from 0 to ${MAX_KEY_VALUE}`);
@@ -295,6 +321,8 @@ module.exports = {
   validateAmplitude,
   buildReceiverSearch,
   readReceiverConditions,
+  readTransmitKey,
+  buildTransmitSearch,
   buildTransmissionPlan,
   countStartedFrames,
   decodeRate,

@@ -64,6 +64,32 @@ test("receiver link carries the run ID and the transmitter conditions", () => {
   assert.deepEqual(link.readReceiverConditions("?run=AB12CD&room=Lab&notes="), { room: "Lab" });
 });
 
+test("check-in launch links prefill only a valid transmitter key", () => {
+  assert.equal(link.buildTransmitSearch(42, "checkin"), "key=42&from=checkin");
+  assert.equal(link.buildTransmitSearch(0), "key=0");
+  assert.equal(link.readTransmitKey("?key=42&from=checkin"), 42);
+  assert.equal(link.readTransmitKey("?key=0"), 0);
+  assert.equal(link.readTransmitKey(`?key=${link.MAX_KEY_VALUE}`), link.MAX_KEY_VALUE);
+
+  for (const bad of [
+    "",
+    "?key=",
+    "?key=-1",
+    `?key=${link.MAX_KEY_VALUE + 1}`,
+    "?key=abc",
+    "?key=1.5",
+    "?key=1e2",
+    "?key=0x10",
+    "?key=%2B42",
+    "?from=checkin",
+  ]) {
+    assert.equal(link.readTransmitKey(bad), null, `${bad} must not prefill a key`);
+  }
+
+  assert.throws(() => link.buildTransmitSearch(-1), /key must be an integer/);
+  assert.throws(() => link.buildTransmitSearch(link.MAX_KEY_VALUE + 1), /key must be an integer/);
+});
+
 test("TX reports normalise a string amplitude from the range input", () => {
   const plan = link.buildTransmissionPlan({ key: 42, repeats: 2, gapMs: 450 });
   const json = link.buildTxReportJson({ runId: "ABC234", plan, amplitude: "0.9" });

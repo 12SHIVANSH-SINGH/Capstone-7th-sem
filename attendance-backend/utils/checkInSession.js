@@ -18,6 +18,9 @@ const KEY_SPACE = KEY_RADIX ** KEY_DIGIT_COUNT;
 const MAX_KEY_VALUE = KEY_SPACE - 1;
 
 const INITIAL_WAVE = 0;
+// Hard ceiling shared by the session model, the proof validator and the browser.
+// It is a wire-format bound, not a policy: no real class gets near it.
+const MAX_WAVE = 1_000_000;
 const STATUS_ACTIVE = "active";
 const STATUS_CLOSED = "closed";
 const SESSION_STATUSES = [STATUS_ACTIVE, STATUS_CLOSED];
@@ -153,6 +156,7 @@ module.exports = {
   KEY_SPACE,
   MAX_KEY_VALUE,
   INITIAL_WAVE,
+  MAX_WAVE,
   STATUS_ACTIVE,
   STATUS_CLOSED,
   SESSION_STATUSES,

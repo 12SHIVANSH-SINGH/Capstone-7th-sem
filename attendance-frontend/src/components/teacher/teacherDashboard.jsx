@@ -55,7 +55,7 @@ const TeacherDashboard = () => {
 
     const handleLogout = useCallback(async () => {
         try {
-            await axios.get(`${SERVER_URL}/logout`, requestConfig);
+            await axios.post(`${SERVER_URL}/logout`, null, requestConfig);
         } catch (error) {
             // Sign-out is best-effort; the local session ends either way.
         }

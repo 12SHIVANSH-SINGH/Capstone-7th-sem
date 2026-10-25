@@ -1,7 +1,20 @@
 const ErrorHandler = require('../utils/errorhandler')
 
 module.exports = (err, req, resp, next) => {
-    err.statuscode = err.statuscode || 500;
+    // body-parser flags malformed JSON with type "entity.parse.failed" (a
+    // SyntaxError carrying a .body property). Never echo parser text: request
+    // bodies may contain secrets, and parser wording varies by runtime.
+    const parseFailed =
+        err.type === "entity.parse.failed" ||
+        (err instanceof SyntaxError && Object.prototype.hasOwnProperty.call(err, "body"));
+    if (parseFailed) {
+        return resp.status(400).json({
+            success: false,
+            message: "Invalid JSON body"
+        })
+    }
+
+    err.statuscode = err.statuscode || err.statusCode || err.status || 500;
     err.message = err.message || "internal server error";
 
     //wrong mongodb id error(cast error)

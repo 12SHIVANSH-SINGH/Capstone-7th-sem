@@ -16,7 +16,7 @@ Mark attendance for 70-120 students by proving each phone was physically inside 
 
 ## 2. Core idea
 
-Sound stays inside a room, so hearing a fresh signal is the proof of presence. Phones pass the signal on as near-inaudible tones, and the server decides who is present.
+Sound stays inside a room, so hearing a fresh signal is the intended evidence of presence. Phones pass the signal on as near-inaudible tones, and the server decides who is present.
 
 Location (GPS) cannot be the secret: everyone knows where the room is, phone GPS is typically 5-10 m off and worse indoors, and a web app cannot prove its GPS reading is real. GPS is only a weak secondary check.
 
@@ -32,24 +32,25 @@ Three parts:
 | --- | --- | --- |
 | Phones and browsers | Iteration 1: Android, Chrome, phones from 2020 or later, any brand. About 20% of the class uses iOS, which comes in a later iteration | iOS is not part of the Layer 1 test |
 | Band | Lower band is acceptable and preferred if it works | Layer 1 compares 18-20 kHz with a lower band (e.g. 15-17 kHz) and picks the more reliable one |
-| Stored data | GPS reading, IP address, device ID, kept as a secondary verification layer | Browsers cannot read a hardware device ID. "Device ID" = random ID + key pair created on first use and stored in the browser; clearing site data resets it |
-| Retention | Stored data lives for 1 day. Students raise any query that same day; after that it lapses and attendance is locked | Needs a daily expiry job, a same-day query path into the review queue, and a lock on attendance records. Teacher overrides must also happen that day |
+| Stored data | GPS reading, IP address, device ID, kept as a secondary verification layer | Browsers cannot read a hardware device ID. "Device ID" = random ID + key pair created on first use and stored in the browser; clearing site data resets it. Layer 2.3 stores none of these: see the retention row for its actual fields |
+| Retention | Stored data lives for 1 day. Students raise any query that same day; after that it lapses and attendance is locked | Needs a daily expiry job, a same-day query path into the review queue, and a lock on attendance records. Teacher overrides must also happen that day. Layer 2.3 stores student email, device fingerprint, session/wave/key, signature and protocol version, and the whole record expires after about 24 hours; no GPS or IP is stored |
 | Teacher override | Only for the review queue (unsure cases) | The teacher cannot change marks outside the queue |
 | Time budget | Class is 50-55 min. Teacher starts about minute 40. Check-in must finish in 5-6 min | Rough on paper: ~5-6 s per wave, a handful of waves ~30 s, ID round ~2 min for 120. Measure in Layers 2 and 3 |
 | Hosting | Free service such as Render, Netlify or Vercel | Layer 1 needs only static HTTPS hosting. From Layer 2 the server must stay awake and hold live connections for 5-6 min, so check each free tier's idle sleep and connection limits first |
-| Student notice | Short in-app notice shown before first check-in and confirmed with a tap (the Join button, which browsers require anyway for mic access), plus one teacher announcement | Notice states what is collected, why, that it is deleted after 1 day, and how to raise a query that day |
+| Student notice | Short in-app notice shown before first check-in and confirmed with a tap (the Join button, which browsers require anyway for mic access), plus one teacher announcement | Notice states what is collected, why, that it is deleted after 1 day, and how to raise a query that day. **Not built yet:** it must ship with the student check-in shell, before that shell collects a proof |
 | Student identity | College Google account ending nitjsr.ac.in, one account per student. Example: `2023ugcs059@nitjsr.ac.in` encodes batch, programme, branch, roll number | Google sign-in limited to the nitjsr.ac.in domain, verified on the server. Batch/branch/roll are read from the address for display and grouping only; the roster decides class membership |
 | Teacher phone | Ordinary phone speaker plays K0 and stays at the front of the room; it is never passed around | Counts as no room hardware. Students are 1-10 m away; if one phone captures poorly, the teacher may move the phone closer for that wave |
 
 ### Assumptions I made (not yet confirmed, change if wrong)
 
-- Roster and final attendance results are kept for the term; only GPS/IP/device data expires after 1 day.
+- Roster and final attendance results are kept for the term. Layer 2.3 proof evidence stores the student email, device fingerprint, session/wave/key, signature and protocol version; the whole record expires after about 24 hours and it stores no GPS or IP. The student notice and tap consent are not built yet and must ship with the student shell.
+- Device-binding records currently persist indefinitely, while Layer 2.3 proof evidence is TTL'd after about 24 hours. Whether bindings should follow the same 1-day retention or persist until a device change is an open question; the agreed 1-day evidence retention is unchanged. The same browser profile currently shares one device key across accounts; treat "device" as the browser profile until per-student key isolation is designed.
 - The teacher's phone stays at the front of the room, 1-10 m from the nearest student phones. Moving closer is a fallback for a phone that captures poorly, not part of the normal flow.
 - Layer 1 pass target of 95% of frames decoded is a proposal.
 
 ## 4. Roster
 
-The roster is the list of college emails allowed to check in to this class (one row per enrolled student, 70-120 rows). It decides who can check in and who counts as absent (on the roster but not marked present).
+The roster is the list of college emails allowed to check in to this class (one row per enrolled student, 70-120 rows). It decides who can check in and who counts as absent (on the roster without an attendance record).
 
 - Source: a CSV the teacher uploads, with a paste-the-list box as the same feature. For the first pilot, paste 10-20 volunteer emails into the same box.
 - One required column: `email`. Name and section are optional.
@@ -89,7 +90,7 @@ Hardware reality:
 3. Server checks Kn is valid, fresh and unused by that student, marks the student heard in wave n+1, returns K(n+1).
 4. The phone plays K(n+1) two or three times, then stays muted for the session (no feedback loops).
 5. Phones in the same wave play the identical signal, so sounds add instead of colliding.
-6. A phone that hears a valid key from any wave joins at the lowest wave it heard.
+6. A phone that hears a valid key from any wave joins at the lowest wave it heard. This rule needs wave advancement and key history, which are not built yet.
 7. The cascade ends when a wave adds no new students or the check-in window closes.
 
 Phone state machine: Listening -> Decoding -> Server check -> Transmitting -> Muted. Rejected or expired keys go back to Listening.
@@ -114,6 +115,8 @@ Policy: strict by default. Borderline cases go to a review queue where the teach
 ## 8. Layers and gates
 
 Each layer is built only after the previous gate passes, unless the owner explicitly allows a band-independent slice to proceed in parallel. Layer 2.1 (session core) and 2.2 (teacher check-in screen) were allowed on 2026-10-24 while the remaining Layer 1 range tests were still running; scoring and the ID round still wait for the Layer 1 gate decision.
+
+**Status note (2026-10-25):** Layer 2.3 proof transport is built and tested locally (uncommitted): a bound student can submit signed session/wave/key evidence, stored idempotently with a 1-day TTL. It does **not** score attendance and has no student UI. Wave advancement and key history are required before the "lowest wave heard" rule in section 6 and before a 5-6 minute multi-wave session can be rehearsed.
 
 | Layer | Scope | Gate |
 | --- | --- | --- |
@@ -142,11 +145,18 @@ Each layer is built only after the previous gate passes, unless the owner explic
 
 - Confirm student Google sign-in on production with a real student account; teacher Google sign-in is verified.
 - Confirm Render free-plan behaviour during a live 5-6 minute check-in, including idle sleep and connection limits.
-- A real Layer 2 pilot will need a CSRF review for the split-hosting cookie mode and a shared-store rate limiter if the service scales past one instance.
+- **2.3 rehearsal enrollment:** Gmail `TEST_STUDENT_EMAILS` accounts and dev personas cannot join college-only rosters, so they cannot submit proofs for a class. Decide an env-gated test enrollment before the student check-in shell.
+- **Device-binding retention:** binding records persist indefinitely while proof evidence is TTL'd after about 24 hours. Clarify whether bindings should follow the same retention; the agreed 1-day evidence retention is unchanged.
+- **First-binding recovery boundary:** a never-bound account auto-approves its first device, so a stolen session cookie can bind a device. Account/device theft is out of current scope, but claims must say "once a device is bound".
+- **Wave advancement and key history:** required before the "lowest wave heard" rule and 5-6 minute multi-wave sessions.
+- **Split-hosting CSRF caveat:** the exact frontend origin must be in `CLIENT_URLS`; same-origin one-service hosting is automatic and no-Origin CLI requests work.
+- **Startup fails closed on duplicate data:** a duplicate that prevents a unique index stops the service; clean the data before deploy.
+- A real Layer 2 pilot will need a shared-store rate limiter if the service scales past one instance.
 
 ## 11. Out of scope (for now)
 
 - Student using another student's phone or account.
+- Account or device-key theft beyond the first-binding recovery boundary.
 - iOS and other browsers.
 - Native mobile app (Layer 5).
 - Any extra room hardware.

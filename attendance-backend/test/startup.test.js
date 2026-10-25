@@ -68,3 +68,18 @@ test("the same validation runs in production", () => {
     /non-college test accounts/
   );
 });
+
+test("a database connection failure exits 1 before listening", () => {
+  const result = runStartup({
+    NODE_ENV: "production",
+    JWT_SECRET: "a-production-secret-that-is-long-enough",
+    // No server listens on port 1; the short selector timeout keeps the test fast.
+    DB_URI: "mongodb://127.0.0.1:1/bio-attend-startup-unreachable?serverSelectionTimeoutMS=200",
+    COOKIE_EXPIRE: "7",
+  });
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /Refusing to start: database connection failed:/);
+  assert.doesNotMatch(result.stdout, /MongoDB indexes are ready/);
+  assert.doesNotMatch(result.stdout, /server is working/);
+});

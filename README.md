@@ -2,7 +2,7 @@
 
 # 🎧 Bio Attend
 
-**Classroom attendance that proves who's actually in the room — using inaudible near-ultrasonic tones passed between student phones.**
+**Classroom attendance built to show who's actually in the room — using inaudible near-ultrasonic tones passed between student phones.**
 
 Capstone project · NIT Jamshedpur
 
@@ -13,17 +13,17 @@ Capstone project · NIT Jamshedpur
 
 </div>
 
-**Live prototype:** [https://bio-attend.onrender.com](https://bio-attend.onrender.com) — teacher sign-in, class/roster management and the check-in session screen work; the two-phone acoustic link is under test.
+**Live prototype:** [https://bio-attend.onrender.com](https://bio-attend.onrender.com) — teacher sign-in, class/roster management and the check-in session screen work; the two-phone acoustic link is under test. The Layer 2.3 proof transport is built and tested locally but is **not deployed**.
 
 ## Why
 
-Roll calls and QR codes are easy to fake — a friend answers "present", or a QR code gets photographed and shared. Bio Attend aims to prove *physical presence*: students' own phones play and listen for short near-ultrasonic tone sequences, and the server verifies who actually heard the room's one-time key.
+Roll calls and QR codes are easy to fake — a friend answers "present", or a QR code gets photographed and shared. Bio Attend aims to prove *physical presence*: students' own phones play and listen for short near-ultrasonic tone sequences, and the server records which phones heard the room's one-time key.
 
 ## How it works
 
 1. **Teacher starts a check-in** — the server mints a one-time key for that class.
 2. **Phones play and listen** — student phones emit and listen for near-ultrasonic tones (inaudible to most people). No app to install.
-3. **The server verifies** — in the full flow, phones that decoded the key will be marked present. Playing the tone from outside the room doesn't help: the sound only carries inside.
+3. **The server records evidence** — a phone submits the wave and key it decoded, signed by its bound device key. The server stores that as evidence; the full check-in flow will decide attendance. A forwarded key alone does not prove presence, which is why the ID round is still planned.
 
 The full check-in loop is the next milestone; today the building blocks are in place and tested.
 
@@ -31,11 +31,12 @@ The full check-in loop is the next milestone; today the building blocks are in p
 
 - 🔐 **Google-only sign-in** with a college-domain gate (plus env-gated test accounts during rehearsal)
 - 🏫 **Classes, rooms and rosters** — teacher creates a class, sets its room, imports the student roster from CSV
-- 📱 **One device per student** — each browser binds to a private key; new devices wait in a teacher **review queue**
+- 📱 **One device per student** — each browser binds to a private key; the first binding auto-approves, and a changed device waits in a teacher **review queue**
 - 🔊 **Phone sound lab** — measures a phone's audio path (sample rate, tone margins) before real check-ins
 - 📡 **Two-phone TX/RX link test** — one phone plays FSK frames, the other decodes them and both export a paired report
 - 🎛️ **Custom FSK tone codec** — 17 tones in the ~18–19.8 kHz band, 120 ms symbols, with automated tests; no audio libraries
 - 🗝️ **Teacher check-in screen** — pick a class, start/close a server-minted 15^7 wave-0 key, see its two-minute lifetime, open the tested transmitter with the key pre-filled, and review session history
+- 🧾 **Cascade proof transport (Layer 2.3)** — a bound student can submit the session/wave/key it decoded with a signed P-256 device proof; the server stores idempotent evidence with a 1-day TTL and **does not score attendance**. No student UI yet
 - 🎨 **Modern responsive UI** — a light indigo design system shared across both roles
 - 🧪 **Dev-only one-click sign-in** — passwordless test personas for two-phone work; impossible in production
 
@@ -47,10 +48,11 @@ The full check-in loop is the next milestone; today the building blocks are in p
 | New UI — design system + Home, Login, both dashboards, 404 | ✅ done |
 | Class management and sound lab get the new design, plus lab safety fixes | ✅ done |
 | Two-phone TX/RX link pages and reports | ✅ deployed; physical link passes 1 m and 5 m |
-| Phone-to-phone tone test at 1 m (first real presence proof) | ✅ 10/10 at 1 m, 20/20 at 5 m (2026-10-24); reverse/control/10 m pending |
+| Phone-to-phone tone test at 1 m (first real acoustic link result) | ✅ 10/10 at 1 m, 20/20 at 5 m (2026-10-24); reverse/control/10 m pending |
 | Server check-in session core (Layer 2.1) | ✅ built and tested |
 | Teacher check-in screen (Layer 2.2) | ✅ built and tested; starts/closes sessions and hands the key to the transmitter |
-| Full check-in flow for a live class | ⏳ — student proof submission, wave advancement and scoring are not built |
+| Cascade proof transport (Layer 2.3) | ✅ built and tested locally; **no student UI or scoring** and not deployed yet |
+| Full check-in flow for a live class | ⏳ — the proof transport exists; student check-in shell, wave advancement and scoring are next |
 
 This is a prototype — not yet used for real attendance.
 
@@ -99,7 +101,8 @@ Testing on real phones (microphone needs HTTPS) and the full walkthrough: **[doc
 ## Tests
 
 ```bash
-cd attendance-backend && npm test               # 72 tests — auth policy, controller, middleware, startup, env guard, rosters, binding, rate limit, session core, test allowlists
+cd attendance-backend && npm test               # 124 tests — auth policy, controller, middleware, startup, env guard, origin guard, rosters, binding, session core, proof transport, test allowlists
+cd attendance-frontend && npm run test:proof    # 15 tests — proof payload, canonical message, signing and transport helpers
 cd attendance-frontend && npm run test:acoustic # 51 tests — codec, lab, worklets, TX/RX link, key handoff
 cd attendance-frontend && npm run test:checkin  # 7 tests — active-session view, key countdown, history durations
 cd attendance-frontend && npm run test:auth     # 2 tests — signed-in dashboard routing
@@ -108,8 +111,9 @@ cd attendance-frontend && npm run test:auth     # 2 tests — signed-in dashboar
 ## Documentation
 
 - 📄 **[docs/](docs/)** — what the project is, how to run it, how it works, troubleshooting
+- 🗺️ **[Architecture diagrams](docs/diagrams/)** — PlantUML component map, check-in flow and proof sequence
 - 🚀 **[docs/deployment.md](docs/deployment.md)** — Render + Atlas + Google OAuth runbook
-- 🗺️ [`plan.md`](plan.md) — signal design and staged engineering plan
+- 🧭 [`plan.md`](plan.md) — signal design and staged engineering plan
 - 📈 [`progress.md`](progress.md) — what's built, measured results, what's next
 
 ## Notes

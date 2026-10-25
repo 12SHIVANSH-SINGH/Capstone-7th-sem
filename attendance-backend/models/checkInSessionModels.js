@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const {
   MAX_KEY_VALUE,
   INITIAL_WAVE,
+  MAX_WAVE,
   SESSION_STATUSES,
   STATUS_ACTIVE,
 } = require("../utils/checkInSession");
@@ -37,6 +38,12 @@ const checkInSessionSchema = new mongoose.Schema(
       type: Number,
       default: INITIAL_WAVE,
       min: 0,
+      max: MAX_WAVE,
+      // min/max accept 1.5, so the integer check is explicit.
+      validate: {
+        validator: Number.isInteger,
+        message: "wave must be a non-negative integer.",
+      },
     },
     key: {
       type: Number,

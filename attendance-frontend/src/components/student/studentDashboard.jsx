@@ -15,8 +15,8 @@ const STATUS_VIEW = {
         badge: "Approved",
         variant: "success",
         icon: "✓",
-        title: "This browser is approved for attendance",
-        text: "When your teacher starts a check-in, this phone will play and listen for the key tones.",
+        title: "This browser is approved",
+        text: "Your device is bound and approved. Student check-in is not enabled yet; the phone audio test is available now, and hearing a key will record evidence when the student shell ships.",
     },
     review: {
         badge: "In review",
@@ -71,7 +71,7 @@ const StudentDashboard = () => {
 
     const handleLogout = useCallback(async () => {
         try {
-            await axios.get(`${SERVER_URL}/logout`, { withCredentials: true });
+            await axios.post(`${SERVER_URL}/logout`, null, { withCredentials: true });
         } catch (error) {
             // Sign-out is best-effort; the local session ends either way.
         }
@@ -102,7 +102,7 @@ const StudentDashboard = () => {
                 <div>
                     <h1 className="ui-page-head__title">Hi {firstName} 👋</h1>
                     <p className="ui-page-head__sub">
-                        This is your attendance home. Check-ins happen right here once your teacher starts a session.
+                        This is your attendance home. Student check-in is not enabled yet; this page shows your device status and the phone audio test.
                     </p>
                 </div>
             </div>
@@ -120,19 +120,19 @@ const StudentDashboard = () => {
                     </div>
                 </Card>
 
-                <Card title="When your teacher starts a check-in" subtitle="Nothing to tap — the app handles it.">
+                <Card title="Student check-in is not enabled yet" subtitle="This page will show the live step when the student shell ships.">
                     <ol className="checkin-steps">
                         <li>
-                            <strong>Keep this page open.</strong>
-                            The app listens for the one-time key tones played in the room.
+                            <strong>Check your device status.</strong>
+                            The card above shows whether this browser is bound and approved.
                         </li>
                         <li>
-                            <strong>Wait a few seconds.</strong>
-                            Your phone hears the key through its microphone.
+                            <strong>Test the phone audio.</strong>
+                            Make sure this phone can hear the near-ultrasonic tones.
                         </li>
                         <li>
-                            <strong>You’re marked present.</strong>
-                            The server records that this device heard the key.
+                            <strong>Check-in will appear here.</strong>
+                            When the shell ships, hearing a key will record evidence; your teacher’s check-in decides attendance.
                         </li>
                     </ol>
                 </Card>

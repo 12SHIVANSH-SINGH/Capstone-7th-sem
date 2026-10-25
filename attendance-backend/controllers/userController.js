@@ -9,7 +9,9 @@ const { isDevAuthEnabled } = require("../utils/devAuth");
 
 // 📌 Logout User
 exports.logout = catchAsyncError(async (req, res, next) => {
-    res.cookie("token", null, cookieOptions(new Date(Date.now())));
+    // clearCookie expires the cookie immediately instead of storing a literal
+    // null value. Use the same flags as the login cookie so browsers match it.
+    res.clearCookie("token", cookieOptions());
 
     res.status(200).json({
         success: true,

@@ -60,11 +60,14 @@ git ls-files | grep -E '(^|/)config\.env$|(^|/)\.env$'
 ### 1.2 Run the full local gate
 
 ```bash
-# Backend: 72 tests (auth policy, controller, middleware, startup, dev gate, env guard, cookie, rate limit, rosters, binding, session core)
+# Backend: 124 tests (auth policy, controller, middleware, startup, env guard, origin guard, cookie, rate limit, rosters, binding, session core, proof transport)
 cd attendance-backend && npm test
 
+# Proof transport: 15 tests (payload, signed message, device-key helpers)
+cd ../attendance-frontend && npm run test:proof
+
 # Acoustic: 51 tests (codec, lab, worklets, TX/RX link, PCM worklet, pairing)
-cd ../attendance-frontend && npm run test:acoustic
+npm run test:acoustic
 
 # Check-in view: 7 tests (session view helpers and duration formatting)
 npm run test:checkin
@@ -78,7 +81,7 @@ CI=true REACT_APP_API_URL=/api/v1 \
   npm run build
 ```
 
-All five must pass before you push. The build command mirrors Render's build step;
+All six must pass before you push. The build command mirrors Render's build step;
 if it fails locally, fix it before deploying.
 
 ### 1.3 Commit and push
@@ -86,7 +89,7 @@ if it fails locally, fix it before deploying.
 ```bash
 cd ..
 git add -A
-git commit -m "Layer 1 acoustic link, class management, dev auth, deploy readiness"
+git commit -m "Layer 2.3 proof transport and hardening"
 git branch -M main
 git remote add origin https://github.com/YOUR-USERNAME/bio-attend.git
 git push -u origin main
@@ -192,6 +195,12 @@ Notes:
 - `PORT` is provided by Render. Do not set it.
 - `REACT_APP_*` values are baked into the React bundle **at build time**. Changing one
   requires a redeploy, not just a restart.
+- Layer 2.3 adds **no new environment variables**. The proof transport uses the existing
+  database, JWT cookie and device-binding data.
+- If the frontend and API are on different origins, each exact frontend origin must be in
+  `CLIENT_URLS` (comma separated, no trailing slash). The CSRF origin guard rejects unsafe
+  requests from any other origin with 403. Same-origin single-service hosting is allowed
+  automatically; tools such as `curl` that send no `Origin` header still work.
 - `JWT_SECRET` must stay stable across restarts and rollbacks. Changing it signs every
   user out. Rotate it if it leaks, or deliberately when you need to invalidate all
   sessions (see the test-account revocation note in section 4).
@@ -203,11 +212,14 @@ Notes:
 Click **Manual Deploy → Deploy latest commit**. Watch the log for:
 
 ```text
-server is working at http://localhost:10000
 mongodb connected with server:...
+MongoDB indexes are ready for N model(s): ...
+server is working at http://localhost:10000
 ```
 
 Render assigns the port through `PORT`, so the number in the log is not always 10000.
+The exact model count varies with the registered models; the important part is that
+`MongoDB indexes are ready` appears **before** `server is working`.
 
 ---
 
@@ -286,6 +298,10 @@ on its next call as well as at the next sign-in. The stored user row keeps its r
 it or set `role: "student"` if that matters. Rotating `JWT_SECRET` revokes every session,
 including real college accounts, and is not needed for a single test account.
 
+Test accounts can sign in and bind a device, but they **cannot submit a 2.3 proof**: proof
+submission requires an active roster enrollment, and roster upload accepts college
+addresses only. No env-gated test enrollment exists yet; that is an open decision.
+
 ---
 
 ## 5. Verification after deploy
@@ -318,7 +334,39 @@ curl -s -o /dev/null -w '%{http_code}\n' "$BASE/acoustic-tx"
 # 200
 curl -s -o /dev/null -w '%{http_code}\n' "$BASE/teacher/check-in"
 # 200 (the page itself still requires a teacher sign-in in the browser)
+
+# 6. Logout is POST-only
+curl -s -o /dev/null -w '%{http_code}\n' "$BASE/api/v1/logout"
+# 405, with Allow: POST
+
+# 7. The proof endpoint rejects anonymous submissions
+curl -s -o /dev/null -w '%{http_code}\n' -X POST \
+  -H 'Content-Type: application/json' -d '{}' \
+  "$BASE/api/v1/check-in-sessions/000000000000000000000000/proofs"
+# 401
+
+# With a signed-in teacher cookie, the same POST returns 403 (student-only route).
+# Do not attempt a real proof unless a student has an approved device binding:
+# a valid proof must be signed by the P-256 key stored in that student's browser.
 ```
+
+Check the database indexes after the first successful startup:
+
+```bash
+mongosh "YOUR_ATLAS_URI" --eval '
+  db.checkinproofs.getIndexes().map(i => i.name);
+  db.checkinsessions.getIndexes().map(i => i.name);
+'
+# must include:
+#   one_proof_per_student_wave
+#   proof_retention_1_day
+#   one_active_check_in_per_class
+```
+
+Startup now connects to MongoDB and waits for every Mongoose model's `init()` (index
+build) **before** opening the HTTP listener. If a connection or index build fails, the
+process logs `Refusing to start: …` and exits 1; it never listens. A duplicate row that
+prevents a unique index from building therefore stops the service instead of being served.
 
 Then in a browser:
 
@@ -337,8 +385,8 @@ Then in a browser:
 7. Open `BASE/teacher/check-in`, choose the class, and start a check-in. Confirm the key
    and two-minute countdown appear. Click **Open transmitter**: the key field on
    `BASE/acoustic-tx` must match. Click **Back to check-in**, close the session, and confirm
-   it moves into **Session history**. This is UI wiring only; no student proof or
-   attendance is recorded yet.
+   it moves into **Session history**. This is UI wiring only: the 2.3 proof transport exists
+   but has no student UI, so no proof or attendance is recorded from this screen yet.
 8. Open `BASE/acoustic-tx` on one phone and `BASE/acoustic-rx` on the other and run the
    procedure in section 7. No sign-in is needed for the link test.
 9. In browser devtools → Application → Cookies, confirm the `token` cookie is
@@ -364,10 +412,12 @@ HttpOnly; Secure; SameSite=None
   single-service deployment the cookie is first-party anyway, so this is harmless.
 
 The API accepts credentialed requests only from origins listed in `CLIENT_URL` /
-`CLIENT_URLS`; production no longer auto-allows localhost. State-changing endpoints
-expect JSON, which browsers cannot send cross-site without a CORS preflight, so the
-cookie is not usable from an arbitrary website. Sign-in endpoints are rate limited per
-IP (30 Google attempts / 10 minutes per process).
+`CLIENT_URLS`, and production no longer auto-allows localhost. Every unsafe request
+(POST/PUT/PATCH/DELETE) also passes through a CSRF origin guard: the request's own origin,
+an exact configured origin, or a no-`Origin` CLI/server request is allowed; anything else
+gets 403 before authentication or a state change. Split hosting therefore requires the
+exact frontend origin in `CLIENT_URLS`. Sign-in endpoints are rate limited per
+IP (30 Google attempts / 10 minutes per process). Logout is POST-only; a GET returns 405.
 
 ---
 
@@ -576,13 +626,17 @@ session cookie becomes third-party, which Safari and some Chrome modes block.
 Copy this into your notes and tick each line.
 
 - [ ] `config.env` is ignored; no secrets in `git ls-files`
-- [ ] Backend tests pass (72/72)
+- [ ] Backend tests pass (124/124)
+- [ ] Proof transport tests pass (15/15)
 - [ ] Acoustic tests pass (51/51)
+- [ ] Check-in view tests pass (7/7)
+- [ ] Auth routing tests pass (2/2)
 - [ ] `CI=true` production build passes locally
 - [ ] Code pushed to GitHub `main`
 - [ ] Atlas cluster, user and network access created
 - [ ] Render Web Service created with build/start commands and health path
 - [ ] All Render environment variables set; `DEV_AUTH_ENABLED` absent
+- [ ] Split hosting only: exact frontend origin is in `CLIENT_URLS` (unsafe requests otherwise 403)
 - [ ] Rehearsal/testing only: `TEST_STUDENT_EMAILS` / `TEST_TEACHER_EMAILS` set, test users added
       while the consent screen is in Testing, and `REACT_APP_GOOGLE_HOSTED_DOMAIN` empty
       in the rebuilt frontend
@@ -593,6 +647,8 @@ Copy this into your notes and tick each line.
 - [ ] `GOOGLE_CLIENT_ID` and `REACT_APP_GOOGLE_CLIENT_ID` match; redeployed
 - [ ] `/api/v1/health` returns 200
 - [ ] `/api/v1/auth/dev/accounts` returns 404
+- [ ] Anonymous proof POST returns 401 (and 403 with a teacher cookie)
+- [ ] Startup log says indexes are ready; required proof/session indexes exist in `mongosh`
 - [ ] Teacher Google sign-in works on the deployed URL
 - [ ] Test teacher (if configured) signs in and opens `/teacher/check-in`
 - [ ] Room, class, roster preview/save work and survive a refresh

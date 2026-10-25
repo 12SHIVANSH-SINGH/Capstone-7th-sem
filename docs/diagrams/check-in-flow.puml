@@ -1,0 +1,70 @@
+@startuml
+!pragma layout smetana
+title Check-in flow — teacher/server built, student shell planned
+
+skinparam defaultFontName "Arial"
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam roundCorner 8
+skinparam wrapWidth 240
+skinparam activity {
+  BackgroundColor #EEF2FF
+  BorderColor #4F46E5
+}
+skinparam note {
+  BackgroundColor #FFFBEB
+  BorderColor #D97706
+}
+
+|Teacher phone|
+start
+:Open /teacher/check-in;
+:Choose class and start session;
+
+|Server|
+:Server mints wave-0 key K0\n15^7 space · 2-minute key TTL;
+
+|Teacher phone|
+:Play K0 repeatedly from the front;
+
+|Student phone (shell planned)|
+:Listen with mic and decode K0;
+:Build canonical message\nsession + wave + key + student;
+:Sign with the bound P-256 device key;
+:POST /api/v1/check-in-sessions/:id/proofs;
+
+|Server|
+:Origin guard · auth · student role\n60/min per student;
+if (Enrolled, approved device,\nno pending device change?) then (no)
+  :401 / 403 / 429;
+  stop
+endif
+:Load session and verify signature;
+if (Proof already recorded?) then (same key)
+  :200 duplicate\nno second row;
+else (new)
+  if (Active, current wave,\nkey fresh, key matches?) then (no)
+    :400 / 409;
+    stop
+  endif
+  :201 record evidence\nstudent · wave · key · device · signature;
+  :TTL ~24 h;
+endif
+:attendanceDecided = false;
+note right
+  Only the current wave is accepted.
+  "Lowest wave heard" needs wave
+  advancement and key history first.
+end note
+
+|Teacher phone|
+:Teacher closes the session;
+
+|Gated future — not built|
+:Advance wave and repeat\nthe cascade;
+:ID round + neighbour reports;
+:Scoring + teacher review queue;
+:Attendance locked same day;
+stop
+
+@enduml

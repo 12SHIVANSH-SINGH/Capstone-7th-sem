@@ -1,3 +1,5 @@
+import { signProofMessage } from "../acoustic/proofTransport";
+
 const DATABASE_NAME = "attendance-device-keys";
 const STORE_NAME = "keys";
 const DEVICE_KEY_ID = "student-device-v1";
@@ -45,4 +47,16 @@ export const getOrCreateDevicePublicKey = async () => {
   await saveKey({ privateKey: keyPair.privateKey, publicKeyJwk });
 
   return publicKeyJwk;
+};
+
+/**
+ * Sign the exact proof message for this browser's bound device key.
+ * The private key never leaves IndexedDB; only the signature is returned.
+ */
+export const signDeviceMessage = async (message) => {
+  const stored = await readKey();
+  if (!stored?.privateKey) {
+    throw new Error("This browser has no attendance device key. Sign in again.");
+  }
+  return signProofMessage(stored.privateKey, message);
 };

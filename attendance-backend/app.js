@@ -61,6 +61,12 @@ app.use(express.json());
 
 app.set('trust proxy', true); // Add this in your main Express config
 
+// Cookie-authenticated mutations must come from this API's own origin or an
+// explicitly configured frontend. CORS alone does not stop a cross-site form
+// POST; this guard does, before authentication or state changes run.
+const createOriginGuard = require('./middleware/originGuard');
+app.use(createOriginGuard({ allowedOrigins, isProduction }));
+
 const userRoute = require('./routes/userRoute');
 app.use("/api/v1", userRoute);
 

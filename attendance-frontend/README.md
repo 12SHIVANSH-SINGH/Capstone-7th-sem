@@ -10,7 +10,10 @@ React single-page app for **Bio Attend** — classroom attendance with near-ultr
 | `npm start` | Dev server at http://localhost:3000 (laptop only) |
 | `npm run start:shared` | Dev server on the LAN with a same-origin API proxy — for phone/tunnel testing |
 | `npm run build` | Production build into `build/` |
-| `npm run test:acoustic` | Tone codec tests (Node's test runner) |
+| `npm run test:acoustic` | Tone codec and acoustic link tests (51, Node's test runner) |
+| `npm run test:proof` | Proof transport tests (15) |
+| `npm run test:checkin` | Teacher check-in view tests (7) |
+| `npm run test:auth` | Signed-in routing tests (2) |
 
 ## Where things live
 
@@ -19,6 +22,7 @@ React single-page app for **Bio Attend** — classroom attendance with near-ultr
 | `src/ui/` | Shared design system (buttons, cards, badges, toasts, app shell) |
 | `src/components/` | Pages — Home, Login, dashboards, class management, sound lab |
 | `src/acoustic/fsk.js` | The FSK tone codec (encode/decode) |
+| `src/acoustic/proofTransport.js` | Proof payload/signing helpers (server transport built; no student UI yet) |
 | `public/tone-detector-worklet.js` | AudioWorklet that listens for tones in real time |
 
 Setup, test accounts and phone testing: [docs/getting-started.md](../docs/getting-started.md).

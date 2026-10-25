@@ -1,22 +1,34 @@
 # agent.md: Rules for any AI agent working on this project
 
-Read this file, then `plan.md`, then `progress.md`, in that order, **before doing anything else in every session**. Do not rely on memory of earlier sessions; they may not exist.
+Read this file, then `plan.md`, then `progress.md`, in that order, **before doing anything else in every session**. Do not rely on memory of earlier sessions; they may not exist. For the architecture, open [`docs/diagrams/`](docs/diagrams/) after those three files.
 
 ## Project in one paragraph
 
-A web app (Chrome on Android first) that proves students are physically inside a 20 m x 20 m classroom by passing short-lived keys between phones as near-ultrasonic tones, with a server that mints keys, verifies who heard what, and keeps a teacher review queue. Full detail is in `plan.md`. Do not restate or redesign it here.
+A web app (Chrome on Android first) that aims to prove students are physically inside a 20 m x 20 m classroom by passing short-lived keys between phones as near-ultrasonic tones, with a server that mints keys, records who heard what, and eventually scores attendance with a teacher review queue. Full detail is in `plan.md`. Do not restate or redesign it here.
+
+## Current phase (2026-10-25)
+
+- **Layer 1 gate is still open.** The forward acoustic link passes at 1 m (10/10) and 5 m (20/20); the reverse direction (M32 TX → M01 RX), the muted control and the 10 m run are still pending. Do not call the gate passed.
+- **Layer 2 is partly built:** 2.1 check-in session core, 2.2 teacher check-in screen, and 2.3 signed proof transport. 2.3 stores evidence only — it does **not** score, mark attendance, run the ID round or advance waves.
+- **Production is `b7fd8b1`** (`main.ccb4f246.js` at https://bio-attend.onrender.com). The 2.3 transport and the hardening in this working tree are **uncommitted and not deployed**.
+- **The owner controls every push and deploy.** Never push, tag, merge, or deploy unless the owner explicitly asks in that session. A local build or a green test suite is not permission to publish.
+- **Next code slice:** the student check-in shell on top of the 2.3 transport. Before it, decide an env-gated rehearsal-enrollment path, because Gmail test students and dev personas cannot join college-only rosters.
+- **Still blocked:** scoring, the ID round, wave advancement/key history, and the "lowest wave heard" rule. These wait for the Layer 1 gate decision and, for wave logic, a new slice.
 
 ## Core working rule: small slices, one session at a time
 
 1. Build **one small slice** per session, as listed in `progress.md`. A slice should be something that can be built and tested in a single sitting.
 2. Test the slice before calling it done (see "Testing" below).
-3. Start the **next** slice only if the current slice passed its test. If it failed, fix or stop and report; do not stack new work on an unverified base.
+3. Start the **next** slice only if the current slice passed its test. If it failed, fix it or stop and report; do not stack new work on an unverified base.
 4. If a slice turns out too big, split it into smaller slices in `progress.md` before continuing.
 5. Never build ahead of the current layer's gate. Layer N+1 work does not start until Layer N's gate in `plan.md` has passed and the owner has said so.
+
+The owner may explicitly allow a band-independent Layer 2 slice to proceed while Layer 1 measurements are pending. That exception does **not** unlock scoring or the ID round.
 
 ## Session start checklist
 
 - [ ] Read `agent.md`, `plan.md`, `progress.md`.
+- [ ] Open the relevant diagram in `docs/diagrams/` before changing architecture or flow.
 - [ ] Look at the actual files in the project. If `progress.md` and the real code disagree, trust the code, then correct `progress.md` and tell the owner.
 - [ ] State the one slice you will do this session and its pass/fail test, before writing code.
 - [ ] If anything is unclear or two readings are possible, name it and ask. Do not pick silently.
@@ -26,6 +38,8 @@ A web app (Chrome on Android first) that proves students are physically inside a
 - [ ] Run the slice's test and record the real result (pass, fail, or not tested, and why).
 - [ ] Update `progress.md`: slice status, what changed, files touched, test result, next slice, blockers.
 - [ ] If a decision changed, update `plan.md` and say so.
+- [ ] If a component, endpoint, gate, or flow changed, update the matching file in `docs/diagrams/` and re-render its PlantUML source.
+- [ ] Keep `README.md`, `docs/README.md`, `resume-prompt.md` and the other docs consistent with the current counts and production state.
 - [ ] Give the owner a short summary and an updated resume prompt if the "next slice" changed.
 
 ## Coding principles (the owner's preferences)
@@ -34,33 +48,72 @@ A web app (Chrome on Android first) that proves students are physically inside a
 - **Simplicity first:** minimum code that solves the slice. No speculative features, no configurability nobody asked for, no abstractions for single-use code.
 - **Surgical changes:** touch only what the slice needs. Match existing style. Do not refactor or "improve" unrelated code. If you spot unrelated problems, mention them instead of fixing them. Remove only the leftovers your own change created.
 - **Goal-driven:** every slice has a verifiable pass/fail criterion written down first. Loop until it is verified.
+- **Evidence over claims:** "built" means the code exists; "tested" means a named test or measurement passed; "deployed" means the owner published it and it was verified live. Never blur those three.
 
 ## Testing
 
 - Prefer tests that need no hardware first: encode and decode synthetic audio buffers in Node, including added noise and echo, before trying real phones.
-- Then real-device tests, in small steps: one tone, then one frame, then distance (1 m, 6 m, far corner).
+- Then real-device tests, in small steps: one tone, then one frame, then distance (1 m, 5 m, 10 m).
 - Real-device results (phone model, Android version, Chrome version, distance, frames sent, frames decoded, band used) go in `progress.md`. Do not claim a physical result you did not measure.
 - Never report "works" for something that was only reasoned about.
 
-## Project-specific constraints to respect
+Current local gate (all six must pass before asking the owner to deploy):
 
-- Target for iteration 1: Android, Chrome, phones from 2020 or later. Do not add iOS or other-browser work yet.
-- No room hardware. The teacher's phone only starts the process.
-- Mic and audio need a user tap (Join button) and HTTPS. Disable echoCancellation, noiseSuppression and autoGainControl; log what the browser actually applied.
-- Refuse to run below 44.1 kHz sample rate.
-- The server mints keys. Phones never invent keys.
-- GPS, IP and device data are a secondary check only and expire after 1 day. Show the student notice before collecting anything.
-- The teacher can override only cases in the review queue, and only on the same day.
-- A student using another student's phone is out of scope.
+```bash
+cd attendance-backend && npm test                  # 124/124
+cd attendance-backend && npm test -- --test-isolation=none   # 124/124
+cd attendance-frontend && npm run test:proof       # 15/15
+cd attendance-frontend && npm run test:acoustic    # 51/51
+cd attendance-frontend && npm run test:checkin     # 7/7
+cd attendance-frontend && npm run test:auth        # 2/2
+```
+
+Production build (same API path as the deployed site):
+
+```bash
+cd attendance-frontend
+CI=true REACT_APP_API_URL=/api/v1 \
+  REACT_APP_GOOGLE_CLIENT_ID=690196150991-39rsb4sffjvfl66jt22unp0uulhfgu5m.apps.googleusercontent.com \
+  REACT_APP_GOOGLE_HOSTED_DOMAIN= \
+  npm run build
+```
+
+For the proof endpoint, also run the real HTTP smoke recorded in `progress.md` (guards, accept, retry, wrong key/wave, cross-student replay, stored evidence, expiry, close, race, rate limit, indexes). A pure unit test is not enough for that route.
+
+## Architecture and code map
+
+- `attendance-frontend/` — React SPA: Home, Login, dashboards, class management, sound lab, TX/RX link, proof transport helpers. The student check-in shell is **not built**.
+- `attendance-backend/` — Express API: Google sign-in, roster/class management, device binding, check-in sessions, proof transport, startup index readiness, CSRF origin guard.
+- `docs/diagrams/` — PlantUML source: `system-components.puml`, `check-in-flow.puml`, `proof-transport.puml`.
+- `plan.md` — what and why. `progress.md` — current status and measurements. `resume-prompt.md` — how to restart a session.
+
+## Hard boundaries for the current phase
+
+- **2.3 is evidence-only.** Do not add an attendance boolean, score, `present` flag, wave advancement, review decision, or ID round to the proof path. The response must keep saying `attendanceDecided: false`.
+- **The proof endpoint stays student-only and roster-bound.** It accepts only an enrolled, active student with an approved device binding. A pending device change blocks proofs.
+- **The device signature is bound to session, wave, key and student.** Do not shorten, reorder or version-drift the canonical message without updating both client and server and the cross-package test.
+- **One proof per student per wave.** The unique index is the real guard; the find-then-create path is only an optimization. Never remove the index or the `11000` race handling.
+- **Proof evidence expires after one day** through the TTL index. The signature and protocol version are stored but never returned in a response.
+- **Startup order is `connect → every model init() → listen`.** If an index cannot build, the service must exit rather than serve traffic without its constraints.
+- **Unsafe cross-origin requests are rejected.** The origin guard runs before routes. Split hosting must list the exact frontend origin in `CLIENT_URLS`; single-origin hosting works automatically.
+- **Logout is POST-only.** Do not add a GET mutation back.
+- **The teacher's phone stays at the front; student phones are 1–10 m away.** Use **TX** and **RX** terminology in reports and diagrams.
+- **Test accounts are env-gated and non-college.** `TEACHER_EMAILS` and rosters are college-only (`@nitjsr.ac.in`). Test students are not roster-enrolled, so they cannot submit a real 2.3 proof without an approved enrollment path.
+- **No room hardware.** The teacher's ordinary phone starts the process and is never passed around.
+- **Mic and audio need a user tap and HTTPS.** Disable echoCancellation, noiseSuppression and autoGainControl; log what the browser actually applied. Refuse below 44.1 kHz.
+- **The server mints keys.** Phones never invent keys.
+- **The ID round is still required.** A decoded key is data and can be forwarded. Transport must never claim that a stored proof proves physical presence.
 
 ## Things not to do
 
+- Do not push, deploy, or change production configuration without an explicit owner request.
 - Do not invent project state. If you cannot see it, say so.
-- Do not skip reading the three files because the task looks small.
+- Do not skip reading the three core files because the task looks small.
 - Do not mark a slice done without a recorded test result.
 - Do not start the mobile app or later layers early.
 - Do not change the numbers in `plan.md` (tones, symbol length, thresholds) without a measurement that justifies it; record the measurement in `progress.md`.
 - Do not store more personal data than `plan.md` allows.
+- Do not describe the proof transport as attendance, scoring, or proof of physical presence.
 
 ## Reporting style
 

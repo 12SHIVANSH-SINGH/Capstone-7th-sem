@@ -1,0 +1,51 @@
+@startuml
+!pragma layout smetana
+title Layer 2.3 — proof submission (built locally, not deployed)
+
+skinparam defaultFontName "Arial"
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam roundCorner 8
+skinparam wrapWidth 240
+skinparam sequence {
+  ParticipantBackgroundColor #EEF2FF
+  ParticipantBorderColor #4F46E5
+  LifeLineBorderColor #94A3B8
+}
+autonumber
+
+participant "Student phone\n(browser)" as Phone
+participant "Express API" as API
+participant "MongoDB" as DB
+
+note over Phone
+  The phone decoded a session, wave and key.
+  The private P-256 key never leaves IndexedDB.
+end note
+
+Phone -> Phone: Build canonical message\nbioattend-proof:v1|session=…|wave=…|key=…|student=…
+Phone -> Phone: Sign with the bound device key
+Phone -> API: POST /api/v1/check-in-sessions/:id/proofs\n{ wave, key, signature }\n(cookie session)
+
+API -> API: Origin guard · auth · student role\n60 proofs/min per student
+API -> DB: Load session and check\nactive roster · approved binding\n· no pending device change
+API -> API: Verify signature with the\nbound public key
+API -> DB: Find existing proof for\n(session, student, wave)
+
+alt Exact retry
+  API --> Phone: 200\nduplicate: true · attendanceDecided: false
+else New proof — active, fresh, current wave, key matches
+  API -> DB: Insert evidence + signature +\nprotocol version (unique per student/wave)
+  DB --> API: Stored, TTL ~24 h
+  API --> Phone: 201\nrecorded: true · duplicate: false\nattendanceDecided: false
+else Invalid, stale, wrong device or rate limited
+  API --> Phone: 400 / 401 / 403 / 409 / 429
+end
+
+note over API, DB
+  No score, attendance flag, ID round or wave advancement.
+  The signed proof binds the submission to the bound account/device.
+  It does not prove the phone was physically inside the room.
+end note
+
+@enduml

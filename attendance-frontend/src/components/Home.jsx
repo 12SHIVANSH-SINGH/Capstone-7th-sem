@@ -21,12 +21,12 @@ function Home() {
           <div className="hero__inner">
             <span className="hero__badge">Near-ultrasonic · works on any Android Chrome phone</span>
             <h1>
-              Attendance that proves
+              Attendance built to show
               <span className="hero__accent"> who’s in the room.</span>
             </h1>
             <p className="hero__sub">
-              Bio Attend passes one-time key tones between student phones and checks who heard what.
-              No GPS, no roll-call, no extra hardware — just the phones students already carry.
+              Bio Attend is built to pass one-time key tones between student phones and record which phones hear them.
+              The full check-in will decide attendance — no GPS, no roll-call, no extra hardware.
             </p>
             <div className="hero__actions">
               {loading ? (
@@ -58,12 +58,12 @@ function Home() {
             <article className="step">
               <span className="step__num">2</span>
               <h3>Phones swap key tones</h3>
-              <p>Student phones play and listen for near-ultrasonic tones — inaudible to the class, unique per session.</p>
+              <p>In the full flow, student phones play and listen for near-ultrasonic tones — inaudible to the class, unique per session.</p>
             </article>
             <article className="step">
               <span className="step__num">3</span>
-              <h3>The server verifies</h3>
-              <p>Whoever heard the key is marked present. Playing it from outside the room won’t help.</p>
+              <h3>The server records evidence</h3>
+              <p>Whoever hears the key has evidence recorded. The server decides attendance only after the full check-in — a forwarded key alone does not prove presence.</p>
             </article>
           </div>
         </section>
@@ -77,13 +77,13 @@ function Home() {
             </article>
             <article className="feature">
               <span className="feature__icon"><FaVolumeUp /></span>
-              <h3>In-room presence</h3>
-              <p>Presence is proven acoustically: the key tones only reach devices that are actually in the room.</p>
+              <h3>Acoustic evidence</h3>
+              <p>Hearing a key is designed to be recorded as evidence. Attendance is decided only after the full check-in — a forwarded key alone doesn’t prove presence.</p>
             </article>
             <article className="feature">
               <span className="feature__icon"><FaMobileAlt /></span>
               <h3>One device per student</h3>
-              <p>Each browser binds to a device key, and teachers approve new devices before they can check in.</p>
+              <p>Each browser binds to a device key; a changed device waits for teacher approval. The first binding is auto-approved.</p>
             </article>
             <article className="feature">
               <span className="feature__icon"><FaFileCsv /></span>

@@ -1,0 +1,75 @@
+@startuml
+!pragma layout smetana
+title Bio Attend — system components (high level)
+
+skinparam defaultFontName "Arial"
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam roundCorner 8
+skinparam wrapWidth 220
+skinparam rectangle {
+  BackgroundColor #F8FAFC
+  BorderColor #475569
+  BorderThickness 1
+}
+skinparam database {
+  BackgroundColor #F8FAFC
+  BorderColor #475569
+}
+skinparam note {
+  BackgroundColor #FFFBEB
+  BorderColor #D97706
+}
+hide stereotype
+
+rectangle "Teacher phone — Android Chrome" as TP {
+  rectangle "Teacher dashboard\nclasses · rosters · device review" as TD
+  rectangle "Check-in screen\nstart · wave · key · countdown" as TC
+  rectangle "Acoustic transmitter\nplays the current wave key (K0 today)" as TX
+}
+
+rectangle "Student phone — Android Chrome" as SP {
+  rectangle "Student dashboard\nidentity · device status" as SD
+  rectangle "Student check-in shell\nPLANNED" as SHELL #E2E8F0
+  rectangle "Acoustic receiver\nmic + FSK decode" as RX
+  rectangle "Device key\nP-256 in IndexedDB" as DK
+}
+
+rectangle "Bio Attend web service\nNode.js · Express · one origin" as SRV {
+  rectangle "Sign-in & policy\nGoogle · teacher/student · roster" as AUTH
+  rectangle "Device binding\nfirst device · review queue" as BIND
+  rectangle "Check-in sessions\nkeys · wave 0 · close" as SESS
+  rectangle "Proof transport\nsignature · evidence · 24 h TTL" as PROOF
+  rectangle "Safety guards\nCSRF origin · rate limit · startup indexes" as GUARD
+}
+
+database "MongoDB Atlas" as DB {
+  rectangle "Users\n+ device bindings" as U
+  rectangle "Classes · rooms\nrosters" as C
+  rectangle "Check-in sessions" as S
+  rectangle "Proof evidence\nTTL ~24 h" as P
+}
+
+rectangle "Google Identity" as G
+rectangle "Layer 3 — scoring + ID round\nNOT BUILT · gated on Layer 1" as L3 #FEE2E2
+
+TP --> SRV : HTTPS
+SP --> SRV : HTTPS
+SHELL --> SRV : HTTPS (planned)
+TX ..> RX : near-ultrasonic key tones\n(phone-to-phone; server never hears audio)
+SRV --> G : verify Google ID token
+AUTH --> U
+BIND --> U
+SESS --> C
+SESS --> S
+PROOF --> S
+PROOF --> P
+PROOF ..> L3 : evidence feeds scoring\nonly after the gate
+
+note bottom of RX
+  A decoded key is evidence, not attendance.
+  The device signature proves which bound account
+  submitted it; it cannot prove physical presence.
+end note
+
+@enduml

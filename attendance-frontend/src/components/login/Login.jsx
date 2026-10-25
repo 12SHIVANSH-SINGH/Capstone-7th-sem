@@ -132,15 +132,16 @@ const Login = () => {
                 </div>
                 <div className="login-brand__content">
                     <span className="login-brand__badge">Acoustic presence check-in</span>
-                    <h1>Attendance that proves who’s actually in the room.</h1>
+                    <h1>Attendance built to show who’s actually in the room.</h1>
                     <p>
-                        One-time near-ultrasonic key tones travel between student phones, and the
-                        server verifies who heard them. No GPS tracking, no roll-call, no extra hardware.
+                        One-time near-ultrasonic key tones are designed to travel between student phones,
+                        with the server recording which phones heard them. The full check-in will decide
+                        attendance — no GPS tracking, no roll-call, no extra hardware.
                     </p>
                     <ul className="login-brand__points">
                         <li>College Google sign-in — nothing to remember</li>
                         <li>Each browser binds to a private device key</li>
-                        <li>Teachers approve new devices in seconds</li>
+                        <li>Teachers approve changed devices in seconds</li>
                     </ul>
                 </div>
                 <div className="login-brand__wave" aria-hidden="true">

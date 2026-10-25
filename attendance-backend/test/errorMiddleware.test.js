@@ -53,3 +53,29 @@ test("duplicate-key errors stay 400 with or without key metadata", () => {
   assert.equal(patternResult.status, 400);
   assert.match(patternResult.body.message, /Duplicate googleSubject entered/);
 });
+
+test("malformed JSON becomes a safe 400 without parser internals", () => {
+  const parseError = new SyntaxError('Unexpected token } in JSON at position 3 in body "{\\"bad\\""');
+  parseError.type = "entity.parse.failed";
+  parseError.status = 400;
+  parseError.statusCode = 400;
+  parseError.body = '{bad';
+
+  const result = run(parseError);
+  assert.equal(result.status, 400);
+  assert.deepEqual(result.body, { success: false, message: "Invalid JSON body" });
+  assert.doesNotMatch(JSON.stringify(result.body), /Unexpected token|position|bad/);
+});
+
+test("statusCode and status are accepted when statuscode is absent", () => {
+  const statusCodeError = new Error("teapot");
+  statusCodeError.statusCode = 418;
+  assert.equal(run(statusCodeError).status, 418);
+
+  const statusError = new Error("unprocessable");
+  statusError.status = 422;
+  assert.equal(run(statusError).status, 422);
+
+  const defaultError = new Error("boom");
+  assert.equal(run(defaultError).status, 500);
+});

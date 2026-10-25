@@ -173,11 +173,11 @@ case-sensitive.
 | `GOOGLE_CLIENT_ID` | the Web client ID from step 4 |
 | `CLIENT_URL` | `https://YOUR-SERVICE.onrender.com` |
 | `TEACHER_EMAILS` | comma-separated college emails provisioned as teachers on first sign-in, e.g. `2023ugcs059@nitjsr.ac.in` (college domain only; removing one does not demote an existing teacher) |
-| `TEST_STUDENT_EMAILS` | leave **empty** for the pilot, or the test Gmail(s) during rehearsal (non-college only) |
-| `TEST_TEACHER_EMAILS` | leave **empty** for the pilot, or the test Gmail(s) that need teacher access during rehearsal (non-college only) |
+| `TEST_STUDENT_EMAILS` | empty unless you are deliberately testing Gmail student sign-in; non-college addresses only, at most 10 |
+| `TEST_TEACHER_EMAILS` | empty unless an owner/test-teacher Gmail needs teacher access; non-college addresses only, at most 10 |
 | `REACT_APP_API_URL` | `/api/v1` |
 | `REACT_APP_GOOGLE_CLIENT_ID` | the same value as `GOOGLE_CLIENT_ID` |
-| `REACT_APP_GOOGLE_HOSTED_DOMAIN` | `nitjsr.ac.in` (a chooser hint; set it to an **empty value** and rebuild to let Gmail test accounts appear — deleting it falls back to the college domain) |
+| `REACT_APP_GOOGLE_HOSTED_DOMAIN` | `nitjsr.ac.in` for college-only builds; an **empty value** while Gmail test accounts are enabled (a chooser hint; deleting it falls back to the college domain) |
 | `REACT_APP_VERSION` | `1.9.0` (optional; appears in report JSON) |
 
 **Never set `DEV_AUTH_ENABLED` on Render.** If it is set to `true` with
@@ -580,11 +580,12 @@ Copy this into your notes and tick each line.
 - [ ] Atlas cluster, user and network access created
 - [ ] Render Web Service created with build/start commands and health path
 - [ ] All Render environment variables set; `DEV_AUTH_ENABLED` absent
-- [ ] Rehearsal only: `TEST_STUDENT_EMAILS` / `TEST_TEACHER_EMAILS` set, test users added
+- [ ] Rehearsal/testing only: `TEST_STUDENT_EMAILS` / `TEST_TEACHER_EMAILS` set, test users added
       while the consent screen is in Testing, and `REACT_APP_GOOGLE_HOSTED_DOMAIN` empty
       in the rebuilt frontend
-- [ ] Production build restores `REACT_APP_GOOGLE_HOSTED_DOMAIN=nitjsr.ac.in` and empties
-      both `TEST_*` lists (keep `TEACHER_EMAILS` for real college teachers)
+- [ ] When Gmail test access is no longer needed: restore
+      `REACT_APP_GOOGLE_HOSTED_DOMAIN=nitjsr.ac.in`, empty both `TEST_*` lists, and
+      rebuild/redeploy (keep `TEACHER_EMAILS` for real college teachers)
 - [ ] Google OAuth Web client created with the Render origin
 - [ ] `GOOGLE_CLIENT_ID` and `REACT_APP_GOOGLE_CLIENT_ID` match; redeployed
 - [ ] `/api/v1/health` returns 200
@@ -592,7 +593,8 @@ Copy this into your notes and tick each line.
 - [ ] Teacher Google sign-in works on the deployed URL
 - [ ] Test teacher (if configured) signs in and opens `/teacher/check-in`
 - [ ] Room, class, roster preview/save work and survive a refresh
-- [ ] Student sign-in creates a pending device; teacher approves it
+- [ ] Student sign-in auto-approves the first device; a changed device appears as pending
+      for teacher review
 - [ ] TX/RX pages render over HTTPS and two phones complete a run
 - [ ] Control run with the transmitter muted decodes 0 frames
 - [ ] Results recorded in `progress.md` with real numbers

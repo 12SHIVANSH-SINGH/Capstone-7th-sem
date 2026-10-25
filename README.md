@@ -102,6 +102,7 @@ Testing on real phones (microphone needs HTTPS) and the full walkthrough: **[doc
 cd attendance-backend && npm test               # 72 tests — auth policy, controller, middleware, startup, env guard, rosters, binding, rate limit, session core, test allowlists
 cd attendance-frontend && npm run test:acoustic # 51 tests — codec, lab, worklets, TX/RX link, key handoff
 cd attendance-frontend && npm run test:checkin  # 7 tests — active-session view, key countdown, history durations
+cd attendance-frontend && npm run test:auth     # 2 tests — signed-in dashboard routing
 ```
 
 ## Documentation

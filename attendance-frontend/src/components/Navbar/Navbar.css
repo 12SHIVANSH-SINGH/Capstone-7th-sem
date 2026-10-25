@@ -17,3 +17,8 @@
   align-items: center;
   justify-content: space-between;
 }
+
+.navbar__status {
+  font-size: 13px;
+  color: var(--text-faint);
+}

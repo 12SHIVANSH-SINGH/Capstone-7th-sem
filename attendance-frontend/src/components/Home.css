@@ -56,6 +56,15 @@
   flex-wrap: wrap;
 }
 
+.hero__session-note {
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+  padding: 0 18px;
+  color: var(--text-soft);
+  font-size: 14px;
+}
+
 .hero__wave {
   margin-top: 46px;
   height: 64px;

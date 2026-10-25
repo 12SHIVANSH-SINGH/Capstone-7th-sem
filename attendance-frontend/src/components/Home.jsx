@@ -1,6 +1,8 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import Navbar from './Navbar/navbar';
+import useSession from '../hooks/useSession';
+import { dashboardPath } from '../utils/auth';
 import './Home.css';
 import { FaUserShield, FaVolumeUp, FaMobileAlt, FaFileCsv } from 'react-icons/fa';
 
@@ -8,9 +10,12 @@ import { FaUserShield, FaVolumeUp, FaMobileAlt, FaFileCsv } from 'react-icons/fa
 const WAVE = [8, 14, 22, 30, 18, 26, 12, 20, 28, 16, 24, 10, 18, 26, 32, 22, 14, 20, 28, 16, 10, 24, 30, 18, 12, 22, 16, 26];
 
 function Home() {
+  const { user, loading } = useSession();
+  const dashboard = user ? dashboardPath(user.role) : null;
+
   return (
     <>
-      <Navbar />
+      <Navbar user={user} loading={loading} />
       <div className="home">
         <section className="hero">
           <div className="hero__inner">
@@ -24,7 +29,13 @@ function Home() {
               No GPS, no roll-call, no extra hardware — just the phones students already carry.
             </p>
             <div className="hero__actions">
-              <Link to="/login" className="ui-btn ui-btn--primary ui-btn--lg">Sign in with college Google</Link>
+              {loading ? (
+                <span className="hero__session-note">Checking your session…</span>
+              ) : (
+                <Link to={dashboard || "/login"} className="ui-btn ui-btn--primary ui-btn--lg">
+                  {dashboard ? "Open your dashboard" : "Sign in with college Google"}
+                </Link>
+              )}
               <a href="#how" className="ui-btn ui-btn--secondary ui-btn--lg">See how it works</a>
             </div>
             <div className="hero__wave" aria-hidden="true">
@@ -84,9 +95,15 @@ function Home() {
 
         <section className="cta-wrap">
           <div className="cta">
-            <h2>Ready when your class is.</h2>
-            <p>Sign in with your NIT Jamshedpur account to continue.</p>
-            <Link to="/login" className="ui-btn ui-btn--lg">Get started</Link>
+            <h2>{user ? "You’re already signed in." : "Ready when your class is."}</h2>
+            <p>
+              {user
+                ? "Continue to your dashboard, or open the phone audio test."
+                : "Sign in with your NIT Jamshedpur account to continue."}
+            </p>
+            <Link to={dashboard || "/login"} className="ui-btn ui-btn--lg">
+              {dashboard ? "Open dashboard" : "Get started"}
+            </Link>
           </div>
         </section>
 
@@ -94,7 +111,7 @@ function Home() {
           <div className="footer__inner">
             <span className="footer__note">© 2026 Bio Attend · NIT Jamshedpur capstone</span>
             <nav className="footer__links" aria-label="Footer">
-              <Link to="/login">Sign in</Link>
+              <Link to={dashboard || "/login"}>{dashboard ? "Dashboard" : "Sign in"}</Link>
               <Link to="/acoustic-lab">Phone audio test</Link>
             </nav>
           </div>

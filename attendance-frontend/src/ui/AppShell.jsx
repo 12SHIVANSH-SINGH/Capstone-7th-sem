@@ -2,6 +2,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 import Badge from "./Badge";
 import Brand from "./Brand";
+import { dashboardPath } from "../utils/auth";
 
 // Sticky top bar + centered content column shared by every signed-in page.
 // `links` is an array of { to, label, active }.
@@ -12,7 +13,7 @@ const AppShell = ({ role, name, email, onLogout, links = [], children }) => {
     <div className="ui-shell">
       <header className="ui-shell__bar">
         <div className="ui-shell__inner">
-          <Brand />
+          <Brand to={dashboardPath(role)} />
 
           {links.length > 0 && (
             <nav className="ui-shell__nav" aria-label="Primary">

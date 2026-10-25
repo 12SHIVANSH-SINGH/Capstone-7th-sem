@@ -7,15 +7,26 @@ import GoogleSignInButton from "./GoogleSignInButton";
 import { getOrCreateDevicePublicKey } from "../../utils/deviceKey";
 import Badge from "../../ui/Badge";
 import Brand from "../../ui/Brand";
-import { Spinner } from "../../ui/Spinner";
+import { PageLoader, Spinner } from "../../ui/Spinner";
+import useSession from "../../hooks/useSession";
+import { dashboardPath } from "../../utils/auth";
 
 const Login = () => {
     const navigate = useNavigate();
+    const { user: sessionUser, loading: sessionLoading } = useSession();
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState("");
     const [devAccounts, setDevAccounts] = useState([]);
     const [devBusy, setDevBusy] = useState("");
     const [devNotice, setDevNotice] = useState("");
+
+    // A signed-in visitor who reaches /login (bookmark, back button, old link)
+    // should not be asked to sign in again.
+    useEffect(() => {
+        if (!sessionLoading && sessionUser) {
+            navigate(dashboardPath(sessionUser.role), { replace: true });
+        }
+    }, [navigate, sessionLoading, sessionUser]);
 
     const completeSignIn = useCallback(async (data) => {
         let deviceStatus = "approved";
@@ -104,6 +115,14 @@ const Login = () => {
     }, [completeSignIn]);
 
     const busy = isLoading || Boolean(devBusy);
+
+    if (sessionLoading) {
+        return <PageLoader label="Checking your session…" />;
+    }
+
+    if (sessionUser) {
+        return <PageLoader label="Opening your dashboard…" />;
+    }
 
     return (
         <div className="login-page">

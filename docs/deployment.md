@@ -69,13 +69,16 @@ cd ../attendance-frontend && npm run test:acoustic
 # Check-in view: 7 tests (session view helpers and duration formatting)
 npm run test:checkin
 
+# Auth routing: 2 tests (signed-in dashboard target)
+npm run test:auth
+
 # Production build, same API path the deployed site will use
 CI=true REACT_APP_API_URL=/api/v1 \
   REACT_APP_GOOGLE_CLIENT_ID=YOUR-GOOGLE-CLIENT-ID.apps.googleusercontent.com \
   npm run build
 ```
 
-All four must pass before you push. The build command mirrors Render's build step;
+All five must pass before you push. The build command mirrors Render's build step;
 if it fails locally, fix it before deploying.
 
 ### 1.3 Commit and push

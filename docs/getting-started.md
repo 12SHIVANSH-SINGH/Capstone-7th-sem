@@ -93,4 +93,5 @@ chooser). Rebuild after changing it.
 cd attendance-backend && npm test               # 72 tests
 cd attendance-frontend && npm run test:acoustic # 51 tests
 cd attendance-frontend && npm run test:checkin  # 7 tests
+cd attendance-frontend && npm run test:auth     # 2 tests
 ```

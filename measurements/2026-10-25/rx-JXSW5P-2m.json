@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "testType": "cross-phone",
+  "role": "rx",
+  "runId": "JXSW5P",
+  "generatedAt": "2026-10-25T04:56:41.314Z",
+  "appVersion": "1.8.0",
+  "device": {
+    "role": "rx",
+    "contextSampleRate": 48000,
+    "trackSampleRate": 48000,
+    "warning": null,
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Mobile Safari/537.36"
+  },
+  "conditions": {
+    "distance": "2 m",
+    "room": null,
+    "notes": null
+  },
+  "planned": 10,
+  "decoded": 9,
+  "decodeRate": 0.9,
+  "elapsedMs": 36015.5,
+  "keys": [
+    112601243,
+    112601243,
+    112601243,
+    112601243,
+    112601243,
+    112601243,
+    112601243,
+    112601243,
+    112601243
+  ],
+  "lastKey": 112601243,
+  "lastMargin": 30.57041794535047,
+  "frames": [
+    {
+      "atMs": 4047,
+      "frameStartSample": 194256,
+      "key": 112601243,
+      "marginDb": 28.7
+    },
+    {
+      "atMs": 5813,
+      "frameStartSample": 279024,
+      "key": 112601243,
+      "marginDb": 28.4
+    },
+    {
+      "atMs": 7604,
+      "frameStartSample": 364992,
+      "key": 112601243,
+      "marginDb": 27.1
+    },
+    {
+      "atMs": 9370,
+      "frameStartSample": 449760,
+      "key": 112601243,
+      "marginDb": 28.9
+    },
+    {
+      "atMs": 11146,
+      "frameStartSample": 535008,
+      "key": 112601243,
+      "marginDb": 29.8
+    },
+    {
+      "atMs": 12912,
+      "frameStartSample": 619776,
+      "key": 112601243,
+      "marginDb": 29.8
+    },
+    {
+      "atMs": 14683,
+      "frameStartSample": 704784,
+      "key": 112601243,
+      "marginDb": 20.4
+    },
+    {
+      "atMs": 16444,
+      "frameStartSample": 789312,
+      "key": 112601243,
+      "marginDb": 32.8
+    },
+    {
+      "atMs": 18220,
+      "frameStartSample": 874560,
+      "key": 112601243,
+      "marginDb": 30.6
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 @startuml
 !pragma layout smetana
-title Bio Attend — system components (high level)
+title Bio Attend — system components (evidence-only pilot)
 
 skinparam defaultFontName "Arial"
 skinparam defaultFontSize 13
@@ -24,13 +24,14 @@ hide stereotype
 
 rectangle "Teacher phone — Android Chrome" as TP {
   rectangle "Teacher dashboard\nclasses · rosters · device review" as TD
-  rectangle "Check-in screen\nstart · wave · key · countdown" as TC
-  rectangle "Acoustic transmitter\nplays the current wave key (K0 today)" as TX
+  rectangle "Check-in screen\nstart · wave · key · advance" as TC
+  rectangle "Evidence view\nread-only · email · wave · time\nno attendance" as TE
+  rectangle "Acoustic transmitter\nplays the current wave key" as TX
 }
 
 rectangle "Student phone — Android Chrome" as SP {
   rectangle "Student dashboard\nidentity · device status" as SD
-  rectangle "Student check-in shell\nPLANNED" as SHELL #E2E8F0
+  rectangle "Student check-in shell\nconsent · mic · evidence" as SHELL
   rectangle "Acoustic receiver\nmic + FSK decode" as RX
   rectangle "Device key\nP-256 in IndexedDB" as DK
 }
@@ -38,7 +39,8 @@ rectangle "Student phone — Android Chrome" as SP {
 rectangle "Bio Attend web service\nNode.js · Express · one origin" as SRV {
   rectangle "Sign-in & policy\nGoogle · teacher/student · roster" as AUTH
   rectangle "Device binding\nfirst device · review queue" as BIND
-  rectangle "Check-in sessions\nkeys · wave 0 · close" as SESS
+  rectangle "Check-in sessions\nkeys · current wave · advance\nbounded key history" as SESS
+  rectangle "Student discovery\nlive sessions · no key" as DISC
   rectangle "Proof transport\nsignature · evidence · 24 h TTL" as PROOF
   rectangle "Safety guards\nCSRF origin · rate limit · startup indexes" as GUARD
 }
@@ -46,27 +48,33 @@ rectangle "Bio Attend web service\nNode.js · Express · one origin" as SRV {
 database "MongoDB Atlas" as DB {
   rectangle "Users\n+ device bindings" as U
   rectangle "Classes · rooms\nrosters" as C
-  rectangle "Check-in sessions" as S
+  rectangle "Check-in sessions\ncurrent key + bounded history" as S
   rectangle "Proof evidence\nTTL ~24 h" as P
 }
 
 rectangle "Google Identity" as G
-rectangle "Layer 3 — scoring + ID round\nNOT BUILT · gated on Layer 1" as L3 #FEE2E2
+rectangle "Layer 3 — scoring + ID round\nNOT BUILT · gated" as L3 #FEE2E2
 
 TP --> SRV : HTTPS
 SP --> SRV : HTTPS
-SHELL --> SRV : HTTPS (planned)
+SHELL --> SRV : HTTPS
+SHELL ..> DISC : live sessions\n(no key)
 TX ..> RX : near-ultrasonic key tones\n(phone-to-phone; server never hears audio)
 SRV --> G : verify Google ID token
 AUTH --> U
 BIND --> U
 SESS --> C
 SESS --> S
+TE --> P : read-only evidence\nno key or signature
+DISC --> C
+DISC --> S
 PROOF --> S
 PROOF --> P
-PROOF ..> L3 : evidence feeds scoring\nonly after the gate
+PROOF ..> L3 : evidence feeds scoring\nonly after the owner starts it
 
 note bottom of RX
+  Layer 1 is assumed passed by owner direction
+  for build planning only; it is not measured-passed.
   A decoded key is evidence, not attendance.
   The device signature proves which bound account
   submitted it; it cannot prove physical presence.

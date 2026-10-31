@@ -43,7 +43,7 @@ const deriveIdentity = (email) => {
   };
 };
 
-const parseRosterText = (rosterText) => {
+const parseRosterText = (rosterText, { allowedTestEmails = [] } = {}) => {
   if (typeof rosterText !== "string" || !rosterText.trim()) {
     return { entries: [], errors: [{ row: null, message: "Paste a CSV or one college email per line." }] };
   }
@@ -51,6 +51,13 @@ const parseRosterText = (rosterText) => {
   const errors = [];
   const entries = [];
   const seenEmails = new Set();
+  const rehearsalEmails = new Set(
+    (Array.isArray(allowedTestEmails) ? allowedTestEmails : [])
+      .map((email) => String(email || "").trim().toLowerCase())
+      .filter(Boolean)
+  );
+  const isInstitutionalEmail = (email) =>
+    email.endsWith(`@${INSTITUTIONAL_DOMAIN}`) && /^[^\s@]+@nitjsr\.ac\.in$/i.test(email);
   const lines = rosterText.replace(/^\uFEFF/, "").split(/\r?\n/);
   let firstDataLine = true;
 
@@ -75,8 +82,13 @@ const parseRosterText = (rosterText) => {
     }
     firstDataLine = false;
 
-    if (!email.endsWith(`@${INSTITUTIONAL_DOMAIN}`) || !/^[^\s@]+@nitjsr\.ac\.in$/i.test(email)) {
-      errors.push({ row, message: `Use a valid @${INSTITUTIONAL_DOMAIN} email.` });
+    if (!isInstitutionalEmail(email) && !rehearsalEmails.has(email)) {
+      errors.push({
+        row,
+        message: rehearsalEmails.size > 0
+          ? `Use a valid @${INSTITUTIONAL_DOMAIN} email or an allowlisted rehearsal account.`
+          : `Use a valid @${INSTITUTIONAL_DOMAIN} email.`,
+      });
       return;
     }
 

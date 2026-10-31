@@ -43,5 +43,10 @@ Confirmed by the owner on 2026-10-24:
   speaker measured only 0.7 dB at 19.5 kHz in the lab.
 - Muted-transmitter control must decode **0** frames.
 
-The 1 m and 5 m forward runs passed on 2026-10-24. The reverse direction, muted
-control and 10 m run are still open.
+The final 2026-10-25 distance sweep is the current evidence: **1 m 10/10,
+2 m 9/10, 3 m 9/10, 5 m 4/10, 10 m 1/10**. The 1 m run meets the proposed
+95% target, but **5 m and 10 m fail** and the gate is not met. The old
+2026-10-24 5 m run is not a true 5 m measurement because its RX report still
+said `distance: "1 m"`. The reverse direction and muted control are still
+open. See `2026-10-25/README.md` for the caveats (phone models and media
+volume were not recorded; 5 m used 45% amplitude).

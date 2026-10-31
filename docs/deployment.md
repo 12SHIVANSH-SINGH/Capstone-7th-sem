@@ -21,6 +21,12 @@ an alternative at the end, but it is not the recommended path.
 Estimated time: 45–70 minutes the first time. Have the repo pushed **before** starting
 Render, because Render deploys from GitHub.
 
+> **Scope:** this runbook deploys an **evidence-only Layer 2 pilot**. It records signed
+> evidence, advances waves after evidence and shows the teacher a read-only evidence view;
+> it does **not** decide attendance or score. Layer 1 is treated as passed by owner
+> assumption for build planning only; the measured 5 m/10 m sweep still fails and reverse
+> plus muted control are unmeasured.
+
 ---
 
 ## 0. What you need
@@ -60,7 +66,7 @@ git ls-files | grep -E '(^|/)config\.env$|(^|/)\.env$'
 ### 1.2 Run the full local gate
 
 ```bash
-# Backend: 124 tests (auth policy, controller, middleware, startup, env guard, origin guard, cookie, rate limit, rosters, binding, session core, proof transport)
+# Backend: 151 tests (auth policy, controller, middleware, startup, env guard, origin guard, cookie, rate limit, rosters, binding, session core, wave advancement, teacher evidence, proof transport, student discovery, rehearsal enrollment)
 cd attendance-backend && npm test
 
 # Proof transport: 15 tests (payload, signed message, device-key helpers)
@@ -71,6 +77,9 @@ npm run test:acoustic
 
 # Check-in view: 7 tests (session view helpers and duration formatting)
 npm run test:checkin
+
+# Student check-in view: 9 tests (session selection, consent/expiry gate, evidence shape)
+npm run test:studentcheckin
 
 # Auth routing: 2 tests (signed-in dashboard target)
 npm run test:auth
@@ -181,22 +190,34 @@ case-sensitive.
 | `TEACHER_EMAILS` | comma-separated college emails provisioned as teachers on first sign-in, e.g. `2023ugcs059@nitjsr.ac.in` (college domain only; removing one does not demote an existing teacher) |
 | `TEST_STUDENT_EMAILS` | empty unless you are deliberately testing Gmail student sign-in; non-college addresses only, at most 10 |
 | `TEST_TEACHER_EMAILS` | empty unless an owner/test-teacher Gmail needs teacher access; non-college addresses only, at most 10 |
+| `ALLOW_TEST_ROSTER_EMAILS` | **must be absent or `false` in production.** Non-production (development/test) rehearsal only: allows the exact `TEST_STUDENT_EMAILS` addresses onto a class roster. Production startup refuses `true`/`1`/`yes`/`on` |
 | `REACT_APP_API_URL` | `/api/v1` |
 | `REACT_APP_GOOGLE_CLIENT_ID` | the same value as `GOOGLE_CLIENT_ID` |
 | `REACT_APP_GOOGLE_HOSTED_DOMAIN` | `nitjsr.ac.in` for college-only builds; an **empty value** while Gmail test accounts are enabled (a chooser hint; deleting it falls back to the college domain) |
 | `REACT_APP_VERSION` | `1.9.0` (optional; appears in report JSON) |
 
-**Never set `DEV_AUTH_ENABLED` on Render.** If it is set to `true` with
-`NODE_ENV=production`, the server refuses to start on purpose. The dev persona routes
-are not mounted in production at all.
+**Never set `DEV_AUTH_ENABLED` or `ALLOW_TEST_ROSTER_EMAILS` on Render.** If either is
+`true` with `NODE_ENV=production`, the server refuses to start on purpose. The dev persona
+routes are not mounted in production at all, and a real roster stays college-only.
 
 Notes:
 
 - `PORT` is provided by Render. Do not set it.
 - `REACT_APP_*` values are baked into the React bundle **at build time**. Changing one
   requires a redeploy, not just a restart.
-- Layer 2.3 adds **no new environment variables**. The proof transport uses the existing
-  database, JWT cookie and device-binding data.
+- Layer 2.3 and 2.4a add **no new environment variables**. The proof transport uses the
+  existing database, JWT cookie and device-binding data.
+- Layer 2.4b0 adds the optional `ALLOW_TEST_ROSTER_EMAILS` rehearsal flag. It is not a
+  production setting; leave it unset on Render.
+- Layer 2.4b adds the `/student/check-in` page and the dashboard entry point. It adds no
+  environment variables; it reuses the 2.3 proof endpoint, 2.4a discovery and the existing
+  device binding. It records evidence only and does not decide attendance.
+- Layer 2.4c/2.5 add wave advancement and the read-only teacher evidence view. They add no
+  environment variables; the old key is archived in bounded history, never returned, and
+  the evidence response carries no key, signature, protocol version or fingerprint.
+- Deployment hardening needs no environment variables: HSTS is sent only when
+  `NODE_ENV=production`, API responses are `no-store`, hashed `static/` files are immutable,
+  and `index.html`/deep links are `no-cache`. SIGTERM/SIGINT close the listener then Mongo.
 - If the frontend and API are on different origins, each exact frontend origin must be in
   `CLIENT_URLS` (comma separated, no trailing slash). The CSRF origin guard rejects unsafe
   requests from any other origin with 403. Same-origin single-service hosting is allowed
@@ -298,9 +319,10 @@ on its next call as well as at the next sign-in. The stored user row keeps its r
 it or set `role: "student"` if that matters. Rotating `JWT_SECRET` revokes every session,
 including real college accounts, and is not needed for a single test account.
 
-Test accounts can sign in and bind a device, but they **cannot submit a 2.3 proof**: proof
-submission requires an active roster enrollment, and roster upload accepts college
-addresses only. No env-gated test enrollment exists yet; that is an open decision.
+On production, test accounts can sign in and bind a device, but they **cannot submit a 2.3
+proof**: roster upload accepts college addresses only, and production startup refuses
+`ALLOW_TEST_ROSTER_EMAILS`. To rehearse proof submission in development or test, enable that
+flag and have the teacher add the exact test address to the class roster.
 
 ---
 
@@ -318,8 +340,17 @@ curl -s "$BASE/api/v1/health"
 # {"success":true,"status":"ok"}
 
 # 2. Security headers and no framework banner
-curl -sI "$BASE/" | grep -Ei 'x-content-type-options|x-frame-options|permissions-policy|x-powered-by'
-# expect nosniff, DENY, microphone=(self), and NO x-powered-by line
+curl -sI "$BASE/" | grep -Ei 'x-content-type-options|x-frame-options|permissions-policy|strict-transport-security|x-powered-by'
+# expect nosniff, DENY, microphone=(self), HSTS max-age=31536000, and NO x-powered-by line
+
+# 2b. Caching: API no-store, shell revalidated, hashed assets immutable
+curl -sI "$BASE/api/v1/health" | grep -i '^cache-control:'
+# Cache-Control: no-store
+curl -sI "$BASE/teacher/check-in" | grep -i '^cache-control:'
+# Cache-Control: no-cache
+ASSET=$(curl -s "$BASE/" | grep -o '/static/js/main\.[a-f0-9]*\.js' | head -1)
+curl -sI "$BASE$ASSET" | grep -i '^cache-control:'
+# Cache-Control: public, max-age=31536000, immutable
 
 # 3. Dev routes must not exist
 curl -s -o /dev/null -w '%{http_code}\n' "$BASE/api/v1/auth/dev/accounts"
@@ -345,7 +376,16 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST \
   "$BASE/api/v1/check-in-sessions/000000000000000000000000/proofs"
 # 401
 
-# With a signed-in teacher cookie, the same POST returns 403 (student-only route).
+# 8. Wave advance and teacher evidence are teacher-only
+curl -s -o /dev/null -w '%{http_code}\n' -X POST \
+  -H 'Content-Type: application/json' -d '{}' \
+  "$BASE/api/v1/check-in-sessions/000000000000000000000000/advance"
+# 401
+curl -s -o /dev/null -w '%{http_code}\n' \
+  "$BASE/api/v1/check-in-sessions/000000000000000000000000/proofs"
+# 401
+
+# With a signed-in teacher cookie, the proof POST returns 403 (student-only route).
 # Do not attempt a real proof unless a student has an approved device binding:
 # a valid proof must be signed by the P-256 key stored in that student's browser.
 ```
@@ -384,12 +424,20 @@ Then in a browser:
    student session; the dashboard should show an approved device.
 7. Open `BASE/teacher/check-in`, choose the class, and start a check-in. Confirm the key
    and two-minute countdown appear. Click **Open transmitter**: the key field on
-   `BASE/acoustic-tx` must match. Click **Back to check-in**, close the session, and confirm
-   it moves into **Session history**. This is UI wiring only: the 2.3 proof transport exists
-   but has no student UI, so no proof or attendance is recorded from this screen yet.
-8. Open `BASE/acoustic-tx` on one phone and `BASE/acoustic-rx` on the other and run the
+   `BASE/acoustic-tx` must match. After at least one phone records evidence, use
+   **Advance wave** and confirm. The wave number must increase, the key must change, and
+   the evidence card must still show the previous wave's submission without an attendance
+   label. Click **Back to check-in**, close the session, and confirm it moves into
+   **Session history**; its **Evidence** button must show that session's read-only rows.
+8. On the rostered student profile, start a fresh check-in from the teacher screen and
+   open `BASE/student/check-in`. Confirm the retention/consent notice appears, Join stays
+   disabled until the checkbox is ticked, and the phone records an evidence card after it
+   hears the current wave. The page must never show the key, and it must not claim
+   attendance was marked. If the teacher advances while the phone is listening, listening
+   must stop and ask the student to tap Join for the new wave.
+9. Open `BASE/acoustic-tx` on one phone and `BASE/acoustic-rx` on the other and run the
    procedure in section 7. No sign-in is needed for the link test.
-9. In browser devtools → Application → Cookies, confirm the `token` cookie is
+10. In browser devtools → Application → Cookies, confirm the `token` cookie is
    `HttpOnly`, `Secure`, and `SameSite=None` (the production setting; it still works on
    a single HTTPS origin).
 
@@ -452,7 +500,7 @@ classroom range.
 
 ### Matrix and controls
 
-- Distances: 1 m, 2 m, 5 m and 10 m. The gate needs 1 m, 5 m and 10 m.
+- Distances: 1 m, 2 m, 3 m, 5 m and 10 m. The gate needs 1 m, 5 m and 10 m.
 - **Test the reverse direction too** (swap TX/RX). The M32 speaker was weak at 19.5 kHz
   in the lab, so one direction passing does not prove the other.
 - Use the same settings for every distance in a series (amplitude, repeats, gap, media
@@ -461,8 +509,10 @@ classroom range.
 - Control: repeat once with the transmitter muted (or in another room). Expected
   decoded count is **0**. A false decode in the control is a serious finding.
 - Proposed Layer 1 gate: **≥95% decoded at 1 m, 5 m and 10 m**, both directions, on
-  phones students actually use. The forward 1 m and 5 m runs passed 100% on 2026-10-24;
-  the gate is not complete until the reverse, control and 10 m runs are recorded in
+  phones students actually use. The final 2026-10-25 sweep got 10/10 at 1 m, 9/10 at
+  2 m, 9/10 at 3 m, **4/10 at 5 m** and **1/10 at 10 m**; the gate is **not** met. The
+  old 2026-10-24 5 m run is not a valid 5 m result because its RX condition stayed at
+  1 m. Diagnose the range failure before recording the reverse and control runs in
   `progress.md`.
 
 The teacher's phone stays at the **front**; students are 1-10 m away. If one phone captures
@@ -570,6 +620,7 @@ Restore with `mongorestore`. Store backups outside the repo.
 | Build fails with `[eslint] … no-unused-vars` | Render sets `CI=true`, so warnings are errors. Run `CI=true npm run build` locally and fix the warning. |
 | `Refusing to start: JWT_SECRET …` | Missing, short or placeholder secret. Set 32+ random characters. |
 | `Refusing to start: DEV_AUTH_ENABLED=true …` | Remove `DEV_AUTH_ENABLED` from Render. Dev login is local-only. |
+| `Refusing to start: ALLOW_TEST_ROSTER_EMAILS …` | Remove `ALLOW_TEST_ROSTER_EMAILS` from Render. Rehearsal enrollment is non-production only. |
 | `Google sign-in is not configured for this build` | `REACT_APP_GOOGLE_CLIENT_ID` was missing at build time. Add it and redeploy (a restart is not enough). |
 | `Google sign-in is not configured on the server` (503) | `GOOGLE_CLIENT_ID` is missing on the backend. Add it and redeploy. |
 | Google popup: `origin_mismatch` | The page origin is not in the OAuth client's **Authorized JavaScript origins**. Add the exact `https://…onrender.com` origin (no trailing slash) and retry. |
@@ -626,16 +677,17 @@ session cookie becomes third-party, which Safari and some Chrome modes block.
 Copy this into your notes and tick each line.
 
 - [ ] `config.env` is ignored; no secrets in `git ls-files`
-- [ ] Backend tests pass (124/124)
+- [ ] Backend tests pass (151/151)
 - [ ] Proof transport tests pass (15/15)
 - [ ] Acoustic tests pass (51/51)
 - [ ] Check-in view tests pass (7/7)
+- [ ] Student check-in view tests pass (9/9)
 - [ ] Auth routing tests pass (2/2)
 - [ ] `CI=true` production build passes locally
 - [ ] Code pushed to GitHub `main`
 - [ ] Atlas cluster, user and network access created
 - [ ] Render Web Service created with build/start commands and health path
-- [ ] All Render environment variables set; `DEV_AUTH_ENABLED` absent
+- [ ] All Render environment variables set; `DEV_AUTH_ENABLED` and `ALLOW_TEST_ROSTER_EMAILS` absent
 - [ ] Split hosting only: exact frontend origin is in `CLIENT_URLS` (unsafe requests otherwise 403)
 - [ ] Rehearsal/testing only: `TEST_STUDENT_EMAILS` / `TEST_TEACHER_EMAILS` set, test users added
       while the consent screen is in Testing, and `REACT_APP_GOOGLE_HOSTED_DOMAIN` empty

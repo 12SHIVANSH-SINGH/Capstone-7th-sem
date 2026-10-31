@@ -1,6 +1,6 @@
 @startuml
 !pragma layout smetana
-title Check-in flow — teacher/server built, student shell planned
+title Check-in flow — evidence-only pilot (wave advancement + teacher evidence view built)
 
 skinparam defaultFontName "Arial"
 skinparam defaultFontSize 13
@@ -27,11 +27,15 @@ start
 |Teacher phone|
 :Play K0 repeatedly from the front;
 
-|Student phone (shell planned)|
-:Listen with mic and decode K0;
+|Student phone — /student/check-in|
+:Open the shell and read the\nretention/consent notice;
+:Confirm consent, then tap Join;
+:Discover the live session\nGET /student/check-in-sessions/active\n(no key returned);
+:Listen with mic and decode K0\nraw audio stays on the phone;
 :Build canonical message\nsession + wave + key + student;
 :Sign with the bound P-256 device key;
 :POST /api/v1/check-in-sessions/:id/proofs;
+:Show the recorded evidence\nand poll live/closed state;
 
 |Server|
 :Origin guard · auth · student role\n60/min per student;
@@ -51,17 +55,37 @@ else (new)
   :TTL ~24 h;
 endif
 :attendanceDecided = false;
-note right
-  Only the current wave is accepted.
-  "Lowest wave heard" needs wave
-  advancement and key history first.
-end note
 
 |Teacher phone|
-:Teacher closes the session;
+:Open the read-only evidence card\nstudent email · wave · recorded time\nper-wave counts · no attendance decision\n(no key, signature or fingerprint);
+
+:Choose "Advance wave";
+if (At least one accepted proof\nin the current wave?) then (no)
+  :409 · keep the current wave;
+  stop
+endif
+:Confirm the advance;
+
+|Server|
+:Atomically match session + wave;
+:Archive the old key in bounded history\n(20 entries maximum);
+:Mint a fresh two-minute key for wave + 1;
+:Return the teacher view\n(wave history has no keys);
+
+|Teacher phone|
+:Play the new key from the front;
+note right
+  The student shell stops listening if
+  the wave changes mid-capture, so a
+  frame from the old key is not submitted.
+end note
+:Repeat the cascade for the next wave;
+
+|Teacher phone|
+:Close the session;
 
 |Gated future — not built|
-:Advance wave and repeat\nthe cascade;
+:Student does not receive wave keys\nor key history;
 :ID round + neighbour reports;
 :Scoring + teacher review queue;
 :Attendance locked same day;

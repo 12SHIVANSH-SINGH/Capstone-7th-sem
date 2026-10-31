@@ -12,6 +12,7 @@ const runStartup = (overrides) =>
       ...process.env,
       NODE_ENV: "test",
       DEV_AUTH_ENABLED: "",
+      ALLOW_TEST_ROSTER_EMAILS: "",
       TEACHER_EMAILS: "",
       TEST_STUDENT_EMAILS: "",
       TEST_TEACHER_EMAILS: "",
@@ -67,6 +68,40 @@ test("the same validation runs in production", () => {
     }),
     /non-college test accounts/
   );
+});
+
+test("production refuses the rehearsal roster flag", () => {
+  assertRefused(
+    runStartup({
+      NODE_ENV: "production",
+      JWT_SECRET: "a-production-secret-that-is-long-enough",
+      DB_URI: "mongodb://127.0.0.1:27018/bio-attend-startup-test",
+      COOKIE_EXPIRE: "7",
+      ALLOW_TEST_ROSTER_EMAILS: "true",
+      TEST_STUDENT_EMAILS: "tester@gmail.com",
+    }),
+    /ALLOW_TEST_ROSTER_EMAILS must not be enabled in production/
+  );
+});
+
+test("the rehearsal roster flag requires a test student", () => {
+  assertRefused(
+    runStartup({ ALLOW_TEST_ROSTER_EMAILS: "true" }),
+    /requires at least one TEST_STUDENT_EMAILS address/
+  );
+});
+
+test("a non-production rehearsal configuration passes config and reaches Mongo", () => {
+  const result = runStartup({
+    ALLOW_TEST_ROSTER_EMAILS: "true",
+    TEST_STUDENT_EMAILS: "tester@gmail.com",
+    // No server listens on port 1; the short selector timeout keeps the test fast.
+    DB_URI: "mongodb://127.0.0.1:1/bio-attend-startup-unreachable?serverSelectionTimeoutMS=200",
+  });
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /database connection failed:/);
+  assert.doesNotMatch(result.stderr, /ALLOW_TEST_ROSTER_EMAILS/);
 });
 
 test("a database connection failure exits 1 before listening", () => {

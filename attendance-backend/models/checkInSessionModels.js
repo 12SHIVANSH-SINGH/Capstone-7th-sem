@@ -1,11 +1,23 @@
 const mongoose = require("mongoose");
 const {
   MAX_KEY_VALUE,
-  INITIAL_WAVE,
   MAX_WAVE,
+  INITIAL_WAVE,
   SESSION_STATUSES,
   STATUS_ACTIVE,
 } = require("../utils/checkInSession");
+
+// Previous wave keys, bounded by the controller/helper. They are stored for
+// audit and the teacher's wave timeline, never returned to a student.
+const keyHistorySchema = new mongoose.Schema(
+  {
+    wave: { type: Number, required: true, min: 0, max: MAX_WAVE },
+    key: { type: Number, required: true, min: 0, max: MAX_KEY_VALUE },
+    keyIssuedAt: { type: Date, required: true },
+    keyExpiresAt: { type: Date, required: true },
+  },
+  { _id: false }
+);
 
 const checkInSessionSchema = new mongoose.Schema(
   {
@@ -58,6 +70,11 @@ const checkInSessionSchema = new mongoose.Schema(
     keyExpiresAt: {
       type: Date,
       required: true,
+    },
+    // Wave 0 has no history. Advancing appends the wave/key that just ended.
+    keyHistory: {
+      type: [keyHistorySchema],
+      default: [],
     },
     startedAt: {
       type: Date,

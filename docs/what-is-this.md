@@ -6,7 +6,7 @@ Taking attendance the usual way is easy to cheat. In a roll call, a friend can a
 
 ## The idea
 
-Every check-in gets a one-time secret "key". The key is passed between phones as very high-pitched tones — near-ultrasonic, so most people can't hear them. A phone that hears the key is evidence that it was in the room, because the sound itself does not travel over the internet. In the full flow, the server will compare what each phone heard, decide attendance and score it; today it records the signed evidence only.
+Every check-in gets a one-time secret "key". The key is passed between phones as very high-pitched tones — near-ultrasonic, so most people can't hear them. A phone that hears the key is evidence that it was in the room, because the sound itself does not travel over the internet. In the full flow, the server will compare what each phone heard, decide attendance and score it; today it records signed evidence, lets the teacher advance waves after evidence and shows a read-only evidence list. It never claims attendance was decided.
 
 Nothing to install: it runs in the phone's browser.
 
@@ -25,9 +25,9 @@ Nothing to install: it runs in the phone's browser.
 | One device per student + teacher approval queue | ✅ working |
 | "Sound lab" page that tests a phone's speaker and microphone | ✅ working |
 | Modern UI for both roles | ✅ done |
-| Live phone-to-phone tone test | ✅ 10/10 at 1 m, 20/20 at 5 m (Oct 2026); reverse direction, control and 10 m still being tested |
-| Server check-in sessions (wave-0 keys) | ✅ core and teacher screen built; proof transport built, student UI next |
-| Full check-in flow for a real class | ⏳ evidence transport only — no scoring, ID round or student interface yet |
+| Live phone-to-phone tone test | ⚠️ 1 m 10/10, 2 m 9/10, 3 m 9/10, **5 m 4/10**, **10 m 1/10** (final 2026-10-25 sweep); reverse direction and muted control still being tested; the proposed gate is not measured as met (Layer 1 is an owner assumption for build planning only) |
+| Server check-in sessions | ✅ session core, teacher screen, proof transport, student discovery, rehearsal enrollment, student shell, evidence-gated wave advancement and read-only teacher evidence view built |
+| Full check-in flow for a real class | ⏳ evidence-only pilot works end to end; the student cascade, a real-phone/Google multi-wave rehearsal, scoring and the ID round are not built |
 
 This is a capstone prototype — not yet used for real attendance. The live deployment is at <https://bio-attend.onrender.com>.
 

@@ -6,6 +6,7 @@ import Home from './components/Home';
 import NotFound from './components/NotFound';
 import Login from './components/login/Login';
 import StudentDashboard from './components/student/studentDashboard';
+import StudentCheckIn from './components/student/studentCheckIn';
 import TeacherDashboard from './components/teacher/teacherDashboard';
 import ClassManagement from './components/teacher/classManagement';
 import CheckInSessions from './components/teacher/checkInSessions';
@@ -26,6 +27,7 @@ function App() {
           <Route path='/acoustic-tx' element={<AcousticTransmit />} />
           <Route path='/acoustic-rx' element={<AcousticReceive />} />
           <Route path={'/student-dashboard'} element={<StudentDashboard />} />
+          <Route path={'/student/check-in'} element={<StudentCheckIn />} />
           <Route path={'/teacher-dashboard'} element={<TeacherDashboard />} />
           <Route path='*' element={<NotFound />} />
         </Routes>

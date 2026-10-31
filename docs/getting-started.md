@@ -45,9 +45,20 @@ npm start          # http://localhost:3000
 
 Open http://localhost:3000 in Chrome. After creating a class and roster, the teacher flow
 continues at http://localhost:3000/teacher/check-in: choose the class, start a session, and
-open the transmitter from the live key. The backend also has the Layer 2.3 proof transport
-(a bound student can submit signed session/wave/key evidence), but there is no student
-check-in UI and no scoring yet, so the teacher screen is still where the flow stops.
+open the transmitter from the live key. A signed-in student continues at
+http://localhost:3000/student/check-in: read the retention notice, confirm consent, then
+tap Join while a session is live. The phone listens for the current wave, signs the decoded
+evidence with the bound device key and shows the recorded-evidence card. The shell is
+evidence-only: it does not display the key or decide attendance, and it stops listening if
+the teacher advances the wave mid-capture.
+
+Back on the teacher screen, the evidence card lists student email, wave and recorded time
+plus per-wave counts. **Advance wave** is allowed only after the current wave has at least
+one accepted proof; it mints a fresh two-minute key, keeps the old key in bounded
+server-side history and never returns that history to the student. A closed session's
+**Evidence** button opens the same read-only view. None of these screens marks attendance
+or scores it; the student cascade, scoring and the ID round are still future work. Layer 1
+is treated as passed by owner assumption for build planning only, not as a measurement.
 
 Heads-up: with this project's local OAuth client, **Google sign-in only works from http://localhost:3000** — that is the address registered with Google. It won't work from a LAN IP or a tunnel URL. The deployed site uses its own authorized origin.
 
@@ -89,16 +100,21 @@ Testing, and the frontend must be built with `REACT_APP_GOOGLE_HOSTED_DOMAIN` se
 **empty value** (unset falls back to `nitjsr.ac.in`, which hides Gmail accounts in the
 chooser). Rebuild after changing it.
 
-Test accounts and dev personas can sign in and bind a device, but they cannot submit a
-Layer 2.3 proof for a class: proof submission requires an active roster enrollment, and
-rosters accept college addresses only. No supported rehearsal enrollment path exists yet.
+To rehearse the full check-in flow with a Gmail test student, set
+`ALLOW_TEST_ROSTER_EMAILS=true` in the backend environment while running in development or
+test. The teacher can then add the exact `TEST_STUDENT_EMAILS` addresses to a class roster;
+no other non-college address is accepted. This flag requires at least one entry in
+`TEST_STUDENT_EMAILS`, and **production startup refuses it**. Leave it unset for a real
+class. Dev personas still cannot join a roster; use a Google test student for proof
+rehearsals.
 
 ## Run the tests
 
 ```bash
-cd attendance-backend && npm test               # 124 tests
-cd attendance-frontend && npm run test:proof    # 15 tests (proof transport, no student UI yet)
+cd attendance-backend && npm test               # 151 tests
+cd attendance-frontend && npm run test:proof    # 15 tests (payload, canonical message, signing and transport helpers)
 cd attendance-frontend && npm run test:acoustic # 51 tests
 cd attendance-frontend && npm run test:checkin  # 7 tests
+cd attendance-frontend && npm run test:studentcheckin # 9 tests (session selection, consent/expiry gate, evidence shape)
 cd attendance-frontend && npm run test:auth     # 2 tests
 ```

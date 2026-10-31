@@ -18,31 +18,65 @@ try {
     process.exit(1);
 }
 
+// Load the app (and every route/model) before registering shutdown handlers,
+// so a signal that arrives during startup can still close Mongoose cleanly.
+const app = require('./app');
+const mongoose = require('mongoose');
+const connectdatabase = require("./config/database");
+const { startServer } = require("./utils/startServer");
+
 // The listener is only assigned after MongoDB and all model indexes are ready.
 let server = null;
+let shuttingDown = false;
 
-const shutDown = (kind, error) => {
-    console.log(`Error:${error && error.message ? error.message : error}`);
-    console.log(`shutting down server due to ${kind} error`);
+const closeResources = async () => {
+    try {
+        // false: do not wait for background index builds; the listener is gone.
+        await mongoose.connection.close(false);
+    } catch (error) {
+        console.error(`Error closing MongoDB: ${error.message}`);
+    }
+};
+
+const shutDown = (kind, error, exitCode = 1) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    if (error) console.error(`Error: ${error.message || error}`);
+    console.log(`shutting down server due to ${kind}`);
+
+    const finish = () => {
+        closeResources().finally(() => process.exit(exitCode));
+    };
+
     if (!server) {
         // Startup failed before the listener existed, so there is nothing to close.
-        process.exit(1);
+        finish();
         return;
     }
+
+    // Stop accepting connections, let in-flight requests finish, then close
+    // the database. A stuck keep-alive connection must not block the deploy.
+    const forceTimer = setTimeout(() => {
+        console.error("Forcing shutdown after 10s");
+        process.exit(exitCode);
+    }, 10_000);
+    forceTimer.unref();
     server.close(() => {
-        process.exit(1);
+        clearTimeout(forceTimer);
+        finish();
     });
+    if (typeof server.closeIdleConnections === "function") {
+        server.closeIdleConnections();
+    }
 };
 
 //handling uncaught exception
 process.on("uncaughtException", err => shutDown("uncaught", err));
 //unhandled promise rejection
 process.on("unhandledRejection", err => shutDown("unhandled", err));
-
-const app = require('./app');
-const mongoose = require('mongoose');
-const connectdatabase = require("./config/database");
-const { startServer } = require("./utils/startServer");
+// Render sends SIGTERM on deploy/restart; Ctrl-C sends SIGINT locally.
+process.on("SIGTERM", () => shutDown("SIGTERM", null, 0));
+process.on("SIGINT", () => shutDown("SIGINT", null, 0));
 
 app.get("/", (req, res) => {
     res.json("Hello");

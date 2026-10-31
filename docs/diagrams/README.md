@@ -4,8 +4,8 @@ PlantUML sources for the high-level map and the two flows that matter right now.
 
 | File | What it shows | Use it for |
 | --- | --- | --- |
-| `system-components.puml` | The component map: teacher phone, student phone, the Express service, MongoDB, Google Identity, the acoustic channel, and the gated Layer 3 block | Orientation and architecture reviews |
-| `check-in-flow.puml` | End-to-end check-in from the teacher starting a wave to the current evidence-only stop, with the gated future in its own swimlane | Explaining what is built vs what is still blocked |
+| `system-components.puml` | The component map: teacher phone (including the read-only evidence view), student phone (including the 2.4b check-in shell), the Express service (including live-session discovery, wave advancement and bounded key history), MongoDB, Google Identity, the acoustic channel, and the gated Layer 3 block | Orientation and architecture reviews |
+| `check-in-flow.puml` | End-to-end check-in from the teacher starting a wave through student consent, discovery, decoding, evidence submission, the teacher evidence card and the evidence-gated wave advance, with the gated future in its own swimlane | Explaining what is built vs what is still blocked |
 | `proof-transport.puml` | The Layer 2.3 sequence: canonical message, device signature, guards, validation, `201`/`200`, evidence TTL | Security and API reviews of the proof endpoint |
 
 ## Render
@@ -23,8 +23,8 @@ Open the generated `.svg` files in a browser. Sources were checked with PlantUML
 ## Reading the status colors
 
 - **Normal boxes** are built and present in the working tree.
-- **Grey `PLANNED` box** is the next student-facing slice, not built yet.
-- **Red `NOT BUILT · gated` box** is Layer 3. It must not start before the Layer 1 gate is decided.
+- **Red `NOT BUILT · gated` box** is Layer 3 (scoring, ID round, review queue). It is not built and is not part of this evidence-only pilot.
+- **Layer 1 is an assumption:** the owner directed that the physical gate be treated as passed for build planning only. The measured 5 m/10 m sweep still fails and reverse/muted control remain unmeasured; the diagrams do not claim otherwise.
 - The orange dashed link between the phones is sound, not a network call. The server never hears the room.
 
 Keep these diagrams aligned with `plan.md` and `progress.md`. If an endpoint, component, or gate changes, update the diagram in the same session.

@@ -6,14 +6,15 @@ Read this file, then `plan.md`, then `progress.md`, in that order, **before doin
 
 A web app (Chrome on Android first) that aims to prove students are physically inside a 20 m x 20 m classroom by passing short-lived keys between phones as near-ultrasonic tones, with a server that mints keys, records who heard what, and eventually scores attendance with a teacher review queue. Full detail is in `plan.md`. Do not restate or redesign it here.
 
-## Current phase (2026-10-25)
+## Current phase (2026-10-31)
 
-- **Layer 1 gate is still open.** The forward acoustic link passes at 1 m (10/10) and 5 m (20/20); the reverse direction (M32 TX → M01 RX), the muted control and the 10 m run are still pending. Do not call the gate passed.
-- **Layer 2 is partly built:** 2.1 check-in session core, 2.2 teacher check-in screen, and 2.3 signed proof transport. 2.3 stores evidence only — it does **not** score, mark attendance, run the ID round or advance waves.
-- **Production is `b7fd8b1`** (`main.ccb4f246.js` at https://bio-attend.onrender.com). The 2.3 transport and the hardening in this working tree are **uncommitted and not deployed**.
+- **Layer 1 is assumed passed by owner direction (2026-10-29) for production-readiness planning only.** This is **not** a measured pass. The 2026-10-25 sweep decoded 10/10 at 1 m, 9/10 at 2 m, 9/10 at 3 m, **4/10 at 5 m** and **1/10 at 10 m**; the reverse direction (M32 TX → M01 RX) and muted control are still unmeasured. The 2026-10-24 5 m claim was not a true 5 m result. Never describe the physical gate as measured-passed.
+- **Layer 2 evidence-only pilot is built through 2.5:** 2.1 session core, 2.2 teacher check-in screen, 2.3 signed proof transport, 2.4a student discovery, 2.4b0 rehearsal enrollment, 2.4b student shell, 2.4c evidence-gated wave advancement + bounded key history, and 2.5 teacher evidence view. 2.3 stores evidence only — it does **not** score or mark attendance. 2.4c is a separate teacher-only route; the proof path does not advance waves. 2.5 is read-only and returns no attendance field. Students never receive the current key or key history. The student cascade (receiving and retransmitting the next key) is **not built**.
+- **Deployment hardening is built:** production HSTS, API `no-store`, immutable hashed assets, revalidated shell/deep links, and SIGTERM/SIGINT shutdown that closes the listener then Mongo.
+- **Production is `b7fd8b1`** (`main.ccb4f246.js` at https://bio-attend.onrender.com). Local `HEAD` and `origin/main` are `d0824a3`, which contains 2.3 and the session-14 hardening. 2.4a, 2.4b0, 2.4b, 2.4c, 2.5 and the new hardening are uncommitted in the working tree. None of it is deployed.
 - **The owner controls every push and deploy.** Never push, tag, merge, or deploy unless the owner explicitly asks in that session. A local build or a green test suite is not permission to publish.
-- **Next code slice:** the student check-in shell on top of the 2.3 transport. Before it, decide an env-gated rehearsal-enrollment path, because Gmail test students and dev personas cannot join college-only rosters.
-- **Still blocked:** scoring, the ID round, wave advancement/key history, and the "lowest wave heard" rule. These wait for the Layer 1 gate decision and, for wave logic, a new slice.
+- **Next slice:** 2.6 multi-wave rehearsal with real Google accounts and physical phones (10–20 phones, 5–6 minutes), measuring wave timing and range. The proposed order is in `plan.md` section 8.
+- **Still blocked:** scoring, the ID round, attendance decisions, and the "lowest wave heard"/student-cascade rule. Physical 5 m/10 m range remains the top risk.
 
 ## Core working rule: small slices, one session at a time
 
@@ -57,14 +58,15 @@ The owner may explicitly allow a band-independent Layer 2 slice to proceed while
 - Real-device results (phone model, Android version, Chrome version, distance, frames sent, frames decoded, band used) go in `progress.md`. Do not claim a physical result you did not measure.
 - Never report "works" for something that was only reasoned about.
 
-Current local gate (all six must pass before asking the owner to deploy):
+Current local gate (all seven must pass before asking the owner to deploy):
 
 ```bash
-cd attendance-backend && npm test                  # 124/124
-cd attendance-backend && npm test -- --test-isolation=none   # 124/124
+cd attendance-backend && npm test                  # 151/151
+cd attendance-backend && npm test -- --test-isolation=none   # 151/151
 cd attendance-frontend && npm run test:proof       # 15/15
 cd attendance-frontend && npm run test:acoustic    # 51/51
 cd attendance-frontend && npm run test:checkin     # 7/7
+cd attendance-frontend && npm run test:studentcheckin # 9/9
 cd attendance-frontend && npm run test:auth        # 2/2
 ```
 
@@ -78,18 +80,19 @@ CI=true REACT_APP_API_URL=/api/v1 \
   npm run build
 ```
 
-For the proof endpoint, also run the real HTTP smoke recorded in `progress.md` (guards, accept, retry, wrong key/wave, cross-student replay, stored evidence, expiry, close, race, rate limit, indexes). A pure unit test is not enough for that route.
+For the proof endpoint, also run the real HTTP smoke recorded in `progress.md` (guards, accept, retry, wrong key/wave, cross-student replay, stored evidence, expiry, close, race, rate limit, indexes). The 2.4a discovery route has its own real Mongo/HTTP smoke in `progress.md` (401, 403, own-session filtering, no key, `no-store`). The 2.4b shell has a recorded browser fake-audio smoke (one proof, idempotent retry, expired/no-session/consent/device-review states). The 2.4c/2.5 teacher flow has a recorded headless-Chrome smoke (advance wave, key change, key-free history, live and closed evidence, no attendance field). A real Google sign-in and physical-phone multi-wave rehearsal are still pending. A pure unit test is not enough for either route.
 
 ## Architecture and code map
 
-- `attendance-frontend/` — React SPA: Home, Login, dashboards, class management, sound lab, TX/RX link, proof transport helpers. The student check-in shell is **not built**.
+- `attendance-frontend/` — React SPA: Home, Login, dashboards, class management, sound lab, TX/RX link, proof transport helpers and the `/student/check-in` shell (consent, mic capture, evidence card).
 - `attendance-backend/` — Express API: Google sign-in, roster/class management, device binding, check-in sessions, proof transport, startup index readiness, CSRF origin guard.
 - `docs/diagrams/` — PlantUML source: `system-components.puml`, `check-in-flow.puml`, `proof-transport.puml`.
 - `plan.md` — what and why. `progress.md` — current status and measurements. `resume-prompt.md` — how to restart a session.
 
 ## Hard boundaries for the current phase
 
-- **2.3 is evidence-only.** Do not add an attendance boolean, score, `present` flag, wave advancement, review decision, or ID round to the proof path. The response must keep saying `attendanceDecided: false`.
+- **2.3 is evidence-only.** Do not add an attendance boolean, score, `present` flag, wave advancement, review decision, or ID round to the proof path. The response must keep saying `attendanceDecided: false`. Wave advancement belongs only to the separate teacher-only `POST /check-in-sessions/:id/advance` route; it must stay evidence-gated.
+- **Keys and key history stay server-side.** Students receive only the current wave and its expiry. The teacher view returns the current key but a key-free `waveHistory`. The evidence view returns no key, signature, protocol version or device fingerprint. Never widen these responses.
 - **The proof endpoint stays student-only and roster-bound.** It accepts only an enrolled, active student with an approved device binding. A pending device change blocks proofs.
 - **The device signature is bound to session, wave, key and student.** Do not shorten, reorder or version-drift the canonical message without updating both client and server and the cross-package test.
 - **One proof per student per wave.** The unique index is the real guard; the find-then-create path is only an optimization. Never remove the index or the `11000` race handling.
@@ -98,7 +101,7 @@ For the proof endpoint, also run the real HTTP smoke recorded in `progress.md` (
 - **Unsafe cross-origin requests are rejected.** The origin guard runs before routes. Split hosting must list the exact frontend origin in `CLIENT_URLS`; single-origin hosting works automatically.
 - **Logout is POST-only.** Do not add a GET mutation back.
 - **The teacher's phone stays at the front; student phones are 1–10 m away.** Use **TX** and **RX** terminology in reports and diagrams.
-- **Test accounts are env-gated and non-college.** `TEACHER_EMAILS` and rosters are college-only (`@nitjsr.ac.in`). Test students are not roster-enrolled, so they cannot submit a real 2.3 proof without an approved enrollment path.
+- **Test accounts are env-gated and non-college.** `TEACHER_EMAILS` and real rosters are college-only (`@nitjsr.ac.in`). For non-production (development/test) rehearsals only, `ALLOW_TEST_ROSTER_EMAILS=true` admits exact `TEST_STUDENT_EMAILS` addresses to a roster; production startup refuses the flag. Dev personas never join a roster.
 - **No room hardware.** The teacher's ordinary phone starts the process and is never passed around.
 - **Mic and audio need a user tap and HTTPS.** Disable echoCancellation, noiseSuppression and autoGainControl; log what the browser actually applied. Refuse below 44.1 kHz.
 - **The server mints keys.** Phones never invent keys.

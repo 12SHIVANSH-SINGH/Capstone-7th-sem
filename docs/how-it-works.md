@@ -38,6 +38,7 @@ On a student's first sign-in, the website quietly creates a private key in that 
 - A **room** is just a room number, e.g. `B-204`.
 - A **class** has a course code, title, a default room, and a **roster** — the list of student emails (imported from the college CSV).
 - Only emails on the roster may submit a proof for that class.
+- For non-production (development/test) rehearsals only, `ALLOW_TEST_ROSTER_EMAILS=true` lets the teacher add the exact `TEST_STUDENT_EMAILS` addresses to a roster. Production startup refuses the flag, so a real roster stays college-only.
 
 The teacher can now open **Check-in** (`/teacher/check-in`), choose a class, and start a
 server-minted **check-in session**. It begins at wave 0 with a fresh seven-symbol key that
@@ -46,8 +47,10 @@ session history, and closes the session when the teacher confirms.
 
 Only the owning teacher can read or close a session. An enrolled student can read the
 active session's wave and expiry, but never the key: the design intends a key to be earned
-by hearing the previous one, but wave advancement is not built yet. **Open transmitter**
-passes the key to the tested `/acoustic-tx` page with the value pre-filled, so the teacher
+by hearing the previous one. The server can now advance the wave after accepted evidence
+and keeps a bounded server-side key history, but the student cascade that would return the
+next key to a phone and have it retransmit is **not built**. **Open transmitter** passes
+the current key to the tested `/acoustic-tx` page with the value pre-filled, so the teacher
 does not retype it.
 
 The **Layer 2.3 proof transport** is built: a student phone can submit the session, wave and
@@ -55,9 +58,19 @@ key it decoded, signed with the P-256 device key bound at sign-in. The server ch
 signature, roster enrollment, active session and key freshness, and stores the result as
 **evidence only** — it does not mark attendance or assign a score. Duplicate retries are
 idempotent per student/wave, submissions are capped at 60 per minute per student, a pending
-device change blocks proofs, and the evidence expires after one day. There is no student
-check-in UI yet; wave advancement and scoring come later, and scoring stays gated on the
-Layer 1 decision.
+device change blocks proofs, and the evidence expires after one day. **Layer 2.4a** adds
+`GET /student/check-in-sessions/active`, which lists live sessions for the student's own
+active enrollments and never returns a key. **Layer 2.4b** adds `/student/check-in`: the
+student reads a retention/consent notice and confirms it before Join, the phone listens for
+the current wave, decodes it locally, signs the evidence with the bound device key and shows
+the recorded-evidence card. The page never displays the key, and raw audio stays on the
+phone. **Layer 2.4c** adds evidence-gated wave advancement: only a teacher can advance, the
+current wave needs at least one accepted proof, the old key is archived in bounded history
+(20 entries) and a fresh two-minute key is minted; old keys are never returned. The student
+shell stops listening if the wave changes mid-capture. **Layer 2.5** adds a read-only
+teacher evidence view for live and closed sessions: student email, wave, recorded time and
+per-wave counts, with `attendanceDecided: false` and no key, signature, protocol version or
+device fingerprint. Scoring, the ID round and the student cascade remain future work.
 
 ## The tones (the actual trick)
 
@@ -66,10 +79,11 @@ Layer 1 decision.
 - Phones play the frame on their speaker and listen through the microphone. The server now
   records a signed proof of which session/wave/key a bound student's phone decoded, but
   that is evidence only: no score or attendance is decided yet. Today the TX/RX pages
-  measure the link and the proof transport has no student UI.
+  measure the link, and `/student/check-in` captures the current wave into signed evidence;
+  neither page decides attendance.
 - The code lives in `attendance-frontend/src/acoustic/fsk.js` (making and reading the tones) and `public/tone-detector-worklet.js` (listening live through the microphone). Both are covered by automated tests.
 
-What we measured so far (Samsung M32): tones up to 18.5 kHz came back loud and clear, but 19.5 kHz was too weak on that phone. The live link has since passed at 1 m and 5 m; the tone band may still shift before the remaining 10 m and reverse-direction runs.
+What we measured so far: the 2026-10-25 distance sweep decoded 10/10 at 1 m, 9/10 at 2 m, 9/10 at 3 m, only 4/10 at 5 m and 1/10 at 10 m. RX margins at 5–10 m were 10.2–12.9 dB, close to the 9 dB detection threshold. On the Samsung M32 lab run, tones up to 18.5 kHz came back loud and clear but 19.5 kHz was too weak. The band and TX settings still need tuning; the reverse direction and muted control are unmeasured. The owner has directed that Layer 1 be treated as passed for build planning only; that is an **assumption, not a measurement**.
 
 ## Where things live in the code
 
@@ -79,6 +93,7 @@ What we measured so far (Samsung M32): tones up to 18.5 kHz came back loud and c
 | Classes, rosters, rooms | `attendance-backend/controllers/classController.js` |
 | Check-in sessions and proof transport | `attendance-backend/controllers/checkInSessionController.js`, `checkInProofController.js`, `attendance-backend/utils/checkInSession.js`, `checkInProof.js` |
 | Teacher check-in screen | `attendance-frontend/src/components/teacher/checkInSessions.jsx`, `checkInSessionView.js` |
+| Student check-in shell | `attendance-frontend/src/components/student/studentCheckIn.jsx`, `studentCheckInView.js`, `attendance-frontend/src/acoustic/useCheckInAudio.js` |
 | Shared UI pieces (buttons, cards, toasts) | `attendance-frontend/src/ui/` |
 | Pages (Home, Login, dashboards, sound lab, class management) | `attendance-frontend/src/components/` |
 

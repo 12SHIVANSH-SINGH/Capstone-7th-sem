@@ -7,6 +7,8 @@
  * test keep working with the local config file.
  */
 
+const { isTruthyFlag } = require("./envFlag");
+
 const PLACEHOLDER_SECRETS = new Set([
   "secret",
   "jwt_secret",
@@ -54,6 +56,12 @@ const validateProductionEnv = (env = process.env) => {
   const cookieDays = Number(env.COOKIE_EXPIRE);
   if (env.COOKIE_EXPIRE != null && (!Number.isFinite(cookieDays) || cookieDays <= 0)) {
     problems.push("COOKIE_EXPIRE must be a positive number of days.");
+  }
+
+  // Rehearsal enrollment is for local/staging rehearsals only. A production
+  // deploy must never accept a Gmail test address on a real class roster.
+  if (isTruthyFlag(env.ALLOW_TEST_ROSTER_EMAILS)) {
+    problems.push("ALLOW_TEST_ROSTER_EMAILS must not be enabled in production.");
   }
 
   return { ok: problems.length === 0, problems, warnings };

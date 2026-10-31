@@ -231,6 +231,37 @@ test("the proof view exposes evidence only, never an attendance decision", () =>
   assert.equal(Object.hasOwn(view, "deviceFingerprint"), false);
 });
 
+test("the teacher evidence view names the student and wave but leaks no secrets", () => {
+  const view = core.toTeacherProofView({
+    _id: "proof-1",
+    studentEmail: " Student@NITJSR.ac.in ",
+    wave: 2,
+    createdAt: new Date("2026-10-25T10:00:01.000Z"),
+    key: 12345678,
+    signature: "secret-signature",
+    protocolVersion: core.PROOF_MESSAGE_VERSION,
+    deviceFingerprint: "fingerprint",
+  });
+
+  assert.deepEqual(view, {
+    id: "proof-1",
+    studentEmail: "student@nitjsr.ac.in",
+    wave: 2,
+    recordedAt: "2026-10-25T10:00:01.000Z",
+  });
+  for (const forbidden of [
+    "key",
+    "signature",
+    "protocolVersion",
+    "deviceFingerprint",
+    "attendance",
+    "present",
+    "score",
+  ]) {
+    assert.equal(Object.hasOwn(view, forbidden), false, forbidden);
+  }
+});
+
 test("the model has a unique per-student-wave proof and no scoring fields", () => {
   const unique = CheckInProof.schema
     .indexes()

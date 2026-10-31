@@ -91,3 +91,20 @@ test("the real app still serves the health route", async (t) => {
   assert.equal(response.status, 200);
   assert.equal((await response.json()).success, true);
 });
+
+test("API responses are not cacheable and carry the baseline security headers", async (t) => {
+  const { server, baseUrl } = await start();
+  t.after(() => stop(server));
+
+  const response = await fetch(`${baseUrl}/api/v1/health`);
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.equal(response.headers.get("x-content-type-options"), "nosniff");
+  assert.equal(response.headers.get("x-frame-options"), "DENY");
+  assert.equal(response.headers.get("referrer-policy"), "strict-origin-when-cross-origin");
+  assert.equal(
+    response.headers.get("permissions-policy"),
+    "camera=(), geolocation=(), microphone=(self)"
+  );
+  // HSTS is production-only; local HTTP development must not be pinned.
+  assert.equal(response.headers.get("strict-transport-security"), null);
+});

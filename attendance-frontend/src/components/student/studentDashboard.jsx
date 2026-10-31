@@ -8,6 +8,7 @@ import Button from "../../ui/Button";
 import Card from "../../ui/Card";
 import { PageLoader } from "../../ui/Spinner";
 import { useToast } from "../../ui/Toast";
+import { sessionLabel, sessionTitle } from "./studentCheckInView";
 import "./studentDashboard.css";
 
 const STATUS_VIEW = {
@@ -16,7 +17,7 @@ const STATUS_VIEW = {
         variant: "success",
         icon: "✓",
         title: "This browser is approved",
-        text: "Your device is bound and approved. Student check-in is not enabled yet; the phone audio test is available now, and hearing a key will record evidence when the student shell ships.",
+        text: "Your device is bound and approved. Open Check-in while your teacher’s session is live; hearing the key records evidence, not attendance.",
     },
     review: {
         badge: "In review",
@@ -47,6 +48,7 @@ const StudentDashboard = () => {
     const toast = useToast();
     const [user, setUser] = useState(null);
     const [deviceStatus, setDeviceStatus] = useState(location.state?.deviceStatus || "checking");
+    const [liveSessions, setLiveSessions] = useState([]);
 
     useEffect(() => {
         const fetchUser = async () => {
@@ -59,6 +61,22 @@ const StudentDashboard = () => {
                 setUser(response.data.user);
                 const bindingResponse = await axios.get(`${SERVER_URL}/device-bindings/status`, { withCredentials: true });
                 setDeviceStatus(bindingResponse.data.status);
+                try {
+                    const sessionResponse = await axios.get(
+                        `${SERVER_URL}/student/check-in-sessions/active`,
+                        { withCredentials: true }
+                    );
+                    setLiveSessions(
+                        Array.isArray(sessionResponse.data?.sessions) ? sessionResponse.data.sessions : []
+                    );
+                } catch (sessionError) {
+                    // A failed discovery lookup must not hide the dashboard.
+                    if (sessionError.response?.status === 401) {
+                        navigate("/login");
+                        return;
+                    }
+                    setLiveSessions([]);
+                }
             } catch (error) {
                 if (error.response?.status && error.response.status !== 401) {
                     toast("Could not load your dashboard. Please try again.", "error");
@@ -95,6 +113,7 @@ const StudentDashboard = () => {
             onLogout={handleLogout}
             links={[
                 { to: "/student-dashboard", label: "Dashboard", active: true },
+                { to: "/student/check-in", label: "Check-in" },
                 { to: "/acoustic-lab", label: "Phone audio test" },
             ]}
         >
@@ -102,7 +121,7 @@ const StudentDashboard = () => {
                 <div>
                     <h1 className="ui-page-head__title">Hi {firstName} 👋</h1>
                     <p className="ui-page-head__sub">
-                        This is your attendance home. Student check-in is not enabled yet; this page shows your device status and the phone audio test.
+                        This is your attendance home. Open Check-in while your teacher’s session is live, or test this phone’s audio before class.
                     </p>
                 </div>
             </div>
@@ -116,25 +135,51 @@ const StudentDashboard = () => {
                     <h2 className="device-card__title">{info.title}</h2>
                     <p className="device-card__text">{info.text}</p>
                     <div className="device-card__actions">
+                        <Button onClick={() => navigate("/student/check-in")}>Open check-in</Button>
                         <Button variant="soft" onClick={() => navigate("/acoustic-lab")}>🔊 Test phone audio</Button>
                     </div>
                 </Card>
 
-                <Card title="Student check-in is not enabled yet" subtitle="This page will show the live step when the student shell ships.">
-                    <ol className="checkin-steps">
-                        <li>
-                            <strong>Check your device status.</strong>
-                            The card above shows whether this browser is bound and approved.
-                        </li>
-                        <li>
-                            <strong>Test the phone audio.</strong>
-                            Make sure this phone can hear the near-ultrasonic tones.
-                        </li>
-                        <li>
-                            <strong>Check-in will appear here.</strong>
-                            When the shell ships, hearing a key will record evidence; your teacher’s check-in decides attendance.
-                        </li>
-                    </ol>
+                <Card
+                    className="device-card student-live-card"
+                    title={liveSessions.length > 0 ? "A check-in is live" : "No live check-in yet"}
+                    subtitle={
+                        liveSessions.length > 0
+                            ? `${sessionLabel(liveSessions[0])} · ${sessionTitle(liveSessions[0])}`
+                            : "Open Check-in and it will keep looking for your teacher’s session."
+                    }
+                >
+                    {liveSessions.length > 0 ? (
+                        <>
+                            <p className="device-card__text">
+                                Your teacher has an active wave for {sessionLabel(liveSessions[0])}. Open check-in
+                                before the two-minute key expires. Hearing the key records evidence, not attendance.
+                            </p>
+                            <div className="device-card__actions">
+                                <Button onClick={() => navigate("/student/check-in")}>Join check-in</Button>
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            <ol className="checkin-steps">
+                                <li>
+                                    <strong>Open Check-in.</strong>
+                                    The page refreshes every ten seconds while you wait.
+                                </li>
+                                <li>
+                                    <strong>Listen for the current wave.</strong>
+                                    Keep the page visible and allow the microphone.
+                                </li>
+                                <li>
+                                    <strong>See the evidence.</strong>
+                                    The server records the signed proof; your teacher decides attendance later.
+                                </li>
+                            </ol>
+                            <div className="device-card__actions">
+                                <Button variant="soft" onClick={() => navigate("/student/check-in")}>Open check-in</Button>
+                            </div>
+                        </>
+                    )}
                 </Card>
             </div>
         </AppShell>

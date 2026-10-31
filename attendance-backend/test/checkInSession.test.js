@@ -79,6 +79,69 @@ test("closing a session is idempotent and preserves the first close time", () =>
   assert.throws(() => core.closeSessionState({ ...session, status: "paused" }), /valid status/);
 });
 
+test("advancing archives the old key and mints a fresh wave with bounded history", () => {
+  const now = new Date("2026-10-24T12:02:00.000Z");
+  const history = Array.from({ length: core.MAX_KEY_HISTORY }, (_, wave) => ({
+    wave,
+    key: 1000 + wave,
+    keyIssuedAt: new Date("2026-10-24T11:00:00.000Z"),
+    keyExpiresAt: new Date("2026-10-24T11:02:00.000Z"),
+  }));
+  const session = {
+    ...core.buildInitialSession({ now: new Date("2026-10-24T12:00:00.000Z"), key: 42 }),
+    wave: core.MAX_KEY_HISTORY - 1,
+    key: 555,
+    keyHistory: history,
+  };
+
+  const advanced = core.advanceSessionState(session, { now, key: 777 });
+  assert.equal(advanced.wave, core.MAX_KEY_HISTORY);
+  assert.equal(advanced.key, 777);
+  assert.equal(advanced.keyIssuedAt.toISOString(), "2026-10-24T12:02:00.000Z");
+  assert.equal(advanced.keyExpiresAt.toISOString(), "2026-10-24T12:04:00.000Z");
+  assert.equal(advanced.keyHistory.length, core.MAX_KEY_HISTORY);
+  assert.equal(advanced.keyHistory[0].wave, 1, "the oldest wave is dropped");
+  assert.deepEqual(advanced.keyHistory.at(-1), {
+    wave: core.MAX_KEY_HISTORY - 1,
+    key: 555,
+    keyIssuedAt: new Date("2026-10-24T12:00:00.000Z"),
+    keyExpiresAt: new Date("2026-10-24T12:02:00.000Z"),
+  });
+  assert.equal(session.wave, core.MAX_KEY_HISTORY - 1, "the input is not mutated");
+  assert.equal(session.key, 555);
+});
+
+test("advancing refuses closed sessions, the wave ceiling and a repeated key", () => {
+  const base = {
+    ...core.buildInitialSession({ now: new Date("2026-10-24T12:00:00.000Z"), key: 42 }),
+  };
+
+  assert.throws(
+    () => core.advanceSessionState({ ...base, status: core.STATUS_CLOSED }),
+    /must be active/
+  );
+  assert.throws(
+    () => core.advanceSessionState({ ...base, wave: core.MAX_WAVE }, { key: 43 }),
+    /cannot advance/
+  );
+  assert.throws(() => core.advanceSessionState(base, { key: 42 }), /must differ/);
+  assert.throws(() => core.advanceSessionState(base, { key: 43, keyTtlMs: 0 }), /positive number/);
+  assert.throws(
+    () => core.advanceSessionState(base, { key: 43, maxHistory: 0 }),
+    /positive integer/
+  );
+  assert.throws(
+    () => core.advanceSessionState(base, { key: core.KEY_SPACE }),
+    /integer from 0/
+  );
+});
+
+test("the default next-key mint retries a collision and fails closed if it cannot", () => {
+  const values = [42, 42, 43];
+  assert.equal(core.mintDistinctKey(42, () => values.shift()), 43);
+  assert.throws(() => core.mintDistinctKey(42, () => 42), /different from the current wave/);
+});
+
 test("teacher and student views expose the right session fields", () => {
   const now = new Date("2026-10-24T12:00:30.000Z");
   const session = {
@@ -94,6 +157,14 @@ test("teacher and student views expose the right session fields", () => {
       now: new Date("2026-10-24T12:00:00.000Z"),
       key: 314159,
     }),
+    keyHistory: [
+      {
+        wave: 0,
+        key: 271828,
+        keyIssuedAt: new Date("2026-10-24T11:58:00.000Z"),
+        keyExpiresAt: new Date("2026-10-24T12:00:00.000Z"),
+      },
+    ],
   };
 
   const teacher = core.toTeacherSession(session, { now });
@@ -111,9 +182,19 @@ test("teacher and student views expose the right session fields", () => {
   assert.equal(teacher.keyIssuedAt, "2026-10-24T12:00:00.000Z");
   assert.equal(teacher.keyExpiresAt, "2026-10-24T12:02:00.000Z");
   assert.equal(teacher.closedAt, null);
+  assert.deepEqual(teacher.waveHistory, [
+    {
+      wave: 0,
+      keyIssuedAt: "2026-10-24T11:58:00.000Z",
+      keyExpiresAt: "2026-10-24T12:00:00.000Z",
+    },
+  ]);
+  assert.equal(JSON.stringify(teacher).includes("271828"), false, "old keys stay private");
 
   const student = core.toStudentSession(session, { now });
   assert.equal(Object.hasOwn(student, "key"), false);
+  assert.equal(Object.hasOwn(student, "keyHistory"), false);
+  assert.equal(Object.hasOwn(student, "waveHistory"), false);
   assert.equal(student.id, "session-1");
   assert.equal(student.wave, 0);
   assert.equal(student.keyExpired, false);
@@ -127,6 +208,12 @@ test("the model enforces one active check-in per class and the key range", () =>
 
   const statusPath = CheckInSession.schema.path("status");
   assert.deepEqual(statusPath.enumValues, [core.STATUS_ACTIVE, core.STATUS_CLOSED]);
+
+  const historyPath = CheckInSession.schema.path("keyHistory");
+  assert.ok(historyPath);
+  assert.equal(historyPath.instance, "Array");
+  assert.equal(CheckInSession.schema.path("keyHistory.wave").options.max, core.MAX_WAVE);
+  assert.equal(CheckInSession.schema.path("keyHistory.key").options.max, core.MAX_KEY_VALUE);
 
   const activeIndex = CheckInSession.schema
     .indexes()

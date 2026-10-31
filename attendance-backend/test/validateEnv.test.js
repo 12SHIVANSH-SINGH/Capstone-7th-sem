@@ -50,6 +50,26 @@ test("production requires a MongoDB URI and a valid cookie lifetime", () => {
   );
 });
 
+test("production refuses every truthy rehearsal roster flag", () => {
+  for (const value of ["true", "1", "yes", "on", "TRUE"]) {
+    assert.throws(
+      () =>
+        envCheck.assertProductionEnv(
+          { ...validProduction, ALLOW_TEST_ROSTER_EMAILS: value },
+          { warn() {} }
+        ),
+      /ALLOW_TEST_ROSTER_EMAILS/
+    );
+  }
+
+  assert.doesNotThrow(() =>
+    envCheck.assertProductionEnv(
+      { ...validProduction, ALLOW_TEST_ROSTER_EMAILS: "false" },
+      { warn() {} }
+    )
+  );
+});
+
 test("a complete production environment passes and warns about missing Google", () => {
   const warnings = [];
   assert.doesNotThrow(() =>

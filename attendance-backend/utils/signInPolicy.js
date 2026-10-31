@@ -28,6 +28,8 @@
  * always see the current values.
  */
 
+const { isTruthyFlag } = require("./envFlag");
+
 const WORKSPACE_DOMAIN = "nitjsr.ac.in";
 
 // Deliberately conservative: ASCII dot-atoms only, one address per entry, no
@@ -255,6 +257,15 @@ const validateTestAccountConfig = (env = process.env) => {
         }
       }
     }
+  }
+
+  // Rehearsal enrollment only makes sense when there is at least one exact
+  // allowlisted student address to admit to a roster. Fail closed otherwise.
+  const testStudentList = lists.find((list) => list.name === "TEST_STUDENT_EMAILS");
+  if (isTruthyFlag(env.ALLOW_TEST_ROSTER_EMAILS) && testStudentList.emails.length === 0) {
+    problems.push(
+      "ALLOW_TEST_ROSTER_EMAILS requires at least one TEST_STUDENT_EMAILS address."
+    );
   }
 
   return { ok: problems.length === 0, problems };

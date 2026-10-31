@@ -6,7 +6,10 @@ const {
   listSessions,
   getSession,
   closeSession,
+  advanceSession,
+  listSessionProofs,
   getActiveSessionForStudent,
+  listActiveSessionsForStudent,
 } = require("../controllers/checkInSessionController");
 const { submitProof } = require("../controllers/checkInProofController");
 
@@ -47,6 +50,15 @@ router.get(
   getActiveSessionForStudent
 );
 
+// Discovery for the student shell: all live sessions for the student's own
+// active enrollments. The response never contains a key.
+router.get(
+  "/student/check-in-sessions/active",
+  noStore,
+  studentOnly,
+  listActiveSessionsForStudent
+);
+
 // Proof transport only: the server stores what a phone decoded. It does not
 // mark attendance or score the student.
 router.post(
@@ -57,7 +69,16 @@ router.post(
   submitProof
 );
 
+// Read-only evidence for the owning teacher. No attendance decision is exposed.
+router.get(
+  "/check-in-sessions/:sessionId/proofs",
+  noStore,
+  teacherOnly,
+  listSessionProofs
+);
+
 router.get("/check-in-sessions/:sessionId", noStore, teacherOnly, getSession);
+router.post("/check-in-sessions/:sessionId/advance", noStore, teacherOnly, advanceSession);
 router.post("/check-in-sessions/:sessionId/close", noStore, teacherOnly, closeSession);
 
 module.exports = router;

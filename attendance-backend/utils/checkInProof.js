@@ -169,6 +169,18 @@ const toProofView = (proof, { duplicate = false } = {}) => ({
   duplicate: Boolean(duplicate),
 });
 
+/**
+ * Teacher-facing evidence row. It identifies whose phone submitted which wave,
+ * but carries no attendance, score or decision. The key, signature, protocol
+ * version and device fingerprint stay server-side.
+ */
+const toTeacherProofView = (proof) => ({
+  id: referenceId(proof._id || proof.id),
+  studentEmail: String(proof.studentEmail || "").trim().toLowerCase(),
+  wave: proof.wave,
+  recordedAt: asIsoString(proof.createdAt || proof.recordedAt),
+});
+
 module.exports = {
   PROOF_MESSAGE_VERSION,
   SIGNATURE_BYTES,
@@ -180,4 +192,5 @@ module.exports = {
   validateProofPayload,
   evaluateProof,
   toProofView,
+  toTeacherProofView,
 };

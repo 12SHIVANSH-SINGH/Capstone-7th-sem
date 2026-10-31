@@ -78,9 +78,20 @@ const CheckInSessions = () => {
   const [starting, setStarting] = useState(false);
   const [closingId, setClosingId] = useState("");
   const [confirmClose, setConfirmClose] = useState(false);
+  const [advancing, setAdvancing] = useState(false);
+  const [confirmAdvance, setConfirmAdvance] = useState(false);
+  const [evidenceSessionId, setEvidenceSessionId] = useState("");
+  const [evidence, setEvidence] = useState({
+    loading: false,
+    error: "",
+    total: 0,
+    byWave: [],
+    proofs: [],
+  });
   const [now, setNow] = useState(() => new Date());
 
   const sessionsRequestRef = useRef(0);
+  const evidenceRequestRef = useRef(0);
 
   const loadClasses = useCallback(async () => {
     try {
@@ -174,12 +185,57 @@ const CheckInSessions = () => {
     [navigate]
   );
 
+  const loadEvidence = useCallback(
+    async (sessionId, { quiet = false } = {}) => {
+      if (!sessionId) return false;
+
+      const requestId = evidenceRequestRef.current + 1;
+      evidenceRequestRef.current = requestId;
+      if (!quiet) {
+        setEvidence((current) => ({ ...current, loading: true, error: "" }));
+      }
+
+      try {
+        const response = await axios.get(
+          `${SERVER_URL}/check-in-sessions/${sessionId}/proofs`,
+          requestConfig
+        );
+        if (requestId !== evidenceRequestRef.current) return false;
+        setEvidence({
+          loading: false,
+          error: "",
+          total: Number(response.data?.total) || 0,
+          byWave: Array.isArray(response.data?.byWave) ? response.data.byWave : [],
+          proofs: Array.isArray(response.data?.proofs) ? response.data.proofs : [],
+        });
+        return true;
+      } catch (requestError) {
+        if (requestId !== evidenceRequestRef.current) return false;
+        if (isUnauthorised(requestError)) {
+          navigate("/login");
+          return false;
+        }
+        setEvidence((current) => ({
+          ...current,
+          loading: false,
+          error: messageFor(requestError, "Could not load the evidence for this session."),
+        }));
+        return false;
+      }
+    },
+    [navigate]
+  );
+
   useEffect(() => {
     sessionsRequestRef.current += 1;
     setSessions([]);
     setSessionsClassId("");
     setSessionsError("");
     setConfirmClose(false);
+    setConfirmAdvance(false);
+    setEvidenceSessionId("");
+    evidenceRequestRef.current += 1;
+    setEvidence({ loading: false, error: "", total: 0, byWave: [], proofs: [] });
     setNow(new Date());
     if (!selectedClassId) {
       setSessionsLoading(false);
@@ -203,6 +259,13 @@ const CheckInSessions = () => {
     () => classes.find((courseClass) => courseClass._id === selectedClassId) || null,
     [classes, selectedClassId]
   );
+  const evidenceSession = useMemo(
+    () =>
+      sessions.find((session) => session.id === evidenceSessionId) ||
+      activeSession ||
+      null,
+    [sessions, evidenceSessionId, activeSession]
+  );
 
   useEffect(() => {
     if (!activeSession) return undefined;
@@ -210,6 +273,38 @@ const CheckInSessions = () => {
     const timer = window.setInterval(() => setNow(new Date()), 1000);
     return () => window.clearInterval(timer);
   }, [activeSession]);
+
+  // Follow the live session automatically. A history row can replace it when
+  // the teacher asks to inspect an older session, but a newly started active
+  // session wins over an old closed one.
+  useEffect(() => {
+    if (!activeSession?.id) return;
+    setEvidenceSessionId((current) => {
+      if (!current) return activeSession.id;
+      if (current === activeSession.id) return current;
+      const currentSession = sessions.find((session) => session.id === current);
+      return currentSession && currentSession.status === "active"
+        ? current
+        : activeSession.id;
+    });
+  }, [activeSession?.id, sessions]);
+
+  useEffect(() => {
+    if (!evidenceSessionId) return undefined;
+    loadEvidence(evidenceSessionId);
+    return () => {
+      evidenceRequestRef.current += 1;
+    };
+  }, [evidenceSessionId, loadEvidence]);
+
+  useEffect(() => {
+    if (!activeSession?.id || evidenceSessionId !== activeSession.id) return undefined;
+    const timer = window.setInterval(
+      () => loadEvidence(activeSession.id, { quiet: true }),
+      10 * 1000
+    );
+    return () => window.clearInterval(timer);
+  }, [activeSession?.id, evidenceSessionId, loadEvidence]);
 
   const remainingMs = activeSession ? keyRemainingMs(activeSession, now) : 0;
   const keyUsable = activeSession ? keyIsUsable(activeSession, now) : false;
@@ -223,6 +318,7 @@ const CheckInSessions = () => {
     setSessionsError("");
     setSessionsLoading(true);
     setConfirmClose(false);
+    setConfirmAdvance(false);
   };
 
   const startSession = async () => {
@@ -237,8 +333,10 @@ const CheckInSessions = () => {
       );
       if (response.data?.session) {
         setSessions((current) => upsertSession(current, response.data.session));
+        setEvidenceSessionId(response.data.session.id);
       }
       setConfirmClose(false);
+      setConfirmAdvance(false);
       setNow(new Date());
       toast("Check-in started. Wave 0 is ready to play.", "success");
     } catch (requestError) {
@@ -280,6 +378,47 @@ const CheckInSessions = () => {
       toast(messageFor(requestError, "Could not close the check-in."), "error");
     } finally {
       setClosingId("");
+    }
+  };
+
+  const advanceWave = async () => {
+    if (!activeSession?.id || advancing) return;
+    setAdvancing(true);
+
+    try {
+      const response = await axios.post(
+        `${SERVER_URL}/check-in-sessions/${activeSession.id}/advance`,
+        {},
+        requestConfig
+      );
+      if (response.data?.session) {
+        setSessions((current) => upsertSession(current, response.data.session));
+        setEvidenceSessionId(response.data.session.id);
+        setConfirmAdvance(false);
+        setNow(new Date());
+        toast(
+          `Wave ${response.data.session.wave} is live. Open the transmitter with the new key.`,
+          "success"
+        );
+        await loadEvidence(response.data.session.id, { quiet: true });
+      }
+    } catch (requestError) {
+      if (isUnauthorised(requestError)) {
+        navigate("/login");
+        return;
+      }
+      toast(
+        messageFor(
+          requestError,
+          "Could not advance the wave. Wait for a phone to submit evidence first."
+        ),
+        "error"
+      );
+      if (requestError?.response?.status === 409) {
+        await loadSessions(selectedClass?._id, { quiet: true });
+      }
+    } finally {
+      setAdvancing(false);
     }
   };
 
@@ -343,8 +482,9 @@ const CheckInSessions = () => {
         <div>
           <h1 className="ui-page-head__title">Run a check-in</h1>
           <p className="ui-page-head__sub">
-            Pick a class, start the live session, and play its wave-0 key from this phone. The key
-            never leaves the teacher side.
+            Pick a class, start the live session, and play its current wave key from this phone.
+            Advance the wave only after at least one phone records evidence. The key never leaves
+            the teacher side.
           </p>
         </div>
         <div className="ui-page-head__actions">
@@ -496,12 +636,46 @@ const CheckInSessions = () => {
                     >
                       <FiVolume2 aria-hidden="true" /> Open transmitter
                     </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={() => setConfirmAdvance(true)}
+                      disabled={advancing || confirmClose}
+                    >
+                      <FiChevronRight aria-hidden="true" /> Advance wave
+                    </Button>
                   </div>
+
+                  {confirmAdvance && (
+                    <div className="checkin__confirm" role="alert">
+                      <div className="checkin__confirm-icon" aria-hidden="true">
+                        <FiAlertTriangle />
+                      </div>
+                      <div className="checkin__confirm-body">
+                        <h3>Advance to wave {activeSession.wave + 1}?</h3>
+                        <p>
+                          The current key stops being accepted and a fresh two-minute key is
+                          minted. Advance only after at least one phone has recorded evidence.
+                        </p>
+                        <div className="checkin__confirm-actions">
+                          <Button onClick={advanceWave} loading={advancing}>
+                            <FiChevronRight aria-hidden="true" /> Confirm advance
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            onClick={() => setConfirmAdvance(false)}
+                            disabled={advancing}
+                          >
+                            Keep wave {activeSession.wave}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   <p className={keyUsable ? "checkin__key-note" : "checkin__key-warning"}>
                     {keyUsable
-                      ? "The transmitter opens with this key already filled in. Play it once students are listening."
-                      : "This key passed its two-minute lifetime. Close the session and start a new one to mint a fresh key."}
+                      ? "The transmitter opens with this key already filled in. Play it once students are listening. Advance the wave after at least one phone records evidence."
+                      : "This key passed its two-minute lifetime. Wait for a phone to record evidence, then advance the wave; closing the session ends the check-in."}
                   </p>
                 </div>
 
@@ -521,6 +695,14 @@ const CheckInSessions = () => {
                   <div>
                     <dt>Key issued</dt>
                     <dd>{formatWhen(activeSession.keyIssuedAt)}</dd>
+                  </div>
+                  <div>
+                    <dt>Evidence</dt>
+                    <dd>
+                      {evidence.loading && evidence.total === 0
+                        ? "Loading…"
+                        : `${evidence.total} proof${evidence.total === 1 ? "" : "s"}`}
+                    </dd>
                   </div>
                 </dl>
 
@@ -618,6 +800,86 @@ const CheckInSessions = () => {
         </section>
       )}
 
+      {evidenceSession && (
+        <Card
+          className="checkin__evidence"
+          title="Evidence received"
+          subtitle={`${classLabel(evidenceSession)} · ${
+            evidenceSession.status === "active" ? "Live" : "Closed"
+          } · Wave ${evidenceSession.wave}`}
+          actions={
+            <div className="checkin__evidence-actions">
+              <Badge variant="neutral">
+                {evidence.total} proof{evidence.total === 1 ? "" : "s"}
+              </Badge>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => loadEvidence(evidenceSession.id)}
+                loading={evidence.loading}
+              >
+                <FiRefreshCw aria-hidden="true" /> Refresh
+              </Button>
+            </div>
+          }
+        >
+          {evidence.error ? (
+            <div className="checkin__alert" role="alert">
+              <FiAlertTriangle aria-hidden="true" />
+              <div>
+                <strong>Could not load the evidence</strong>
+                <p>{evidence.error}</p>
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => loadEvidence(evidenceSession.id)}
+              >
+                Retry
+              </Button>
+            </div>
+          ) : evidence.loading && evidence.proofs.length === 0 ? (
+            <div className="checkin__loading">
+              <Spinner />
+              <p className="checkin__note">Loading signed evidence…</p>
+            </div>
+          ) : evidence.total === 0 ? (
+            <EmptyState
+              icon={<FiCheck />}
+              title="No evidence yet"
+              text="Ask students to open Check-in while the wave key is live. Only evidence submitted for this session appears here."
+            />
+          ) : (
+            <>
+              <div className="checkin__evidence-summary">
+                {evidence.byWave.map((entry) => (
+                  <Badge key={entry.wave} variant="info">
+                    Wave {entry.wave} · {entry.count}
+                  </Badge>
+                ))}
+              </div>
+              <div className="checkin__evidence-list">
+                {evidence.proofs.map((proof) => (
+                  <div className="checkin__evidence-row" key={proof.id}>
+                    <span className="checkin__evidence-email">{proof.studentEmail}</span>
+                    <span className="checkin__evidence-meta">
+                      <Badge variant="neutral">Wave {proof.wave}</Badge>
+                      <time dateTime={proof.recordedAt || undefined}>
+                        {formatWhen(proof.recordedAt)}
+                      </time>
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <p className="checkin__note">
+                Evidence only. This list does not decide attendance, and proof evidence expires
+                after about 24 hours.
+              </p>
+            </>
+          )}
+        </Card>
+      )}
+
       {selectedClass && !sessionsError && history.length > 0 && (
         <Card
           className="checkin__history"
@@ -646,6 +908,13 @@ const CheckInSessions = () => {
                   <Badge variant="neutral" dot>
                     Closed
                   </Badge>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setEvidenceSessionId(session.id)}
+                  >
+                    Evidence
+                  </Button>
                 </div>
               </article>
             ))}
@@ -654,8 +923,8 @@ const CheckInSessions = () => {
       )}
 
       <p className="checkin__footer">
-        This slice starts and closes sessions and plays wave 0. Student proof submission, wave
-        advancement and attendance scoring are not built yet.
+        This screen starts and closes sessions, advances waves after accepted evidence, and shows
+        the evidence received. It does not score attendance or run the ID round.
       </p>
     </AppShell>
   );

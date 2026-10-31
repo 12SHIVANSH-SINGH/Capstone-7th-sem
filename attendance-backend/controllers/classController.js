@@ -5,6 +5,7 @@ const CourseClass = require("../models/classModels");
 const Enrollment = require("../models/enrollmentModels");
 const { Room } = require("../models/roomModels");
 const { parseRosterText } = require("../utils/roster");
+const { rosterOptions } = require("../utils/rehearsalEnrollment");
 
 const getOwnedClass = async (classId, teacherId, next) => {
   if (!mongoose.isValidObjectId(classId)) {
@@ -90,7 +91,7 @@ exports.previewRoster = catchAsyncError(async (req, res, next) => {
   const courseClass = await getOwnedClass(req.params.classId, req.user._id, next);
   if (!courseClass) return;
 
-  const preview = parseRosterText(req.body.rosterText);
+  const preview = parseRosterText(req.body.rosterText, rosterOptions());
   res.status(200).json({ success: true, preview });
 });
 
@@ -98,7 +99,7 @@ exports.replaceRoster = catchAsyncError(async (req, res, next) => {
   const courseClass = await getOwnedClass(req.params.classId, req.user._id, next);
   if (!courseClass) return;
 
-  const { entries, errors } = parseRosterText(req.body.rosterText);
+  const { entries, errors } = parseRosterText(req.body.rosterText, rosterOptions());
   if (errors.length > 0) {
     return next(new ErrorHandler("Fix roster validation errors before saving", 400));
   }

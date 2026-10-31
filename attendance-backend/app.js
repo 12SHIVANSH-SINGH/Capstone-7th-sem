@@ -5,6 +5,8 @@ const cors = require('cors');
 const app = express();
 app.disable("x-powered-by");
 
+const isProduction = String(process.env.NODE_ENV || "").trim().toLowerCase() === "production";
+
 // Minimal security headers. The microphone stays available to this origin
 // because the acoustic lab needs it; camera and geolocation are not used.
 app.use((req, res, next) => {
@@ -12,12 +14,24 @@ app.use((req, res, next) => {
   res.set("X-Frame-Options", "DENY");
   res.set("Referrer-Policy", "strict-origin-when-cross-origin");
   res.set("Permissions-Policy", "camera=(), geolocation=(), microphone=(self)");
+  // Render terminates TLS and forwards HTTP here. HSTS is only sent in
+  // production so local HTTP development is never pinned to HTTPS.
+  if (isProduction) {
+    res.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  }
+  next();
+});
+
+// API responses carry sessions, keys and evidence. A shared cache must never
+// keep them, regardless of which route answered. Route-level no-store remains
+// for direct router tests.
+app.use("/api", (req, res, next) => {
+  res.set("Cache-Control", "no-store");
   next();
 });
 
 // Browser origins allowed to call this API with cookies.
 // Add exact origins (deployments) with CLIENT_URLS=origin1,origin2 in config.env.
-const isProduction = String(process.env.NODE_ENV || "").trim().toLowerCase() === "production";
 // Localhost is a development origin. A production process must list its
 // frontend origin explicitly; single-service hosting needs no origin at all.
 const defaultOrigins = isProduction
@@ -94,9 +108,25 @@ const path = require('path');
 const fs = require('fs');
 const frontendBuild = path.join(__dirname, '..', 'attendance-frontend', 'build');
 if (fs.existsSync(path.join(frontendBuild, 'index.html'))) {
-  app.use(express.static(frontendBuild));
+  // CRA puts content-hashed bundles under static/, so those can be cached
+  // forever. index.html must stay revalidated or a new deploy is invisible.
+  const staticDir = path.join(frontendBuild, 'static') + path.sep;
+  app.use(
+    express.static(frontendBuild, {
+      setHeaders(res, filePath) {
+        res.set(
+          "Cache-Control",
+          filePath.startsWith(staticDir)
+            ? "public, max-age=31536000, immutable"
+            : "no-cache"
+        );
+      },
+    })
+  );
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api/')) return next();
+    // Deep links return the shell; the shell must be checked before each load.
+    res.set("Cache-Control", "no-cache");
     return res.sendFile(path.join(frontendBuild, 'index.html'));
   });
 }

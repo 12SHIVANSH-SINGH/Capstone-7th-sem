@@ -675,8 +675,8 @@ const ClassManagement = () => {
         >
           <p className="class-mgmt__muted">
             Paste one <code>@nitjsr.ac.in</code> email per line, or use <code>email,name</code> CSV.
-            Saving replaces the active roster: students missing from the new list are marked
-            inactive, not deleted.
+            Rehearsal builds may also accept an allowlisted test account. Saving replaces the
+            active roster: students missing from the new list are marked inactive, not deleted.
           </p>
 
           {rosterError && (
@@ -713,7 +713,7 @@ const ClassManagement = () => {
           <Field
             label="Roster CSV"
             htmlFor="roster-text"
-            hint="A header row named email is optional. Duplicate and non-institutional rows are rejected in the preview."
+            hint="A header row named email is optional. Duplicate and non-institutional rows are rejected in the preview unless the server has rehearsal enrollment enabled."
           >
             <textarea
               id="roster-text"

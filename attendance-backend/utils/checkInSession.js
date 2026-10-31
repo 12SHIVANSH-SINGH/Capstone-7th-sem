@@ -21,6 +21,10 @@ const INITIAL_WAVE = 0;
 // Hard ceiling shared by the session model, the proof validator and the browser.
 // It is a wire-format bound, not a policy: no real class gets near it.
 const MAX_WAVE = 1_000_000;
+// A session is minutes long, so a small bounded history is enough for the
+// teacher view and for later "lowest wave heard" work. Keeping every key would
+// grow a session document without limit.
+const MAX_KEY_HISTORY = 20;
 const STATUS_ACTIVE = "active";
 const STATUS_CLOSED = "closed";
 const SESSION_STATUSES = [STATUS_ACTIVE, STATUS_CLOSED];
@@ -45,6 +49,19 @@ const mintKey = (randomInt = crypto.randomInt) => {
   const value = randomInt(KEY_SPACE);
   if (!isValidKey(value)) {
     throw new Error(`Key generator must return an integer from 0 to ${MAX_KEY_VALUE}.`);
+  }
+  return value;
+};
+
+// A repeated key would let a phone that heard the previous wave replay the
+// same footprint. The probability is tiny, but make the invariant explicit.
+const mintDistinctKey = (previous, randomInt = crypto.randomInt) => {
+  let value = mintKey(randomInt);
+  for (let attempt = 0; attempt < 5 && value === previous; attempt += 1) {
+    value = mintKey(randomInt);
+  }
+  if (value === previous) {
+    throw new Error("Could not mint a key different from the current wave.");
   }
   return value;
 };
@@ -87,6 +104,63 @@ const closeSessionState = (session, { now = new Date() } = {}) => {
     };
   }
   return { status: STATUS_CLOSED, closedAt: asDate(now, "now") };
+};
+
+/**
+ * Move an active session to the next wave. The old key is archived (without
+ * growing past maxHistory) and the new key gets a fresh lifetime. The caller
+ * decides whether the current wave earned advancement; this helper is pure.
+ */
+const advanceSessionState = (
+  session,
+  {
+    now = new Date(),
+    key,
+    keyTtlMs = KEY_TTL_MS,
+    maxHistory = MAX_KEY_HISTORY,
+  } = {}
+) => {
+  if (!session || session.status !== STATUS_ACTIVE) {
+    throw new TypeError("session must be active to advance.");
+  }
+  if (!Number.isInteger(session.wave) || session.wave < 0 || session.wave >= MAX_WAVE) {
+    throw new RangeError("session wave cannot advance further.");
+  }
+  if (!isValidKey(session.key)) {
+    throw new TypeError("session key is not valid.");
+  }
+  if (!Number.isFinite(keyTtlMs) || keyTtlMs <= 0) {
+    throw new RangeError("keyTtlMs must be a positive number.");
+  }
+  if (!Number.isInteger(maxHistory) || maxHistory <= 0) {
+    throw new RangeError("maxHistory must be a positive integer.");
+  }
+
+  const nextKey = key === undefined ? mintDistinctKey(session.key) : key;
+  if (!isValidKey(nextKey)) {
+    throw new RangeError(`key must be an integer from 0 to ${MAX_KEY_VALUE}.`);
+  }
+  if (nextKey === session.key) {
+    throw new RangeError("the next key must differ from the current key.");
+  }
+
+  const issuedAt = asDate(now, "now");
+  const previous = {
+    wave: session.wave,
+    key: session.key,
+    keyIssuedAt: asDate(session.keyIssuedAt, "keyIssuedAt"),
+    keyExpiresAt: asDate(session.keyExpiresAt, "keyExpiresAt"),
+  };
+  const history = Array.isArray(session.keyHistory) ? session.keyHistory.slice() : [];
+  history.push(previous);
+
+  return {
+    wave: session.wave + 1,
+    key: nextKey,
+    keyIssuedAt: issuedAt,
+    keyExpiresAt: new Date(issuedAt.getTime() + keyTtlMs),
+    keyHistory: history.slice(-maxHistory),
+  };
 };
 
 const keyIsFresh = (session, now = new Date()) => {
@@ -139,6 +213,20 @@ const baseView = (session, now) => ({
 });
 
 /**
+ * The teacher view may show which waves existed and when, but old keys are no
+ * longer useful and are not returned. Keeping the summary key-free means a
+ * teacher response cannot leak the whole cascade history.
+ */
+const keyHistoryView = (session) => {
+  const history = Array.isArray(session?.keyHistory) ? session.keyHistory : [];
+  return history.map((entry) => ({
+    wave: Number.isInteger(entry?.wave) ? entry.wave : null,
+    keyIssuedAt: asIsoString(entry?.keyIssuedAt),
+    keyExpiresAt: asIsoString(entry?.keyExpiresAt),
+  }));
+};
+
+/**
  * Teachers need the current key to play it. Students receive only the wave and
  * lifetime: a student gets the next key by proving they heard the current one,
  * which is the next slice.
@@ -146,6 +234,7 @@ const baseView = (session, now) => ({
 const toTeacherSession = (session, { now = new Date() } = {}) => ({
   ...baseView(session, now),
   key: session.key,
+  waveHistory: keyHistoryView(session),
 });
 
 const toStudentSession = (session, { now = new Date() } = {}) => baseView(session, now);
@@ -157,15 +246,19 @@ module.exports = {
   MAX_KEY_VALUE,
   INITIAL_WAVE,
   MAX_WAVE,
+  MAX_KEY_HISTORY,
   STATUS_ACTIVE,
   STATUS_CLOSED,
   SESSION_STATUSES,
   KEY_TTL_MS,
   isValidKey,
   mintKey,
+  mintDistinctKey,
   buildInitialSession,
   closeSessionState,
+  advanceSessionState,
   keyIsFresh,
+  keyHistoryView,
   toTeacherSession,
   toStudentSession,
 };

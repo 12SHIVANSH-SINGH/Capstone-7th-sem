@@ -4,13 +4,17 @@ const ErrorHandler = require("../utils/errorhandler");
 const CourseClass = require("../models/classModels");
 const Enrollment = require("../models/enrollmentModels");
 const CheckInSession = require("../models/checkInSessionModels");
+const CheckInProof = require("../models/checkInProofModels");
 const {
   STATUS_ACTIVE,
+  MAX_KEY_HISTORY,
   buildInitialSession,
   closeSessionState,
+  advanceSessionState,
   toStudentSession,
   toTeacherSession,
 } = require("../utils/checkInSession");
+const { toTeacherProofView } = require("../utils/checkInProof");
 
 const SESSION_POPULATE = [
   { path: "courseClass", select: "courseCode title section" },
@@ -128,6 +132,114 @@ exports.closeSession = catchAsyncError(async (req, res, next) => {
   res.status(200).json({ success: true, session: toTeacherSession(session) });
 });
 
+/**
+ * Advance to the next wave only after the current wave has at least one
+ * accepted proof. This keeps wave numbers tied to real acoustic progress and
+ * stops a teacher from skipping waves by tapping repeatedly.
+ *
+ * The update is matched on the wave the request read. Two concurrent taps mint
+ * two keys, but only one can win; the loser gets a clear conflict instead of
+ * silently overwriting the winner.
+ */
+exports.advanceSession = catchAsyncError(async (req, res, next) => {
+  const session = await getOwnedSession(req.params.sessionId, req.user._id, next);
+  if (!session) return;
+
+  if (session.status !== STATUS_ACTIVE) {
+    return next(new ErrorHandler("This check-in session is closed.", 409));
+  }
+
+  const evidence = await CheckInProof.exists({
+    session: session._id,
+    wave: session.wave,
+  });
+  if (!evidence) {
+    return next(
+      new ErrorHandler(
+        "No phone has recorded evidence for this wave yet. Wait for a proof before advancing.",
+        409
+      )
+    );
+  }
+
+  let advanced;
+  try {
+    advanced = advanceSessionState(session);
+  } catch (error) {
+    return next(new ErrorHandler(error.message, 409));
+  }
+  const archived = advanced.keyHistory[advanced.keyHistory.length - 1];
+
+  const updated = await CheckInSession.findOneAndUpdate(
+    {
+      _id: session._id,
+      teacher: req.user._id,
+      status: STATUS_ACTIVE,
+      wave: session.wave,
+    },
+    {
+      $set: {
+        wave: advanced.wave,
+        key: advanced.key,
+        keyIssuedAt: advanced.keyIssuedAt,
+        keyExpiresAt: advanced.keyExpiresAt,
+      },
+      $push: {
+        keyHistory: {
+          $each: [archived],
+          $slice: -MAX_KEY_HISTORY,
+        },
+      },
+    },
+    { new: true, runValidators: true }
+  ).populate(SESSION_POPULATE);
+
+  if (!updated) {
+    return next(
+      new ErrorHandler(
+        "The session changed before the wave could advance. Refresh and try again.",
+        409
+      )
+    );
+  }
+
+  res.status(200).json({ success: true, session: toTeacherSession(updated) });
+});
+
+/**
+ * Read-only evidence for the teacher who owns the session. This is not a
+ * roster roll-call and not a score: it lists which enrolled students submitted
+ * which wave, so the teacher can see the transport working during a rehearsal.
+ */
+exports.listSessionProofs = catchAsyncError(async (req, res, next) => {
+  const session = await getOwnedSession(req.params.sessionId, req.user._id, next);
+  if (!session) return;
+
+  // A class is at most a few hundred submissions across a rehearsal; 500 is a
+  // safety bound, not pagination. No signature, key or device data is selected.
+  const proofs = await CheckInProof.find({ session: session._id })
+    .select("studentEmail wave createdAt")
+    .sort({ createdAt: 1 })
+    .limit(500);
+
+  const waveCounts = new Map();
+  for (const proof of proofs) {
+    waveCounts.set(proof.wave, (waveCounts.get(proof.wave) || 0) + 1);
+  }
+  const byWave = [...waveCounts.entries()]
+    .sort(([left], [right]) => left - right)
+    .map(([wave, count]) => ({ wave, count }));
+
+  res.status(200).json({
+    success: true,
+    sessionId: String(session._id),
+    attendanceDecided: false,
+    total: proofs.length,
+    byWave,
+    proofs: proofs.map(toTeacherProofView),
+  });
+});
+
 exports.getActiveSessionForStudent = catchAsyncError(async (req, res, next) => {
   if (!mongoose.isValidObjectId(req.params.classId)) {
     return next(new ErrorHandler("Class not found", 404));
@@ -157,5 +269,36 @@ exports.getActiveSessionForStudent = catchAsyncError(async (req, res, next) => {
   res.status(200).json({
     success: true,
     session: session ? toStudentSession(session) : null,
+  });
+});
+
+/**
+ * Active sessions across every class this student is enrolled in.
+ *
+ * The student check-in shell needs one call to discover whether anything is
+ * live, without first knowing the class id. Only the student's own active
+ * enrollments are considered, and the response uses the student view, so it
+ * never contains a key.
+ */
+exports.listActiveSessionsForStudent = catchAsyncError(async (req, res) => {
+  const email = String(req.user.email || "").trim().toLowerCase();
+  const classIds = await Enrollment.distinct("class", { email, status: "active" });
+  const validClassIds = classIds.filter((classId) => mongoose.isValidObjectId(classId));
+
+  if (validClassIds.length === 0) {
+    return res.status(200).json({ success: true, sessions: [] });
+  }
+
+  const sessions = await CheckInSession.find({
+    courseClass: { $in: validClassIds },
+    status: STATUS_ACTIVE,
+  })
+    .populate(SESSION_POPULATE)
+    .sort({ startedAt: -1 })
+    .limit(20);
+
+  res.status(200).json({
+    success: true,
+    sessions: sessions.map((session) => toStudentSession(session)),
   });
 });

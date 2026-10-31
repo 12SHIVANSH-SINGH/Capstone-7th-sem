@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "testType": "cross-phone",
+  "role": "rx",
+  "runId": "6RHC9R",
+  "generatedAt": "2026-10-25T05:06:08.735Z",
+  "appVersion": "1.8.0",
+  "device": {
+    "role": "rx",
+    "contextSampleRate": 48000,
+    "trackSampleRate": 48000,
+    "warning": null,
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Mobile Safari/537.36"
+  },
+  "conditions": {
+    "distance": "10 m",
+    "room": null,
+    "notes": null
+  },
+  "planned": 10,
+  "decoded": 1,
+  "decodeRate": 0.1,
+  "elapsedMs": 38011.199999809265,
+  "keys": [
+    159574813
+  ],
+  "lastKey": 159574813,
+  "lastMargin": 10.206986646997962,
+  "frames": [
+    {
+      "atMs": 17380,
+      "frameStartSample": 834224,
+      "key": 159574813,
+      "marginDb": 10.2
+    }
+  ]
+}

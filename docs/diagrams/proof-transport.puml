@@ -1,6 +1,6 @@
 @startuml
 !pragma layout smetana
-title Layer 2.3 — proof submission (built locally, not deployed)
+title Layer 2.3 — proof submission (built; evidence-only)
 
 skinparam defaultFontName "Arial"
 skinparam defaultFontSize 13
@@ -43,9 +43,12 @@ else Invalid, stale, wrong device or rate limited
 end
 
 note over API, DB
-  No score, attendance flag, ID round or wave advancement.
+  No score, attendance flag or ID round.
   The signed proof binds the submission to the bound account/device.
   It does not prove the phone was physically inside the room.
+  A teacher may advance only after the current wave has
+  at least one accepted proof; old keys are archived
+  server-side and never returned to students.
 end note
 
 @enduml

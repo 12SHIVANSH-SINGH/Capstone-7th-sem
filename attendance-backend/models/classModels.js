@@ -32,6 +32,13 @@ const classSchema = new mongoose.Schema(
       ref: "Room",
       required: true,
     },
+    // Demo classes and their sessions can be reset from the test admin panel
+    // without deleting anything belonging to real accounts.
+    isDemo: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
   },
   { timestamps: true }
 );

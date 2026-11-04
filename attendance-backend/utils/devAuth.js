@@ -64,8 +64,8 @@ const parseDevAccounts = (value = process.env.DEV_AUTH_ACCOUNTS) => {
     if (!/^[a-z0-9_-]{2,24}$/.test(key)) {
       throw new Error(`DEV_AUTH_ACCOUNTS key "${rawKey}" must be 2-24 lowercase letters, digits, _ or -.`);
     }
-    if (!["teacher", "student"].includes(role)) {
-      throw new Error(`DEV_AUTH_ACCOUNTS role for "${key}" must be teacher or student.`);
+    if (!["teacher", "student", "superadmin"].includes(role)) {
+      throw new Error(`DEV_AUTH_ACCOUNTS role for "${key}" must be teacher or student (or superadmin).`);
     }
     if (!name) {
       throw new Error(`DEV_AUTH_ACCOUNTS name for "${key}" is required.`);

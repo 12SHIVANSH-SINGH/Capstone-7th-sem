@@ -5,6 +5,9 @@ const CourseClass = require("../models/classModels");
 const Enrollment = require("../models/enrollmentModels");
 const CheckInSession = require("../models/checkInSessionModels");
 const CheckInProof = require("../models/checkInProofModels");
+const AttendanceRecord = require("../models/attendanceRecordModels");
+const AttendanceQuery = require("../models/attendanceQueryModels");
+const { Room } = require("../models/roomModels");
 const {
   STATUS_ACTIVE,
   MAX_KEY_HISTORY,
@@ -15,9 +18,21 @@ const {
   toTeacherSession,
 } = require("../utils/checkInSession");
 const { toTeacherProofView } = require("../utils/checkInProof");
+const { normaliseLocation } = require("../utils/location");
+const { getSettings } = require("../utils/settings");
+const {
+  snapshotRosterAttendance,
+  sessionClassSnapshot,
+  queryWindowEnd,
+  summariseRecords,
+  expireStaleQueries,
+} = require("../utils/attendance");
+const { writeAudit } = require("../utils/audit");
+const { createNotifications } = require("../utils/notifications");
+const { isDbReady } = require("../utils/dbReady");
 
 const SESSION_POPULATE = [
-  { path: "courseClass", select: "courseCode title section" },
+  { path: "courseClass", select: "courseCode title section teacher" },
   { path: "room", select: "roomNo" },
 ];
 
@@ -58,6 +73,42 @@ const activeSessionConflict = (next) =>
     )
   );
 
+/**
+ * Batch attendance counts for the session list. The register is the source of
+ * truth; this only decorates the teacher's session cards.
+ */
+const attendanceSummaries = async (sessionIds = []) => {
+  if (!sessionIds.length || !isDbReady()) return new Map();
+  const rows = await AttendanceRecord.aggregate([
+    { $match: { session: { $in: sessionIds } } },
+    { $group: { _id: { session: "$session", status: "$status" }, count: { $sum: 1 } } },
+  ]);
+  const bySession = new Map();
+  for (const row of rows) {
+    const key = String(row._id.session);
+    if (!bySession.has(key)) {
+      bySession.set(key, { total: 0, present: 0, absent: 0, pending: 0, excused: 0 });
+    }
+    const summary = bySession.get(key);
+    summary.total += row.count;
+    if (row._id.status === "present") summary.present += row.count;
+    else if (row._id.status === "absent") summary.absent += row.count;
+    else if (row._id.status === "excused") summary.excused += row.count;
+    else summary.pending += row.count;
+  }
+  for (const summary of bySession.values()) {
+    const decided = summary.present + summary.absent;
+    summary.decided = decided;
+    summary.percentage = decided > 0 ? Math.round((summary.present / decided) * 1000) / 10 : null;
+  }
+  return bySession;
+};
+
+const withSummary = (session, summary) => ({
+  ...toTeacherSession(session),
+  attendanceSummary: summary || { total: 0, present: 0, absent: 0, pending: 0, percentage: null },
+});
+
 exports.createSession = catchAsyncError(async (req, res, next) => {
   const courseClass = await getOwnedClass(req.params.classId, req.user._id, next);
   if (!courseClass) return;
@@ -72,6 +123,13 @@ exports.createSession = catchAsyncError(async (req, res, next) => {
   }).select("_id");
   if (existing) return activeSessionConflict(next);
 
+  const teacherLocation = normaliseLocation(req.body?.teacherLocation, {
+    defaultSource: "teacher-session",
+  });
+  const room = isDbReady()
+    ? await Room.findById(courseClass.defaultRoom).select("roomNo")
+    : { roomNo: courseClass.defaultRoom?.roomNo || "" };
+
   let session;
   try {
     session = await CheckInSession.create({
@@ -79,6 +137,9 @@ exports.createSession = catchAsyncError(async (req, res, next) => {
       teacher: req.user._id,
       room: courseClass.defaultRoom,
       ...buildInitialSession(),
+      teacherLocation,
+      classSnapshot: sessionClassSnapshot(courseClass, room),
+      isDemo: Boolean(req.user.isDemo || courseClass.isDemo),
     });
   } catch (error) {
     // Two rapid taps can pass the check above at the same time. The partial
@@ -88,8 +149,62 @@ exports.createSession = catchAsyncError(async (req, res, next) => {
     throw error;
   }
 
+  // Snapshot the roster before returning. If this fails the session still
+  // exists, but the error is surfaced so the teacher can retry; the snapshot
+  // operation is idempotent.
+  const snapshot = await snapshotRosterAttendance({
+    session,
+    courseClass,
+    room,
+    teacherLocation,
+    isDemo: Boolean(session.isDemo),
+  });
+
+  session.rosterCount = snapshot.count;
+  if (isDbReady() && typeof session.save === "function") {
+    await session.save();
+  }
   await session.populate(SESSION_POPULATE);
-  res.status(201).json({ success: true, session: toTeacherSession(session) });
+
+  const enrolledUsers = isDbReady()
+    ? await Enrollment.find({
+        class: courseClass._id,
+        status: "active",
+        student: { $ne: null },
+      })
+        .select("student")
+        .lean()
+    : [];
+  await createNotifications(
+    enrolledUsers.map((entry) => ({
+      user: entry.student,
+      type: "session.started",
+      title: "Check-in started",
+      message: `${courseClass.courseCode}${courseClass.section ? ` · ${courseClass.section}` : ""} check-in is live. Open Check-in and listen for the current wave.`,
+      link: "/student/check-in",
+      isDemo: Boolean(session.isDemo),
+    }))
+  );
+
+  await writeAudit(req, {
+    action: "session.created",
+    entityType: "CheckInSession",
+    entityId: session._id,
+    summary: `Started check-in for ${courseClass.courseCode}.`,
+    metadata: {
+      teacherLocationCaptured: Boolean(teacherLocation),
+      rosterCount: snapshot.count,
+    },
+    isDemo: session.isDemo,
+  });
+
+  res.status(201).json({
+    success: true,
+    session: {
+      ...withSummary(session),
+      teacherLocation: toTeacherSession(session).teacherLocation,
+    },
+  });
 });
 
 exports.listSessions = catchAsyncError(async (req, res, next) => {
@@ -103,9 +218,12 @@ exports.listSessions = catchAsyncError(async (req, res, next) => {
     .sort({ startedAt: -1 })
     .limit(50);
 
+  const summaries = await attendanceSummaries(sessions.map((session) => session._id));
   res.status(200).json({
     success: true,
-    sessions: sessions.map((session) => toTeacherSession(session)),
+    sessions: sessions.map((session) =>
+      withSummary(session, summaries.get(String(session._id)))
+    ),
   });
 });
 
@@ -113,7 +231,11 @@ exports.getSession = catchAsyncError(async (req, res, next) => {
   const session = await getOwnedSession(req.params.sessionId, req.user._id, next);
   if (!session) return;
 
-  res.status(200).json({ success: true, session: toTeacherSession(session) });
+  const summaries = await attendanceSummaries([session._id]);
+  res.status(200).json({
+    success: true,
+    session: withSummary(session, summaries.get(String(session._id))),
+  });
 });
 
 exports.closeSession = catchAsyncError(async (req, res, next) => {
@@ -124,12 +246,47 @@ exports.closeSession = catchAsyncError(async (req, res, next) => {
   // first closedAt value. A retry after a dropped response must not fail.
   if (session.status === STATUS_ACTIVE) {
     const closed = closeSessionState(session);
+    const settings = await getSettings();
     session.status = closed.status;
     session.closedAt = closed.closedAt;
+    session.queryWindowEndsAt = queryWindowEnd(session.closedAt, settings);
     await session.save();
+
+    const records = isDbReady()
+      ? await AttendanceRecord.find({ session: session._id })
+          .select("student studentEmail status")
+          .lean()
+      : [];
+    const studentIds = records.map((record) => record.student).filter(Boolean);
+    await createNotifications(
+      studentIds.map((user) => ({
+        user,
+        type: "session.closed",
+        title: "Check-in closed",
+        message: `${session.classSnapshot?.courseCode || "Your class"} check-in has closed. If you were present but unmarked, you can raise a query for 24 hours.`,
+        link: "/queries",
+        isDemo: Boolean(session.isDemo),
+      }))
+    );
+
+    await writeAudit(req, {
+      action: "session.closed",
+      entityType: "CheckInSession",
+      entityId: session._id,
+      summary: `Closed check-in for ${session.classSnapshot?.courseCode || "a class"}.`,
+      metadata: {
+        queryWindowEndsAt: session.queryWindowEndsAt,
+        finalised: session.attendanceFinalized,
+      },
+      isDemo: session.isDemo,
+    });
   }
 
-  res.status(200).json({ success: true, session: toTeacherSession(session) });
+  const summaries = await attendanceSummaries([session._id]);
+  res.status(200).json({
+    success: true,
+    session: withSummary(session, summaries.get(String(session._id))),
+  });
 });
 
 /**
@@ -203,7 +360,19 @@ exports.advanceSession = catchAsyncError(async (req, res, next) => {
     );
   }
 
-  res.status(200).json({ success: true, session: toTeacherSession(updated) });
+  await writeAudit(req, {
+    action: "session.advanced",
+    entityType: "CheckInSession",
+    entityId: updated._id,
+    summary: `Advanced check-in from wave ${session.wave} to wave ${updated.wave}.`,
+    isDemo: updated.isDemo,
+  });
+
+  const summaries = await attendanceSummaries([updated._id]);
+  res.status(200).json({
+    success: true,
+    session: withSummary(updated, summaries.get(String(updated._id))),
+  });
 });
 
 /**
@@ -233,7 +402,7 @@ exports.listSessionProofs = catchAsyncError(async (req, res, next) => {
   res.status(200).json({
     success: true,
     sessionId: String(session._id),
-    attendanceDecided: false,
+    attendanceDecided: Boolean(session.attendanceFinalized),
     total: proofs.length,
     byWave,
     proofs: proofs.map(toTeacherProofView),
@@ -245,7 +414,7 @@ exports.getActiveSessionForStudent = catchAsyncError(async (req, res, next) => {
     return next(new ErrorHandler("Class not found", 404));
   }
 
-  const courseClass = await CourseClass.findById(req.params.classId).select("_id");
+  const courseClass = await CourseClass.findById(req.params.classId).select("_id isDemo");
   if (!courseClass) {
     return next(new ErrorHandler("Class not found", 404));
   }
@@ -301,4 +470,55 @@ exports.listActiveSessionsForStudent = catchAsyncError(async (req, res) => {
     success: true,
     sessions: sessions.map((session) => toStudentSession(session)),
   });
+});
+
+/**
+ * Student check-in location. This stores the attempt location on the roster
+ * row for the current session. It is optional: a denied permission must not
+ * stop a student from listening to the key.
+ */
+exports.recordAttemptLocation = catchAsyncError(async (req, res, next) => {
+  if (!mongoose.isValidObjectId(req.params.sessionId)) {
+    return next(new ErrorHandler("Check-in session not found", 404));
+  }
+
+  const location = normaliseLocation(req.body?.location, { defaultSource: "browser" });
+  if (!location) {
+    return next(new ErrorHandler("A valid latitude and longitude are required.", 400));
+  }
+
+  const session = await CheckInSession.findById(req.params.sessionId).select(
+    "courseClass status isDemo"
+  );
+  if (!session) return next(new ErrorHandler("Check-in session not found", 404));
+
+  const email = String(req.user.email || "").trim().toLowerCase();
+  const record = await AttendanceRecord.findOneAndUpdate(
+    { session: session._id, studentEmail: email },
+    { $set: { attemptLocation: location, student: req.user._id } },
+    { new: true }
+  );
+  if (!record) {
+    return next(new ErrorHandler("You are not on this class roster", 403));
+  }
+
+  res.status(200).json({
+    success: true,
+    location: location,
+    recordedAt: record.updatedAt,
+  });
+});
+
+/**
+ * A teacher can see the queries attached to one of their sessions even after
+ * the generic query list has moved on.
+ */
+exports.listSessionQueries = catchAsyncError(async (req, res, next) => {
+  const session = await getOwnedSession(req.params.sessionId, req.user._id, next);
+  if (!session) return;
+  await expireStaleQueries();
+  const queries = await AttendanceQuery.find({ session: session._id })
+    .sort({ createdAt: -1 })
+    .limit(200);
+  res.status(200).json({ success: true, queries });
 });

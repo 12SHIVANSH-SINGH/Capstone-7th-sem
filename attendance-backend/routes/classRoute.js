@@ -17,8 +17,12 @@ const guards = [isAuthenticated, teacherOnly];
 // Guards are attached per route on purpose. A blanket router.use() here would
 // also swallow every /api/v1 route mounted after this router (Google sign-in,
 // device bindings) and answer them with 401 before they can run.
-router.get("/rooms", guards, listRooms);
-router.post("/rooms", guards, createRoom);
+router.get("/rooms", [isAuthenticated, isAuthenticated.authorizeRoles("teacher", "superadmin")], listRooms);
+router.post(
+  "/rooms",
+  [isAuthenticated, isAuthenticated.authorizeRoles("teacher", "superadmin")],
+  createRoom
+);
 router.route("/classes").get(guards, listClasses).post(guards, createClass);
 router.post("/classes/:classId/roster/preview", guards, previewRoster);
 router.put("/classes/:classId/roster", guards, replaceRoster);

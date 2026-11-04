@@ -202,6 +202,7 @@ const roomView = (room) => {
 const baseView = (session, now) => ({
   id: referenceId(session._id || session.id),
   class: classView(session.courseClass),
+  classSnapshot: session.classSnapshot || null,
   room: roomView(session.room),
   status: session.status,
   wave: session.wave,
@@ -210,6 +211,11 @@ const baseView = (session, now) => ({
   keyExpired: !keyIsFresh(session, now),
   startedAt: asIsoString(session.startedAt),
   closedAt: asIsoString(session.closedAt),
+  rosterCount: Number(session.rosterCount) || 0,
+  attendanceFinalized: Boolean(session.attendanceFinalized),
+  attendanceFinalizedAt: asIsoString(session.attendanceFinalizedAt),
+  queryWindowEndsAt: asIsoString(session.queryWindowEndsAt),
+  isDemo: Boolean(session.isDemo),
 });
 
 /**
@@ -235,6 +241,13 @@ const toTeacherSession = (session, { now = new Date() } = {}) => ({
   ...baseView(session, now),
   key: session.key,
   waveHistory: keyHistoryView(session),
+  teacherLocation: session.teacherLocation ? {
+    latitude: session.teacherLocation.latitude,
+    longitude: session.teacherLocation.longitude,
+    accuracy: session.teacherLocation.accuracy ?? null,
+    capturedAt: asIsoString(session.teacherLocation.capturedAt),
+    source: session.teacherLocation.source || "unknown",
+  } : null,
 });
 
 const toStudentSession = (session, { now = new Date() } = {}) => baseView(session, now);

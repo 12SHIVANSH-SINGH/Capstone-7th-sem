@@ -8,6 +8,8 @@ const validProduction = {
   DB_URI: "mongodb+srv://user:pass@cluster.example.mongodb.net/attendance",
   GOOGLE_CLIENT_ID: "123.apps.googleusercontent.com",
   COOKIE_EXPIRE: "7",
+  SUPER_ADMIN_EMAILS: "12shivanshsingha@gmail.com",
+  SUPER_ADMIN_SESSION_HOURS: "12",
 };
 
 test("development and test never require production secrets", () => {
@@ -65,6 +67,36 @@ test("production refuses every truthy rehearsal roster flag", () => {
   assert.doesNotThrow(() =>
     envCheck.assertProductionEnv(
       { ...validProduction, ALLOW_TEST_ROSTER_EMAILS: "false" },
+      { warn() {} }
+    )
+  );
+});
+
+test("production warns when no super-admin can open the console", () => {
+  const warnings = [];
+  assert.doesNotThrow(() =>
+    envCheck.assertProductionEnv(
+      { ...validProduction, SUPER_ADMIN_EMAILS: "" },
+      { warn: (message) => warnings.push(message) }
+    )
+  );
+  assert.match(warnings[0], /SUPER_ADMIN_EMAILS is empty/);
+});
+
+test("production validates the shorter super-admin session lifetime", () => {
+  for (const value of ["0", "-1", "73", "twelve"]) {
+    assert.throws(
+      () =>
+        envCheck.assertProductionEnv(
+          { ...validProduction, SUPER_ADMIN_SESSION_HOURS: value },
+          { warn() {} }
+        ),
+      /SUPER_ADMIN_SESSION_HOURS/
+    );
+  }
+  assert.doesNotThrow(() =>
+    envCheck.assertProductionEnv(
+      { ...validProduction, SUPER_ADMIN_SESSION_HOURS: "72" },
       { warn() {} }
     )
   );

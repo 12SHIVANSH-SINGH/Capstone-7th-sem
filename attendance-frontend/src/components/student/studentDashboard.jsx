@@ -1,6 +1,13 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
+import {
+  FiBarChart2,
+  FiCalendar,
+  FiClock,
+  FiHelpCircle,
+  FiRefreshCw,
+} from "react-icons/fi";
 import SERVER_URL from "../../config/api";
 import AppShell from "../../ui/AppShell";
 import Badge from "../../ui/Badge";
@@ -8,6 +15,7 @@ import Button from "../../ui/Button";
 import Card from "../../ui/Card";
 import { PageLoader } from "../../ui/Spinner";
 import { useToast } from "../../ui/Toast";
+import { classLabel, formatDateTime, percentLabel, relativeTime, givenName } from "../../utils/format";
 import { sessionLabel, sessionTitle } from "./studentCheckInView";
 import "./studentDashboard.css";
 
@@ -49,6 +57,9 @@ const StudentDashboard = () => {
     const [user, setUser] = useState(null);
     const [deviceStatus, setDeviceStatus] = useState(location.state?.deviceStatus || "checking");
     const [liveSessions, setLiveSessions] = useState([]);
+    const [attendance, setAttendance] = useState(null);
+    const [recentSessions, setRecentSessions] = useState([]);
+    const [snapshotLoading, setSnapshotLoading] = useState(false);
 
     useEffect(() => {
         const fetchUser = async () => {
@@ -77,6 +88,23 @@ const StudentDashboard = () => {
                     }
                     setLiveSessions([]);
                 }
+
+                setSnapshotLoading(true);
+                const [attendanceResult, sessionResult] = await Promise.allSettled([
+                    axios.get(`${SERVER_URL}/attendance/me`, { withCredentials: true }),
+                    axios.get(`${SERVER_URL}/attendance/me/sessions`, { withCredentials: true }),
+                ]);
+                if (attendanceResult.status === "fulfilled") {
+                    setAttendance(attendanceResult.value.data || null);
+                }
+                if (sessionResult.status === "fulfilled") {
+                    setRecentSessions(
+                        Array.isArray(sessionResult.value.data?.sessions)
+                            ? sessionResult.value.data.sessions
+                            : []
+                    );
+                }
+                setSnapshotLoading(false);
             } catch (error) {
                 if (error.response?.status && error.response.status !== 401) {
                     toast("Could not load your dashboard. Please try again.", "error");
@@ -103,7 +131,7 @@ const StudentDashboard = () => {
 
     const info = STATUS_VIEW[deviceStatus] || STATUS_VIEW.checking;
     const name = user.name || user.email.split("@")[0];
-    const firstName = name.split(" ")[0];
+    const firstName = givenName(name);
 
     return (
         <AppShell
@@ -111,11 +139,6 @@ const StudentDashboard = () => {
             name={name}
             email={user.email}
             onLogout={handleLogout}
-            links={[
-                { to: "/student-dashboard", label: "Dashboard", active: true },
-                { to: "/student/check-in", label: "Check-in" },
-                { to: "/acoustic-lab", label: "Phone audio test" },
-            ]}
         >
             <div className="ui-page-head">
                 <div>
@@ -181,6 +204,91 @@ const StudentDashboard = () => {
                         </>
                     )}
                 </Card>
+            </div>
+
+            <div className="page-stack" style={{ marginTop: 18 }}>
+                <div className="metric-strip">
+                    <div className="metric metric--indigo">
+                        <div className="metric__label">Overall attendance</div>
+                        <div className="metric__value">{percentLabel(attendance?.summary?.percentage)}</div>
+                        <div className="metric__hint">{attendance?.summary?.present || 0} present · {attendance?.summary?.absent || 0} absent</div>
+                    </div>
+                    <div className="metric">
+                        <div className="metric__label">Classes</div>
+                        <div className="metric__value">{attendance?.classes?.length || 0}</div>
+                        <div className="metric__hint">{attendance?.summary?.pending || 0} rows pending</div>
+                    </div>
+                    <div className="metric metric--warning">
+                        <div className="metric__label">Query window</div>
+                        <div className="metric__value">{recentSessions.filter((session) => session.canRaiseQuery).length}</div>
+                        <div className="metric__hint">Closed sessions you can query</div>
+                    </div>
+                    <div className="metric metric--success">
+                        <div className="metric__label">Approved corrections</div>
+                        <div className="metric__value">{attendance?.queries?.filter((query) => query.status === "approved").length || 0}</div>
+                        <div className="metric__hint">Counted as present</div>
+                    </div>
+                </div>
+
+                <div className="page-grid page-grid--2">
+                    <Card
+                        title="Recent sessions"
+                        subtitle="After a session closes you have 24 hours to correct a missed mark."
+                        actions={<Button variant="ghost" size="sm" onClick={() => navigate("/attendance")}><FiBarChart2 aria-hidden="true" /> Analytics</Button>}
+                    >
+                        {snapshotLoading ? (
+                            <div className="loading-inline"><FiRefreshCw aria-hidden="true" /> Loading your attendance…</div>
+                        ) : recentSessions.length === 0 ? (
+                            <p className="empty-inline">No closed sessions yet. Your first register appears here after class.</p>
+                        ) : (
+                            <div className="query-list">
+                                {recentSessions.slice(0, 4).map((session) => (
+                                    <div className={`query-card ${session.canRaiseQuery ? "query-card--pending" : ""}`} key={session.id}>
+                                        <div className="query-card__head">
+                                            <div>
+                                                <h3 className="query-card__title">{classLabel(session.class)}</h3>
+                                                <p className="query-card__sub">
+                                                    {formatDateTime(session.startedAt)} · {session.attendance?.status || "not on register"}
+                                                </p>
+                                            </div>
+                                            {session.canRaiseQuery ? (
+                                                <Badge variant="warning" dot>Window open</Badge>
+                                            ) : session.query ? (
+                                                <Badge variant={session.query.status === "approved" ? "success" : session.query.status === "rejected" ? "danger" : "neutral"}>
+                                                    Query {session.query.status}
+                                                </Badge>
+                                            ) : session.attendance?.status === "present" ? (
+                                                <Badge variant="success">Present</Badge>
+                                            ) : (
+                                                <Badge variant="neutral">Closed</Badge>
+                                            )}
+                                        </div>
+                                        <div className="query-card__foot">
+                                            <span className="query-window">
+                                                <FiClock aria-hidden="true" /> {session.windowOpen ? `Query window ends ${relativeTime(session.queryWindowEndsAt)}` : "Review window closed"}
+                                            </span>
+                                            {session.canRaiseQuery ? (
+                                                <Link className="ui-btn ui-btn--soft ui-btn--sm" to="/queries">Raise query</Link>
+                                            ) : (
+                                                <Link className="ui-btn ui-btn--ghost ui-btn--sm" to="/queries">Open queries</Link>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </Card>
+
+                    <Card title="Quick actions" subtitle="Everything a student needs between classes.">
+                        <div className="page-stack">
+                            <Link className="ui-btn ui-btn--primary ui-btn--block" to="/student/check-in">Open check-in</Link>
+                            <Link className="ui-btn ui-btn--secondary ui-btn--block" to="/queries"><FiHelpCircle aria-hidden="true" /> Queries &amp; corrections</Link>
+                            <Link className="ui-btn ui-btn--secondary ui-btn--block" to="/attendance"><FiBarChart2 aria-hidden="true" /> My attendance</Link>
+                            <Link className="ui-btn ui-btn--secondary ui-btn--block" to="/timetable"><FiCalendar aria-hidden="true" /> Timetable</Link>
+                            <Link className="ui-btn ui-btn--ghost ui-btn--block" to="/help">How check-in works</Link>
+                        </div>
+                    </Card>
+                </div>
             </div>
         </AppShell>
     );

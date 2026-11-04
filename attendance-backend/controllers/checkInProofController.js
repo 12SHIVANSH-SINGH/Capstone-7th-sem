@@ -3,8 +3,11 @@ const catchAsyncError = require("../middleware/catchasyncerror");
 const ErrorHandler = require("../utils/errorhandler");
 const CheckInSession = require("../models/checkInSessionModels");
 const CheckInProof = require("../models/checkInProofModels");
+const AttendanceRecord = require("../models/attendanceRecordModels");
 const Enrollment = require("../models/enrollmentModels");
 const DeviceBindingRequest = require("../models/deviceBindingRequestModels");
+const { normaliseLocation } = require("../utils/location");
+const { isDbReady } = require("../utils/dbReady");
 const {
   buildProofMessage,
   evaluateProof,
@@ -53,6 +56,7 @@ exports.submitProof = catchAsyncError(async (req, res, next) => {
     return next(new ErrorHandler(parsed.message, 400));
   }
   const { wave, key, signature } = parsed.payload;
+  const attemptLocation = normaliseLocation(req.body?.location, { defaultSource: "browser" });
 
   if (!mongoose.isValidObjectId(req.params.sessionId)) {
     return sessionNotFound(next);
@@ -146,6 +150,7 @@ exports.submitProof = catchAsyncError(async (req, res, next) => {
       key,
       signature,
       protocolVersion: PROOF_MESSAGE_VERSION,
+      ...(attemptLocation ? { location: attemptLocation } : {}),
     });
   } catch (error) {
     // Two retries can pass the read above at the same time. The unique index is
@@ -178,6 +183,27 @@ exports.submitProof = catchAsyncError(async (req, res, next) => {
     wave,
     outcome: PROOF_OUTCOMES.ACCEPT,
   });
+
+  // Keep the durable register in sync while the proof document is still
+  // present. The proof itself expires after 24 hours; this counter survives.
+  if (isDbReady()) {
+    await AttendanceRecord.findOneAndUpdate(
+      { session: session._id, studentEmail },
+      {
+        $set: {
+          student: req.user._id,
+          ...(attemptLocation ? { attemptLocation } : {}),
+        },
+        $inc: { "evidence.proofCount": 1 },
+        $addToSet: { "evidence.waves": wave },
+        $min: { "evidence.firstProofAt": proof.createdAt },
+        $max: { "evidence.lastProofAt": proof.createdAt },
+      },
+      { upsert: false }
+    ).catch((error) => {
+      console.error(`[attendance] proof counter update failed: ${error.message}`);
+    });
+  }
 
   res.status(201).json({
     success: true,

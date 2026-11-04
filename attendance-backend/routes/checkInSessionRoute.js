@@ -10,6 +10,7 @@ const {
   listSessionProofs,
   getActiveSessionForStudent,
   listActiveSessionsForStudent,
+  listSessionQueries,
 } = require("../controllers/checkInSessionController");
 const { submitProof } = require("../controllers/checkInProofController");
 
@@ -75,6 +76,13 @@ router.get(
   noStore,
   teacherOnly,
   listSessionProofs
+);
+
+router.get(
+  "/check-in-sessions/:sessionId/queries",
+  noStore,
+  teacherOnly,
+  listSessionQueries
 );
 
 router.get("/check-in-sessions/:sessionId", noStore, teacherOnly, getSession);

@@ -1,6 +1,10 @@
 # 2026-10-25 — distance sweep from 1 m to 10 m
 
-Five paired runs recorded on 2026-10-25. The 1 m run passed at 100%; 2 m and 3 m reached 90%; 5 m and 10 m fell to 40% and 10%. Overall **33 of 50 frames decoded (66%)**, so the proposed Layer 1 gate (>=95% at 1 m, 5 m and 10 m) is **not met**. All reports use app version 1.8.0, 48 kHz on both ends, Android 10 / Chrome 155, 10 planned frames, 120 ms symbols and a 450 ms gap. TX and RX run IDs match because the receiver link was used, and every decoded key matches its transmitter report.
+Five paired runs recorded on 2026-10-25; this is still the current distance sweep. The 1 m
+run passed at 100%; 2 m and 3 m reached 90%; 5 m and 10 m fell to 40% and 10%. Overall
+**33 of 50 frames decoded (66%)**, so the proposed Layer 1 gate (>=95% at 1 m, 5 m and 10 m)
+is **not met**. The owner treats Layer 1 as passed for build planning only, not as a
+measurement. Current gate status: [`../README.md`](../README.md). All reports use app version 1.8.0, 48 kHz on both ends, Android 10 / Chrome 155, 10 planned frames, 120 ms symbols and a 450 ms gap. TX and RX run IDs match because the receiver link was used, and every decoded key matches its transmitter report.
 
 | Distance | Key | TX run | RX run | Sent | Decoded | Rate | RX margin range | TX settings |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |

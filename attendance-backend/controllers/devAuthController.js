@@ -48,10 +48,15 @@ exports.devSignIn = [
         email: account.email,
         role: account.role,
         authProvider: "dev",
+        isDemo: true,
+        demoLabel: "Dev persona",
       });
     } else {
       user.name = account.name;
       user.role = account.role;
+      user.status = "active";
+      user.isDemo = true;
+      user.authProvider = "dev";
       await user.save();
     }
 

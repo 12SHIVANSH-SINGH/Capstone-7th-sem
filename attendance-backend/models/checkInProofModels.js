@@ -64,6 +64,15 @@ const checkInProofSchema = new mongoose.Schema(
       required: true,
       default: PROOF_MESSAGE_VERSION,
     },
+    // Optional browser location captured at the moment of the attempt. It is
+    // evidence only and expires with the proof after 24 hours.
+    location: {
+      latitude: { type: Number, min: -90, max: 90 },
+      longitude: { type: Number, min: -180, max: 180 },
+      accuracy: { type: Number, min: 0 },
+      capturedAt: Date,
+      source: { type: String, default: "browser" },
+    },
   },
   { timestamps: true }
 );

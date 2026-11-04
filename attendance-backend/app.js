@@ -7,13 +7,17 @@ app.disable("x-powered-by");
 
 const isProduction = String(process.env.NODE_ENV || "").trim().toLowerCase() === "production";
 
-// Minimal security headers. The microphone stays available to this origin
-// because the acoustic lab needs it; camera and geolocation are not used.
+// Minimal security headers. The microphone and browser geolocation stay
+// available to this origin: the acoustic lab needs audio, and an attendance
+// query can attach a one-shot location snapshot. Camera stays disabled.
 app.use((req, res, next) => {
   res.set("X-Content-Type-Options", "nosniff");
   res.set("X-Frame-Options", "DENY");
   res.set("Referrer-Policy", "strict-origin-when-cross-origin");
-  res.set("Permissions-Policy", "camera=(), geolocation=(), microphone=(self)");
+  res.set("Permissions-Policy", "camera=(), geolocation=(self), microphone=(self)");
+  res.set("X-Permitted-Cross-Domain-Policies", "none");
+  res.set("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
+  res.set("Cross-Origin-Resource-Policy", "same-origin");
   // Render terminates TLS and forwards HTTP here. HSTS is only sent in
   // production so local HTTP development is never pinned to HTTPS.
   if (isProduction) {
@@ -71,9 +75,13 @@ app.use(
 );
 
 app.use(cookieParser());
-app.use(express.json());
+// No endpoint accepts a large document. A bounded JSON body keeps an
+// unauthenticated request from buffering arbitrary memory before routing.
+app.use(express.json({ limit: "200kb" }));
 
-app.set('trust proxy', true); // Add this in your main Express config
+// Render terminates TLS at exactly one proxy hop. Trusting every hop would let
+// a client spoof X-Forwarded-For and defeat IP-based rate limiting.
+app.set('trust proxy', 1);
 
 // Cookie-authenticated mutations must come from this API's own origin or an
 // explicitly configured frontend. CORS alone does not stop a cross-site form
@@ -92,6 +100,24 @@ app.use("/api/v1", checkInSessionRoute);
 
 const googleAuthRoute = require('./routes/googleAuthRoute');
 app.use("/api/v1", googleAuthRoute);
+
+const attendanceRoute = require('./routes/attendanceRoute');
+app.use("/api/v1", attendanceRoute);
+
+const queryRoute = require('./routes/queryRoute');
+app.use("/api/v1", queryRoute);
+
+const notificationRoute = require('./routes/notificationRoute');
+app.use("/api/v1", notificationRoute);
+
+const timetableRoute = require('./routes/timetableRoute');
+app.use("/api/v1", timetableRoute);
+
+const exportRoute = require('./routes/exportRoute');
+app.use("/api/v1", exportRoute);
+
+const adminRoute = require('./routes/adminRoute');
+app.use("/api/v1", adminRoute);
 
 // One-click dev identities exist only when NODE_ENV=development|test AND
 // DEV_AUTH_ENABLED=true. A production process never mounts these routes.

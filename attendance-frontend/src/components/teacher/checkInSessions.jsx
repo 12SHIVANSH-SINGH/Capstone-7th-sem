@@ -13,6 +13,7 @@ import {
   FiVolume2,
 } from "react-icons/fi";
 import SERVER_URL from "../../config/api";
+import { getCurrentLocation } from "../../utils/geolocation";
 import AppShell from "../../ui/AppShell";
 import Badge from "../../ui/Badge";
 import Button from "../../ui/Button";
@@ -22,6 +23,7 @@ import { PageLoader, Spinner } from "../../ui/Spinner";
 import { useToast } from "../../ui/Toast";
 import { buildTransmitSearch } from "../../acoustic/transmitPlan";
 import { copyText } from "../acousticLab/linkUtils";
+import SessionAttendanceModal from "./SessionAttendanceModal";
 import {
   findActiveSession,
   formatCountdown,
@@ -81,6 +83,7 @@ const CheckInSessions = () => {
   const [advancing, setAdvancing] = useState(false);
   const [confirmAdvance, setConfirmAdvance] = useState(false);
   const [evidenceSessionId, setEvidenceSessionId] = useState("");
+  const [registerSession, setRegisterSession] = useState(null);
   const [evidence, setEvidence] = useState({
     loading: false,
     error: "",
@@ -326,9 +329,10 @@ const CheckInSessions = () => {
     setStarting(true);
 
     try {
+      const teacherLocation = await getCurrentLocation({ timeout: 6000 });
       const response = await axios.post(
         `${SERVER_URL}/classes/${selectedClass._id}/check-in-sessions`,
-        {},
+        { teacherLocation },
         requestConfig
       );
       if (response.data?.session) {
@@ -471,12 +475,6 @@ const CheckInSessions = () => {
       name={name}
       email={user.email}
       onLogout={handleLogout}
-      links={[
-        { to: "/teacher-dashboard", label: "Dashboard" },
-        { to: "/teacher/classes", label: "Classes & rosters" },
-        { to: "/teacher/check-in", label: "Check-in", active: true },
-        { to: "/acoustic-lab", label: "Phone audio test" },
-      ]}
     >
       <div className="ui-page-head">
         <div>
@@ -697,6 +695,18 @@ const CheckInSessions = () => {
                     <dd>{formatWhen(activeSession.keyIssuedAt)}</dd>
                   </div>
                   <div>
+                    <dt>Start location</dt>
+                    <dd>
+                      {activeSession.teacherLocation
+                        ? `${activeSession.teacherLocation.latitude.toFixed(5)}, ${activeSession.teacherLocation.longitude.toFixed(5)}${
+                            activeSession.teacherLocation.accuracy
+                              ? ` · ±${activeSession.teacherLocation.accuracy} m`
+                              : ""
+                          }`
+                        : "Not shared"}
+                    </dd>
+                  </div>
+                  <div>
                     <dt>Evidence</dt>
                     <dd>
                       {evidence.loading && evidence.total === 0
@@ -743,6 +753,12 @@ const CheckInSessions = () => {
                       disabled={Boolean(closingId)}
                     >
                       <FiSquare aria-hidden="true" /> Close check-in
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={() => setRegisterSession(activeSession)}
+                    >
+                      <FiUsers aria-hidden="true" /> Attendance register
                     </Button>
                     <span className="checkin__note">Closing is final for this session.</span>
                   </div>
@@ -915,12 +931,27 @@ const CheckInSessions = () => {
                   >
                     Evidence
                   </Button>
+                  <Button
+                    variant="soft"
+                    size="sm"
+                    onClick={() => setRegisterSession(session)}
+                  >
+                    <FiUsers aria-hidden="true" /> Register
+                  </Button>
                 </div>
               </article>
             ))}
           </div>
         </Card>
       )}
+
+      <SessionAttendanceModal
+        open={Boolean(registerSession)}
+        session={registerSession}
+        mode="teacher"
+        onClose={() => setRegisterSession(null)}
+        onChanged={refreshSessions}
+      />
 
       <p className="checkin__footer">
         This screen starts and closes sessions, advances waves after accepted evidence, and shows

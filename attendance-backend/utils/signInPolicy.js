@@ -74,6 +74,14 @@ const testStudentEmails = () =>
 const testTeacherEmails = () =>
   parseEmailList(process.env.TEST_TEACHER_EMAILS).filter((email) => !isDevEmail(email));
 
+// A super admin is an explicit environment grant. There is no UI path that can
+// promote an ordinary account, and removing the address revokes the next
+// request because isSessionAllowed() re-checks the list.
+const superAdminEmails = () =>
+  parseEmailList(process.env.SUPER_ADMIN_EMAILS).filter((email) => !isDevEmail(email));
+
+const isSuperAdmin = (email) => superAdminEmails().includes(normaliseEmail(email));
+
 const isWorkspaceAccount = (email) => normaliseEmail(email).endsWith(`@${WORKSPACE_DOMAIN}`);
 
 // TEACHER_EMAILS only bootstraps a college account. Requiring the Workspace
@@ -95,7 +103,12 @@ const isTestAccount = (email) => isTestStudent(email) || isTestTeacher(email);
 const isAllowedSignInEmail = (email) => {
   const normalised = normaliseEmail(email);
   if (!normalised || isDevEmail(normalised)) return false;
-  return isWorkspaceAccount(normalised) || isTestStudent(normalised) || isTestTeacher(normalised);
+  return (
+    isWorkspaceAccount(normalised) ||
+    isTestStudent(normalised) ||
+    isTestTeacher(normalised) ||
+    isSuperAdmin(normalised)
+  );
 };
 
 /**
@@ -117,7 +130,7 @@ const isAllowedGoogleSignIn = ({ email, emailVerified = false, hostedDomain = ""
     return normaliseEmail(hostedDomain) === WORKSPACE_DOMAIN;
   }
 
-  return isTestStudent(normalised) || isTestTeacher(normalised);
+  return isTestStudent(normalised) || isTestTeacher(normalised) || isSuperAdmin(normalised);
 };
 
 /**
@@ -138,6 +151,12 @@ const resolveSignInRole = ({ email, existingRole = null, hasRosterAccess = false
   const testTeacher = isTestTeacher(normalised);
   const testStudent = isTestStudent(normalised);
   const testAccount = testTeacher || testStudent;
+
+  // An explicit super-admin listing wins over every other role. The list is
+  // exact-match and lives only in the server environment.
+  if (isSuperAdmin(normalised)) {
+    return { allowed: true, role: "superadmin", testAccount };
+  }
 
   // An explicit test-teacher listing wins, including promotion of an existing
   // student. Removing the listing revokes the next sign-in at the Google gate.
@@ -172,7 +191,14 @@ const resolveSignInRole = ({ email, existingRole = null, hasRosterAccess = false
  */
 const isSessionAllowed = (user, { devAuthEnabled = false } = {}) => {
   if (!user) return false;
+  if (user.status === "disabled") return false;
   if (user.authProvider === "dev") return devAuthEnabled;
+  if (user.role === "superadmin") {
+    // A super-admin session is only valid while the exact address remains in
+    // the server-side allowlist. This also covers accounts created by a demo
+    // seed: the owner must add the address before it can hold admin power.
+    return isSuperAdmin(user.email) || (devAuthEnabled && user.isDemo === true);
+  }
   if (user.authProvider === "google" || !user.authProvider) {
     if (!isAllowedSignInEmail(user.email)) return false;
     // A Gmail account that was demoted in the database must not keep reading
@@ -215,6 +241,12 @@ const validateTestAccountConfig = (env = process.env) => {
       max: MAX_TEST_ACCOUNTS,
       workspaceOnly: false,
     },
+    {
+      name: "SUPER_ADMIN_EMAILS",
+      emails: parseEmailList(env.SUPER_ADMIN_EMAILS),
+      max: MAX_TEST_ACCOUNTS,
+      workspaceOnly: false,
+    },
   ];
 
   for (const { name, emails, max, workspaceOnly } of lists) {
@@ -233,7 +265,7 @@ const validateTestAccountConfig = (env = process.env) => {
       if (workspaceOnly && !isWorkspaceAccount(email)) {
         problems.push(`${name} entry "${email}" must be an @${WORKSPACE_DOMAIN} address.`);
       }
-      if (!workspaceOnly && isWorkspaceAccount(email)) {
+      if (!workspaceOnly && isWorkspaceAccount(email) && name !== "SUPER_ADMIN_EMAILS") {
         problems.push(
           `${name} is for non-college test accounts; put "${email}" in TEACHER_EMAILS or on a class roster.`
         );
@@ -291,6 +323,8 @@ module.exports = {
   provisionedTeacherEmails,
   testStudentEmails,
   testTeacherEmails,
+  superAdminEmails,
+  isSuperAdmin,
   isProvisionedTeacher,
   isTestStudent,
   isTestTeacher,

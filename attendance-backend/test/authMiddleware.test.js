@@ -40,6 +40,7 @@ const setEnv = (overrides = {}) => {
   process.env.TEACHER_EMAILS = "guide@nitjsr.ac.in";
   process.env.TEST_STUDENT_EMAILS = "";
   process.env.TEST_TEACHER_EMAILS = "owner@gmail.com";
+  process.env.SUPER_ADMIN_EMAILS = "12shivanshsingha@gmail.com";
   delete process.env.DEV_AUTH_ENABLED;
   Object.assign(process.env, overrides);
 };
@@ -95,6 +96,26 @@ testWithEnv("a listed Gmail test teacher session is accepted", async (t) => {
 
   const response = await get("/protected", user);
   assert.equal(response.status, 200);
+});
+
+testWithEnv("a Gmail super-admin session is accepted only while granted", async (t) => {
+  const user = makeUser({
+    email: "12shivanshsingha@gmail.com",
+    role: "superadmin",
+    authProvider: "google",
+  });
+  t.mock.method(User, "findById", async () => user);
+
+  let response = await get("/protected", user);
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).role, "superadmin");
+
+  process.env.SUPER_ADMIN_EMAILS = "";
+  response = await get("/protected", user);
+  assert.equal(response.status, 401);
+
+  const login = await get("/islogin", user);
+  assert.equal(login.status, 401);
 });
 
 testWithEnv("removing the Gmail test teacher from the environment revokes the live session", async (t) => {

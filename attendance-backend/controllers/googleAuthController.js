@@ -8,6 +8,7 @@ const DeviceBindingRequest = require("../models/deviceBindingRequestModels");
 const CourseClass = require("../models/classModels");
 const { fingerprintPublicKey } = require("../utils/deviceBinding");
 const { isDevAuthEnabled, isDevEmail } = require("../utils/devAuth");
+const { writeAudit } = require("../utils/audit");
 const {
   normaliseEmail,
   isAllowedGoogleSignIn,
@@ -78,6 +79,13 @@ exports.googleSignIn = catchAsyncError(async (req, res, next) => {
   if (user?.googleSubject && user.googleSubject !== payload.sub) {
     return next(new ErrorHandler("This account is already linked to a different Google identity", 403));
   }
+  // Disabling an account is an administrative decision, not a temporary
+  // sign-in obstacle. Never let a successful Google exchange re-activate it.
+  if (user?.status === "disabled") {
+    return next(
+      new ErrorHandler("This account has been disabled. Contact your administrator.", 403)
+    );
+  }
 
   // Test accounts (TEST_STUDENT_EMAILS / TEST_TEACHER_EMAILS) skip the roster
   // gate: they exist to exercise the app before the pilot and are never on a
@@ -135,14 +143,23 @@ exports.googleSignIn = catchAsyncError(async (req, res, next) => {
   if (!created) {
     user.googleSubject = payload.sub;
     user.authProvider = "google";
-    if (roleDecision.role === "teacher" && user.role !== "teacher") {
+    if (roleDecision.role === "superadmin" && user.role !== "superadmin") {
+      user.role = "superadmin";
+      promoted = true;
+    }
+    if (roleDecision.role === "teacher" && user.role === "student") {
       user.role = "teacher";
       promoted = true;
     }
     // A Gmail account that has been moved out of TEST_TEACHER_EMAILS and into
     // TEST_STUDENT_EMAILS should lose the old teacher role. Never demote a
-    // college teacher; TEACHER_EMAILS removal is not meant to remove a person.
-    if (roleDecision.role === "student" && user.role === "teacher" && !isWorkspaceAccount(email)) {
+    // college teacher or a super admin; removing an environment grant is not
+    // meant to destroy stored history.
+    if (
+      roleDecision.role === "student" &&
+      user.role === "teacher" &&
+      !isWorkspaceAccount(email)
+    ) {
       user.role = "student";
       demoted = true;
     }
@@ -161,6 +178,23 @@ exports.googleSignIn = catchAsyncError(async (req, res, next) => {
 
   // Audit only after persistence: a failed create/save must not leave a line
   // claiming a sign-in that never happened.
+  if (roleDecision.role === "superadmin" && (created || promoted)) {
+    await writeAudit(
+      { headers: req.headers, ip: req.ip, socket: req.socket },
+      {
+        action: "auth.superadmin.granted",
+        entityType: "User",
+        entityId: user._id,
+        actor: user,
+        summary: `${created ? "Created" : "Promoted"} super-admin access for ${email}.`,
+        after: { email, role: "superadmin" },
+      }
+    );
+    console.info(
+      `[auth] super-admin grant ${created ? "created" : "activated"}: ${email} user=${user._id}`
+    );
+  }
+
   if (isTestAccount(email)) {
     const details = [
       created ? "new" : null,

@@ -58,6 +58,28 @@ const validateProductionEnv = (env = process.env) => {
     problems.push("COOKIE_EXPIRE must be a positive number of days.");
   }
 
+  const adminHours = Number(env.SUPER_ADMIN_SESSION_HOURS);
+  if (
+    env.SUPER_ADMIN_SESSION_HOURS != null &&
+    env.SUPER_ADMIN_SESSION_HOURS !== "" &&
+    (!Number.isFinite(adminHours) || adminHours < 1 || adminHours > 72)
+  ) {
+    problems.push("SUPER_ADMIN_SESSION_HOURS must be between 1 and 72 hours.");
+  }
+
+  // Do not fail startup for a deployment that intentionally has no console,
+  // but make the lockout visible in the deploy log. The admin console is part
+  // of the product, and an empty list is the usual reason it is unreachable.
+  const superAdmins = String(env.SUPER_ADMIN_EMAILS || "")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  if (superAdmins.length === 0) {
+    warnings.push(
+      "SUPER_ADMIN_EMAILS is empty; no account can open /admin in this production deployment."
+    );
+  }
+
   // Rehearsal enrollment is for local/staging rehearsals only. A production
   // deploy must never accept a Gmail test address on a real class roster.
   if (isTruthyFlag(env.ALLOW_TEST_ROSTER_EMAILS)) {

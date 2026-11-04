@@ -19,6 +19,21 @@ const keyHistorySchema = new mongoose.Schema(
   { _id: false }
 );
 
+const locationSchema = new mongoose.Schema(
+  {
+    latitude: { type: Number, min: -90, max: 90 },
+    longitude: { type: Number, min: -180, max: 180 },
+    accuracy: { type: Number, min: 0 },
+    capturedAt: Date,
+    source: {
+      type: String,
+      enum: ["browser", "manual", "teacher-session", "demo", "unknown"],
+      default: "browser",
+    },
+  },
+  { _id: false }
+);
+
 const checkInSessionSchema = new mongoose.Schema(
   {
     courseClass: {
@@ -85,6 +100,31 @@ const checkInSessionSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    // Teacher location captured when the session is started. This is the
+    // reference point shown next to a student's query location.
+    teacherLocation: {
+      type: locationSchema,
+      default: null,
+    },
+    // Class identity is snapshotted so a renamed class does not rewrite old
+    // attendance or exported registers.
+    classSnapshot: {
+      courseCode: { type: String, trim: true, default: "" },
+      title: { type: String, trim: true, default: "" },
+      section: { type: String, trim: true, default: "" },
+      roomNo: { type: String, trim: true, default: "" },
+    },
+    rosterCount: { type: Number, default: 0, min: 0 },
+    attendanceFinalized: { type: Boolean, default: false, index: true },
+    attendanceFinalizedAt: { type: Date, default: null },
+    attendanceFinalizedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    // Set when the session closes; computed from the configured query window.
+    queryWindowEndsAt: { type: Date, default: null },
+    isDemo: { type: Boolean, default: false, index: true },
   },
   { timestamps: true }
 );

@@ -101,9 +101,12 @@ test("API responses are not cacheable and carry the baseline security headers", 
   assert.equal(response.headers.get("x-content-type-options"), "nosniff");
   assert.equal(response.headers.get("x-frame-options"), "DENY");
   assert.equal(response.headers.get("referrer-policy"), "strict-origin-when-cross-origin");
+  assert.equal(response.headers.get("x-permitted-cross-domain-policies"), "none");
+  assert.equal(response.headers.get("cross-origin-opener-policy"), "same-origin-allow-popups");
+  assert.equal(response.headers.get("cross-origin-resource-policy"), "same-origin");
   assert.equal(
     response.headers.get("permissions-policy"),
-    "camera=(), geolocation=(), microphone=(self)"
+    "camera=(), geolocation=(self), microphone=(self)"
   );
   // HSTS is production-only; local HTTP development must not be pinned.
   assert.equal(response.headers.get("strict-transport-security"), null);

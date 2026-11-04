@@ -40,6 +40,39 @@ test("the JWT is set as an httpOnly cookie and never returned in the body", () =
   assert.equal(response.calls.json.user.email, "student1@dev.invalid");
 });
 
+test("a super-admin receives a short session even when COOKIE_EXPIRE is long", () => {
+  const previousHours = process.env.SUPER_ADMIN_SESSION_HOURS;
+  const previousDays = process.env.COOKIE_EXPIRE;
+  process.env.SUPER_ADMIN_SESSION_HOURS = "8";
+  process.env.COOKIE_EXPIRE = "7";
+  try {
+    let tokenOptions = null;
+    const response = fakeResponse();
+    sendToken(
+      {
+        role: "superadmin",
+        email: "12shivanshsingha@gmail.com",
+        getJWTtoken: (options) => {
+          tokenOptions = options;
+          return "jwt";
+        },
+        toObject: () => ({ email: "12shivanshsingha@gmail.com", role: "superadmin" }),
+      },
+      200,
+      response
+    );
+
+    assert.deepEqual(tokenOptions, { expiresIn: "8h" });
+    const hours = (response.calls.cookie.options.expires.getTime() - Date.now()) / (60 * 60 * 1000);
+    assert.ok(hours > 7.9 && hours <= 8.01, `expected ~8h, got ${hours}`);
+  } finally {
+    if (previousHours === undefined) delete process.env.SUPER_ADMIN_SESSION_HOURS;
+    else process.env.SUPER_ADMIN_SESSION_HOURS = previousHours;
+    if (previousDays === undefined) delete process.env.COOKIE_EXPIRE;
+    else process.env.COOKIE_EXPIRE = previousDays;
+  }
+});
+
 test("a missing COOKIE_EXPIRE still produces a valid cookie expiry", () => {
   const previous = process.env.COOKIE_EXPIRE;
   delete process.env.COOKIE_EXPIRE;

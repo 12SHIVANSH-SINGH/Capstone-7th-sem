@@ -110,3 +110,59 @@ h4 {
 ::selection {
   background: var(--indigo-100);
 }
+
+/* ============================================================
+   Dark theme. Semantic tokens are remapped; component overrides in
+   ui.css/pages.css replace the few intentionally literal whites.
+   ============================================================ */
+[data-theme="dark"] {
+  --bg: #0b1120;
+  --surface: #111a2e;
+  --border: #243149;
+  --text: #e5eaf4;
+  --text-soft: #aab6cc;
+  --text-faint: #8492ab;
+  --slate-50: #162238;
+  --slate-100: #1c2a42;
+  --slate-200: #2b3a55;
+  --slate-300: #3a4a66;
+  --slate-400: #7586a3;
+  --slate-500: #95a3ba;
+  --slate-600: #bcc8dc;
+  --slate-700: #d5dded;
+  --slate-800: #e8edf7;
+  --slate-900: #f7f9fd;
+  --indigo-50: #1a2450;
+  --indigo-100: #212d63;
+  --indigo-200: #33417f;
+  --indigo-500: #818cf8;
+  --indigo-600: #a5b4fc;
+  --indigo-700: #c7d2fe;
+  --success-soft: #0c2b26;
+  --success-border: #145c50;
+  --warning-soft: #33240c;
+  --warning-border: #6b4a12;
+  --danger-soft: #351317;
+  --danger-border: #7a2a30;
+  --info-soft: #0c2a3d;
+  --info-border: #14536f;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.35), 0 16px 36px -18px rgba(0, 0, 0, 0.8);
+  --shadow-lg: 0 22px 50px -16px rgba(0, 0, 0, 0.75);
+  color-scheme: dark;
+}
+[data-theme="dark"] body { background: var(--bg); }
+[data-theme="dark"] .ui-shell__bar { background: rgba(11, 17, 32, 0.86); }
+[data-theme="dark"] .ui-btn--secondary { background: var(--surface); color: var(--text); }
+[data-theme="dark"] .ui-btn--secondary:hover:not(:disabled) { background: var(--slate-100); }
+[data-theme="dark"] .ui-input,
+[data-theme="dark"] .ui-textarea { background: var(--slate-50); color: var(--text); }
+[data-theme="dark"] .ui-toast { background: var(--surface); }
+[data-theme="dark"] .ui-toast__message { color: var(--text); }
+[data-theme="dark"] .ui-card__subtitle,
+[data-theme="dark"] .ui-empty__text,
+[data-theme="dark"] .ui-page-head__sub { color: var(--text-soft); }
+[data-theme="dark"] .ui-impersonation { background: #33240c; border-color: #6b4a12; color: #fcd34d; }
+[data-theme="dark"] .ui-bell__item:hover { background: var(--slate-50); }
+[data-theme="dark"] .chart__area { fill: rgba(129, 140, 248, 0.14); }
+[data-theme="dark"] .ui-brand__name em { color: var(--indigo-600); }

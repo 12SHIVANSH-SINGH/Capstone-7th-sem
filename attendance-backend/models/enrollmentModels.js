@@ -26,6 +26,20 @@ const enrollmentSchema = new mongoose.Schema(
       programmeBranch: String,
       rollNumber: String,
     },
+    // Optional link to a real or demo student account. The email remains the
+    // roster key so a roster can be uploaded before the student first signs in.
+    student: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+      index: true,
+    },
+    phoneLabel: {
+      type: String,
+      trim: true,
+      maxlength: 80,
+      default: "",
+    },
     status: {
       type: String,
       enum: ["active", "inactive"],

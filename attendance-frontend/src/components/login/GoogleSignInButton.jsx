@@ -9,11 +9,13 @@ const GOOGLE_CLIENT_ID =
     ? ""
     : "690196150991-39rsb4sffjvfl66jt22unp0uulhfgu5m.apps.googleusercontent.com");
 const SCRIPT_ID = "google-identity-services";
-// College-only account chooser by default. Set REACT_APP_GOOGLE_HOSTED_DOMAIN
-// to an empty value while testing so test Gmail accounts stay selectable; the
-// server still gates every sign-in by domain or TEST_STUDENT_EMAILS /
-// TEST_TEACHER_EMAILS.
-const HOSTED_DOMAIN = process.env.REACT_APP_GOOGLE_HOSTED_DOMAIN ?? "nitjsr.ac.in";
+// The server is the authority for who may sign in: college accounts and the
+// exact TEST_* / SUPER_ADMIN_EMAILS allowlists. Do not force the Google
+// account chooser to a single Workspace domain by default, or a production
+// Gmail super-admin can never reach the sign-in form. Set
+// REACT_APP_GOOGLE_HOSTED_DOMAIN=nitjsr.ac.in only when the deployment does
+// not need any Gmail account.
+const HOSTED_DOMAIN = String(process.env.REACT_APP_GOOGLE_HOSTED_DOMAIN || "").trim();
 
 const GoogleSignInButton = ({ onCredential, onLoadError, disabled }) => {
   const buttonRef = useRef(null);

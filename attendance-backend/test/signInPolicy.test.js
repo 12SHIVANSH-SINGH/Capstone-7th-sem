@@ -2,7 +2,12 @@ const { test, beforeEach, afterEach } = require("node:test");
 const assert = require("node:assert/strict");
 const policy = require("../utils/signInPolicy");
 
-const ENV_KEYS = ["TEACHER_EMAILS", "TEST_STUDENT_EMAILS", "TEST_TEACHER_EMAILS"];
+const ENV_KEYS = [
+  "TEACHER_EMAILS",
+  "TEST_STUDENT_EMAILS",
+  "TEST_TEACHER_EMAILS",
+  "SUPER_ADMIN_EMAILS",
+];
 let snapshot = {};
 
 beforeEach(() => {
@@ -39,13 +44,58 @@ test("gmail accounts are rejected unless listed as test students", () => {
   process.env.TEST_TEACHER_EMAILS = "";
   assert.equal(policy.isAllowedSignInEmail("testforshivansh059@gmail.com"), false);
 
-  process.env.TEST_STUDENT_EMAILS = " testforshivansh059@gmail.com , 12shivanshsingha@gmail.com ";
+  process.env.TEST_STUDENT_EMAILS = " testforshivansh059@gmail.com , another.student@gmail.com ";
   assert.equal(policy.isTestStudent("testforshivansh059@gmail.com"), true);
   assert.equal(policy.isTestStudent(" TESTFORSHIVANSH059@GMAIL.COM "), true);
-  assert.equal(policy.isTestStudent("12shivanshsingha@gmail.com"), true);
+  assert.equal(policy.isTestStudent("another.student@gmail.com"), true);
   assert.equal(policy.isTestStudent("someone.else@gmail.com"), false);
   assert.equal(policy.isAllowedSignInEmail("someone.else@gmail.com"), false);
   assert.equal(policy.isAllowedSignInEmail("2023ugcs059@nitjsr.ac.in"), true);
+});
+
+test("a Gmail super-admin can sign in only while the environment grant is present", () => {
+  process.env.TEACHER_EMAILS = "";
+  process.env.TEST_STUDENT_EMAILS = "";
+  process.env.TEST_TEACHER_EMAILS = "";
+  process.env.SUPER_ADMIN_EMAILS = " 12shivanshsingha@gmail.com ";
+
+  assert.equal(policy.isSuperAdmin("12shivanshsingha@gmail.com"), true);
+  assert.equal(policy.isSuperAdmin("12SHIVANSHsingha@gmail.com"), true);
+  assert.equal(policy.isAllowedSignInEmail("12shivanshsingha@gmail.com"), true);
+  assert.equal(
+    policy.isAllowedGoogleSignIn({
+      email: "12shivanshsingha@gmail.com",
+      emailVerified: true,
+    }),
+    true
+  );
+  assert.deepEqual(
+    policy.resolveSignInRole({
+      email: "12shivanshsingha@gmail.com",
+      existingRole: "student",
+    }),
+    { allowed: true, role: "superadmin", testAccount: false }
+  );
+
+  const session = {
+    email: "12shivanshsingha@gmail.com",
+    role: "superadmin",
+    authProvider: "google",
+  };
+  assert.equal(policy.isSessionAllowed(session), true);
+  process.env.SUPER_ADMIN_EMAILS = "";
+  assert.equal(policy.isSessionAllowed(session), false);
+});
+
+test("the super-admin list supports college accounts and Gmail together", () => {
+  process.env.SUPER_ADMIN_EMAILS =
+    "12shivanshsingha@gmail.com, owner@nitjsr.ac.in";
+  assert.equal(policy.isSuperAdmin("12shivanshsingha@gmail.com"), true);
+  assert.equal(policy.isSuperAdmin("owner@nitjsr.ac.in"), true);
+  assert.equal(
+    policy.validateTestAccountConfig({ SUPER_ADMIN_EMAILS: process.env.SUPER_ADMIN_EMAILS }).ok,
+    true
+  );
 });
 
 test("teacher list is parsed from TEACHER_EMAILS with trim and case folding", () => {
@@ -288,6 +338,18 @@ test("startup validation rejects malformed, duplicated and overlapping lists", (
   assert.equal(
     teacherTestTeacherOverlap.problems.some((problem) =>
       problem.includes("both TEACHER_EMAILS and TEST_TEACHER_EMAILS")
+    ),
+    true
+  );
+
+  const superAdminOverlap = policy.validateTestAccountConfig({
+    SUPER_ADMIN_EMAILS: "owner@gmail.com",
+    TEST_TEACHER_EMAILS: "owner@gmail.com",
+  });
+  assert.equal(superAdminOverlap.ok, false);
+  assert.equal(
+    superAdminOverlap.problems.some((problem) =>
+      problem.includes("both TEST_TEACHER_EMAILS and SUPER_ADMIN_EMAILS")
     ),
     true
   );

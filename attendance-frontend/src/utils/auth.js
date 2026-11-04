@@ -6,6 +6,16 @@
  * stops the landing page, login page and app-shell logo from drifting apart.
  */
 
-const dashboardPath = (role) => (role === "teacher" ? "/teacher-dashboard" : "/student-dashboard");
+const dashboardPath = (role) => {
+  if (role === "superadmin") return "/admin";
+  if (role === "teacher") return "/teacher-dashboard";
+  return "/student-dashboard";
+};
 
-module.exports = { dashboardPath };
+const roleLabel = (role) => {
+  if (role === "superadmin") return "Super admin";
+  if (role === "teacher") return "Teacher";
+  return "Student";
+};
+
+module.exports = { dashboardPath, roleLabel };

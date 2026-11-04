@@ -74,6 +74,7 @@ const setEnv = (overrides = {}) => {
   process.env.TEACHER_EMAILS = "";
   process.env.TEST_STUDENT_EMAILS = "";
   process.env.TEST_TEACHER_EMAILS = "";
+  process.env.SUPER_ADMIN_EMAILS = "";
   Object.assign(process.env, overrides);
 };
 
@@ -133,6 +134,102 @@ testWithEnv("an allowlisted test teacher is created once and audited after persi
   assert.equal(infoLines.length, 1);
   assert.match(infoLines[0], /\[auth\] test teacher sign-in: owner@gmail.com/);
   assert.match(infoLines[0], /\(new\)/);
+});
+
+testWithEnv("a listed Gmail super-admin is created with the admin role", async (t) => {
+  process.env.SUPER_ADMIN_EMAILS = "12shivanshsingha@gmail.com";
+  currentPayload = {
+    email: "12shivanshsingha@gmail.com",
+    email_verified: true,
+    sub: "google-sub-owner-admin",
+    name: "Shivansh",
+  };
+
+  let created;
+  t.mock.method(User, "findOne", async () => null);
+  t.mock.method(User, "create", async (doc) => {
+    created = doc;
+    return makeUser(doc);
+  });
+
+  const response = await post({ credential: "fake-credential" });
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(created.role, "superadmin");
+  assert.equal(body.user.role, "superadmin");
+  assert.equal(body.user.email, "12shivanshsingha@gmail.com");
+  assert.match(infoLines[0], /\[auth\] super-admin grant created/);
+});
+
+testWithEnv("a disabled account cannot re-activate itself by signing in", async (t) => {
+  process.env.TEST_STUDENT_EMAILS = "student@gmail.com";
+  currentPayload = {
+    email: "student@gmail.com",
+    email_verified: true,
+    sub: "google-sub-student",
+    name: "Student",
+  };
+
+  const user = makeUser({
+    name: "Student",
+    email: "student@gmail.com",
+    role: "student",
+    status: "disabled",
+    authProvider: "google",
+    googleSubject: "google-sub-student",
+  });
+  let saveCalls = 0;
+  user.save = async () => {
+    saveCalls += 1;
+    return user;
+  };
+  t.mock.method(User, "findOne", async () => user);
+
+  const response = await post({ credential: "fake-credential" });
+  const body = await response.json();
+
+  assert.equal(response.status, 403);
+  assert.match(body.message, /disabled/);
+  assert.equal(user.status, "disabled");
+  assert.equal(saveCalls, 0);
+  assert.equal(response.headers.get("set-cookie"), null);
+});
+
+testWithEnv("adding an existing Gmail account to the super-admin list promotes it", async (t) => {
+  process.env.SUPER_ADMIN_EMAILS = "12shivanshsingha@gmail.com";
+  currentPayload = {
+    email: "12shivanshsingha@gmail.com",
+    email_verified: true,
+    sub: "google-sub-owner-admin",
+    name: "Shivansh",
+  };
+
+  const user = makeUser({
+    name: "Shivansh",
+    email: "12shivanshsingha@gmail.com",
+    role: "student",
+    authProvider: "google",
+    googleSubject: "google-sub-owner-admin",
+  });
+  let saveCalls = 0;
+  user.save = async () => {
+    saveCalls += 1;
+    return user;
+  };
+  t.mock.method(User, "findOne", async () => user);
+  t.mock.method(User, "create", async () => {
+    throw new Error("create should not be called for an existing user");
+  });
+
+  const response = await post({ credential: "fake-credential" });
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(user.role, "superadmin");
+  assert.equal(saveCalls, 1);
+  assert.equal(body.user.role, "superadmin");
+  assert.match(infoLines[0], /\[auth\] super-admin grant activated/);
 });
 
 testWithEnv("a test student is created as a student and audited", async (t) => {

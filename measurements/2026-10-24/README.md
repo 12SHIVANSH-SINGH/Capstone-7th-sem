@@ -1,8 +1,10 @@
 # 2026-10-24 — first real two-phone link runs
 
-Both runs passed the forward direction at 100%. They were recorded before the
-1.9a report-pairing change, so the TX and RX run IDs differ; the decoded key is
-what pairs each report. Phone models and media volume were not recorded.
+Historical archive. The 1 m run passed at 100%; the 5 m report is **not** a valid 5 m
+measurement because its RX condition still said `1 m`. These runs were recorded before the
+1.9a report-pairing change, so the TX and RX run IDs differ; the decoded key is what pairs
+each report. Phone models and media volume were not recorded. Current gate status is in
+[`../README.md`](../README.md).
 
 | Distance | Key | TX run | RX run | Sent | Decoded | Rate | RX margin range | TX settings |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |

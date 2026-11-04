@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import { FaChalkboardTeacher, FaUserGraduate, FaMobileAlt } from "react-icons/fa";
+import { FaChalkboardTeacher, FaUserGraduate, FaMobileAlt, FaClipboardList } from "react-icons/fa";
 import SERVER_URL from "../../config/api";
 import AppShell from "../../ui/AppShell";
 import Badge from "../../ui/Badge";
@@ -11,6 +11,7 @@ import EmptyState from "../../ui/EmptyState";
 import { PageLoader } from "../../ui/Spinner";
 import StatCard from "../../ui/StatCard";
 import { useToast } from "../../ui/Toast";
+import { classLabel, formatDateTime, givenName, percentLabel } from "../../utils/format";
 import "./teacherDashboard.css";
 
 const requestConfig = { withCredentials: true };
@@ -21,6 +22,8 @@ const TeacherDashboard = () => {
     const [user, setUser] = useState(null);
     const [classes, setClasses] = useState([]);
     const [pendingReviews, setPendingReviews] = useState(0);
+    const [pendingQueries, setPendingQueries] = useState(0);
+    const [recentSessions, setRecentSessions] = useState([]);
 
     useEffect(() => {
         const load = async () => {
@@ -32,9 +35,11 @@ const TeacherDashboard = () => {
                 }
                 setUser(userResponse.data.user);
 
-                const [classesResult, reviewsResult] = await Promise.allSettled([
+                const [classesResult, reviewsResult, queriesResult, sessionsResult] = await Promise.allSettled([
                     axios.get(`${SERVER_URL}/classes`, requestConfig),
                     axios.get(`${SERVER_URL}/device-reviews`, requestConfig),
+                    axios.get(`${SERVER_URL}/queries/review`, requestConfig),
+                    axios.get(`${SERVER_URL}/attendance/sessions?limit=5`, requestConfig),
                 ]);
                 if (classesResult.status === "fulfilled") {
                     setClasses(classesResult.value.data.classes);
@@ -45,6 +50,12 @@ const TeacherDashboard = () => {
                     setPendingReviews(reviewsResult.value.data.reviews.length);
                 } else {
                     toast("Could not load device reviews.", "error");
+                }
+                if (queriesResult.status === "fulfilled") {
+                    setPendingQueries(Number(queriesResult.value.data?.counts?.pending) || 0);
+                }
+                if (sessionsResult.status === "fulfilled") {
+                    setRecentSessions(Array.isArray(sessionsResult.value.data?.sessions) ? sessionsResult.value.data.sessions : []);
                 }
             } catch (error) {
                 navigate("/login");
@@ -68,7 +79,7 @@ const TeacherDashboard = () => {
     }
 
     const name = user.name || user.email.split("@")[0];
-    const firstName = name.split(" ")[0];
+    const firstName = givenName(name);
     const studentCount = classes.reduce((sum, courseClass) => sum + (courseClass.activeStudentCount || 0), 0);
 
     return (
@@ -77,12 +88,6 @@ const TeacherDashboard = () => {
             name={name}
             email={user.email}
             onLogout={handleLogout}
-            links={[
-                { to: "/teacher-dashboard", label: "Dashboard", active: true },
-                { to: "/teacher/classes", label: "Classes & rosters" },
-                { to: "/teacher/check-in", label: "Check-in" },
-                { to: "/acoustic-lab", label: "Phone audio test" },
-            ]}
         >
             <div className="ui-page-head">
                 <div>
@@ -108,6 +113,13 @@ const TeacherDashboard = () => {
                     label="Pending device reviews"
                     value={pendingReviews}
                     hint={pendingReviews > 0 ? "Waiting for your approval" : "All clear"}
+                />
+                <StatCard
+                    icon={<FaClipboardList />}
+                    tone={pendingQueries > 0 ? "amber" : "emerald"}
+                    label="Pending queries"
+                    value={pendingQueries}
+                    hint={pendingQueries > 0 ? "Attendance corrections to review" : "No corrections waiting"}
                 />
             </div>
 
@@ -162,6 +174,20 @@ const TeacherDashboard = () => {
                                 <small>Create classes, paste rosters, review new devices</small>
                             </span>
                         </button>
+                        <button type="button" className="quick-action" onClick={() => navigate("/queries")}>
+                            <span className="quick-action__icon" aria-hidden="true">🩺</span>
+                            <span className="quick-action__body">
+                                <strong>Query centre</strong>
+                                <small>Review missed-attendance claims with location evidence</small>
+                            </span>
+                        </button>
+                        <button type="button" className="quick-action" onClick={() => navigate("/teacher/sessions")}>
+                            <span className="quick-action__icon" aria-hidden="true">📚</span>
+                            <span className="quick-action__body">
+                                <strong>Session history</strong>
+                                <small>Open a register, finalise attendance and audit decisions</small>
+                            </span>
+                        </button>
                         <button type="button" className="quick-action" onClick={() => navigate("/acoustic-lab")}>
                             <span className="quick-action__icon" aria-hidden="true">🔊</span>
                             <span className="quick-action__body">
@@ -177,6 +203,85 @@ const TeacherDashboard = () => {
                             </span>
                         </button>
                     </div>
+                </Card>
+            </div>
+
+            <div style={{ marginTop: 18 }}>
+                <Card
+                    title="Recent sessions"
+                    subtitle="Open a register to finalise attendance, inspect evidence or review a query."
+                    actions={<Button variant="ghost" size="sm" onClick={() => navigate("/teacher/sessions")}>Full history</Button>}
+                >
+                    {recentSessions.length === 0 ? (
+                        <EmptyState
+                            icon="🎧"
+                            title="No sessions yet"
+                            text="Start a check-in from the Check-in page; closed sessions appear here with their register state."
+                            action={<Button variant="soft" onClick={() => navigate("/teacher/check-in")}>Run a check-in</Button>}
+                        />
+                    ) : (
+                        <div className="data-table-wrap">
+                            <table className="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Started</th>
+                                        <th>Class</th>
+                                        <th>Status</th>
+                                        <th>Attendance</th>
+                                        <th>Queries</th>
+                                        <th />
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {recentSessions.map((session) => (
+                                        <tr key={session.id}>
+                                            <td>
+                                                <div className="data-table__main">{formatDateTime(session.startedAt)}</div>
+                                                <div className="data-table__sub">Room {session.roomNo || session.room?.roomNo || "—"}</div>
+                                            </td>
+                                            <td>
+                                                <div className="data-table__main">{classLabel(session.class)}</div>
+                                                <div className="data-table__sub">{session.class?.title || ""}</div>
+                                            </td>
+                                            <td>
+                                                <div className="chip-row">
+                                                    <Badge variant={session.status === "active" ? "success" : "neutral"} dot>
+                                                        {session.status}
+                                                    </Badge>
+                                                    {session.attendanceFinalized ? (
+                                                        <Badge variant="success">Finalised</Badge>
+                                                    ) : (
+                                                        <Badge variant="warning">Pending</Badge>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div className="data-table__main">{percentLabel(session.attendanceSummary?.percentage)}</div>
+                                                <div className="data-table__sub">
+                                                    {session.attendanceSummary?.present || 0} present · {session.attendanceSummary?.pending || 0} pending
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <Badge variant={session.queries?.pending ? "warning" : "neutral"}>
+                                                    {session.queries?.pending || 0} waiting
+                                                </Badge>
+                                            </td>
+                                            <td>
+                                                <div className="data-table__actions">
+                                                    <Button variant="soft" size="sm" onClick={() => navigate("/teacher/sessions")}>
+                                                        Register
+                                                    </Button>
+                                                    <Button variant="ghost" size="sm" onClick={() => navigate("/queries")}>
+                                                        Queries
+                                                    </Button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
                 </Card>
             </div>
         </AppShell>

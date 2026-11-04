@@ -1,120 +1,254 @@
 # Getting started
 
-Run the whole thing on your own laptop. You need:
+Run the whole stack on one laptop: MongoDB, the Express API and the React app. This is
+the canonical local guide; production setup is in [deployment.md](deployment.md), and
+every page/API path is in [routes.md](routes.md).
 
-- **Node.js 22 or newer** — check with `node -v`
-- **MongoDB** — the free community edition is fine
-- **cloudflared** — only needed to test on real phones
+## 1. Prerequisites
 
-## 1. Start the database
+| Tool | Why |
+| --- | --- |
+| **Node.js 22 or newer** | Backend and frontend. Check with `node -v`. |
+| **MongoDB** | Local database for development. Any recent community edition works. |
+| **Chrome** | The supported browser for the acoustic and check-in flows. |
+| **cloudflared** | Optional: HTTPS tunnel for testing microphone pages on real phones. |
 
-Point MongoDB at a data folder of your choice:
+Install dependencies once:
 
 ```bash
-~/mongodb-macos-aarch64--8.3.11/bin/mongod --dbpath ~/data/db-attendance-dev --logpath ~/data/log/mongod-attendance.log
+cd attendance-backend && npm install
+cd ../attendance-frontend && npm install
 ```
 
-(Any local MongoDB works — the path above is just what this project's dev laptop uses.)
+## 2. Create the backend configuration
 
-## 2. Start the backend
+The backend reads `attendance-backend/config/config.env`. It is **gitignored and must
+never be committed**. Ask the project owner for the real file, or copy the example:
 
 ```bash
 cd attendance-backend
-npm install
-npm run dev        # http://localhost:4000, dev personas enabled
+cp config/config.env.example config/config.env
 ```
 
-`npm start` also works, but it does not enable the one-click dev sign-in; it is the
-production entry point. `npm run dev` sets `NODE_ENV=development DEV_AUTH_ENABLED=true`.
+Minimum local values:
 
-The backend needs a secret file, `attendance-backend/config/config.env` — it is **not in git**. Ask the project owner for it. It holds the database URL, JWT secret, Google client ID, and the teacher/test-account lists.
+```dotenv
+PORT=4000
+DB_URI=mongodb://127.0.0.1:27017/attendance
+JWT_SECRET=replace-with-a-long-random-local-secret
+JWT_EXPIRE=5d
+COOKIE_EXPIRE=2
+GOOGLE_CLIENT_ID=your-google-oauth-web-client-id.apps.googleusercontent.com
+CLIENT_URL=http://localhost:3000
+TEACHER_EMAILS=2023ugcs059@nitjsr.ac.in
+SUPER_ADMIN_EMAILS=12shivanshsingha@gmail.com
+SUPER_ADMIN_SESSION_HOURS=12
+```
 
-Quick check that it is up:
+The relevant allowlists are exact-match, server-side environment grants:
+
+| Variable | Purpose |
+| --- | --- |
+| `TEACHER_EMAILS` | College (`@nitjsr.ac.in`) addresses that may create a teacher account on first sign-in. |
+| `TEST_STUDENT_EMAILS` | Optional non-college Gmail addresses that may sign in as students without a roster. Rehearsal only. |
+| `TEST_TEACHER_EMAILS` | Optional non-college Gmail addresses that may sign in as ordinary teachers. Rehearsal only. |
+| `SUPER_ADMIN_EMAILS` | Exact addresses that receive `role: "superadmin"` and can open `/admin`. Gmail is allowed. |
+| `SUPER_ADMIN_SESSION_HOURS` | Admin session lifetime, `1`–`72`, default `12`. |
+
+Rules enforced at startup:
+
+- An address may appear in only **one** allowlist. Overlap, malformed addresses, more than
+  10 entries in a test list, a Gmail in `TEACHER_EMAILS`, or a college address in a test
+  list stops the server.
+- `SUPER_ADMIN_EMAILS` must not overlap `TEACHER_EMAILS`, `TEST_STUDENT_EMAILS` or
+  `TEST_TEACHER_EMAILS`.
+- `ALLOW_TEST_ROSTER_EMAILS=true` is accepted only outside production and requires at
+  least one `TEST_STUDENT_EMAILS` entry. Production startup refuses it.
+- `DEV_AUTH_ENABLED=true` is refused when `NODE_ENV=production`.
+
+For this project's local setup the owner address is
+`12shivanshsingha@gmail.com`, and the college teacher is
+`2023ugcs059@nitjsr.ac.in`. The Gmail address belongs only in `SUPER_ADMIN_EMAILS`.
+
+## 3. Start MongoDB
+
+Use any local data directory. The command below is what this project's dev laptop uses;
+your MongoDB install path may differ.
+
+```bash
+mkdir -p ~/data/db-attendance-dev ~/data/log
+mongod --dbpath ~/data/db-attendance-dev \
+  --logpath ~/data/log/mongod-attendance.log
+```
+
+Leave it running in its own terminal. If `mongod` is already a service on your machine,
+just confirm it is listening on `127.0.0.1:27017`.
+
+## 4. Start the backend
+
+```bash
+cd attendance-backend
+npm run dev        # http://localhost:4000
+```
+
+`npm run dev` sets `NODE_ENV=development DEV_AUTH_ENABLED=true`, which enables the
+one-click dev personas. `npm start` is the normal/production entry point and does **not**
+enable those routes.
+
+Check it:
 
 ```bash
 curl http://localhost:4000/api/v1/health
+# {"success":true,"status":"ok"}
 ```
 
-## 3. Start the frontend
+Startup must log the MongoDB connection and `MongoDB indexes are ready` before
+`server is working`. If an index cannot build, the process refuses to start.
+
+## 5. Start the frontend
 
 ```bash
 cd attendance-frontend
-npm install
 npm start          # http://localhost:3000
 ```
 
-Open http://localhost:3000 in Chrome. After creating a class and roster, the teacher flow
-continues at http://localhost:3000/teacher/check-in: choose the class, start a session, and
-open the transmitter from the live key. A signed-in student continues at
-http://localhost:3000/student/check-in: read the retention notice, confirm consent, then
-tap Join while a session is live. The phone listens for the current wave, signs the decoded
-evidence with the bound device key and shows the recorded-evidence card. The shell is
-evidence-only: it does not display the key or decide attendance, and it stops listening if
-the teacher advances the wave mid-capture.
+Open **http://localhost:3000**. The frontend calls `http://localhost:4000/api/v1` in
+normal development; CORS allows `localhost:3000` and `127.0.0.1:3000`.
 
-Back on the teacher screen, the evidence card lists student email, wave and recorded time
-plus per-wave counts. **Advance wave** is allowed only after the current wave has at least
-one accepted proof; it mints a fresh two-minute key, keeps the old key in bounded
-server-side history and never returns that history to the student. A closed session's
-**Evidence** button opens the same read-only view. None of these screens marks attendance
-or scores it; the student cascade, scoring and the ID round are still future work. Layer 1
-is treated as passed by owner assumption for build planning only, not as a measurement.
+## 6. Walk through the product
 
-Heads-up: with this project's local OAuth client, **Google sign-in only works from http://localhost:3000** — that is the address registered with Google. It won't work from a LAN IP or a tunnel URL. The deployed site uses its own authorized origin.
+### As a teacher
 
-## 4. Test on real phones (audio needs HTTPS)
+1. Sign in with Google, or choose the **Demo Teacher** persona in development.
+2. Open **Classes** (`/teacher/classes`): create a room, create a class, paste a roster and
+   save it. The roster is the list of students allowed to submit evidence.
+3. Open **Check-in** (`/teacher/check-in`): choose the class and start a session. The
+   screen shows wave 0, a two-minute key and a countdown.
+4. Open the transmitter with **Open transmitter**, or inspect live evidence in the
+   **Evidence** card. **Advance wave** is enabled only after the current wave has at least
+   one accepted proof.
+5. When the class is done, **confirm close** on the check-in screen. Then open the
+   **Register**, mark students present/absent/excused and **finalise**. Finalising publishes
+   the register; the 24-hour query window started when the session closed.
 
-Phones only allow microphone access over HTTPS. A temporary Cloudflare tunnel provides that:
+### As a student
+
+1. Sign in with Google, or choose a **Demo Student** persona.
+2. The first browser becomes the bound device automatically. A changed browser becomes a
+   pending review that a teacher must approve.
+3. While a session is live, open **Check-in** (`/student/check-in`), read the retention
+   notice, tick consent and tap **Join**. The phone listens for the current wave, decodes
+   it locally, signs the proof and shows a recorded-evidence card.
+4. Evidence is not attendance. The query window opens when the teacher closes the session
+   and lasts 24 hours; the published result appears after the teacher finalises the
+   register.
+
+### As a super-admin
+
+1. Put the owner address in `SUPER_ADMIN_EMAILS` and restart the backend.
+2. Sign in with that Google account. The server grants `superadmin`; the landing page is
+   `/admin`.
+3. Use **Admin** for users, classes, sessions, attendance overrides/deletion, queries,
+   audit, settings and impersonation.
+4. In development the **Demo data** tab can seed a showcase class; **Reset demo data**
+   removes demo users and their records but keeps the signed-in admin.
+
+The role is not a UI toggle. Removing the address from `SUPER_ADMIN_EMAILS` blocks new
+sign-ins and rejects the existing admin session on its next request.
+
+## 7. Demo data
+
+Demo data is available only when the backend is **not** production and the admin console
+is enabled:
+
+- Seed creates a demo teacher, eight students, a room, a class, a timetable and closed
+  sessions with attendance and queries.
+- Demo accounts use `@demo.invalid`.
+- Demo data is excluded from real exports and never replaces the signed-in admin.
+- In production the demo tab/metric are hidden and every `/api/v1/admin/demo/*` route
+  returns **404**.
+
+## 8. Test accounts and Google sign-in
+
+Development personas (no Google, no password):
+
+- `teacher@dev.invalid`
+- `student1@dev.invalid`, `student2@dev.invalid`, `student3@dev.invalid`
+
+They exist only while the backend runs `npm run dev`. They auto-approve devices and never
+appear in a production build or API.
+
+Real Google accounts:
+
+- **Teacher:** `2023ugcs059@nitjsr.ac.in` (must be in `TEACHER_EMAILS`).
+- **Test student:** the exact Gmail addresses in `TEST_STUDENT_EMAILS`.
+- **Test teacher:** the exact Gmail address in `TEST_TEACHER_EMAILS`, if configured.
+- **Super-admin:** `12shivanshsingha@gmail.com` in `SUPER_ADMIN_EMAILS`.
+
+A Gmail address has two gates: the server allowlist **and**, while the Google OAuth
+consent screen is in **Testing**, the Google Cloud **Test users** list. Leave
+`REACT_APP_GOOGLE_HOSTED_DOMAIN` empty so the account chooser can show Gmail; setting it
+to `nitjsr.ac.in` filters the chooser to the college domain. The server still decides
+who is allowed after Google returns the identity.
+
+With this project's OAuth client, Google sign-in is registered for
+`http://localhost:3000` only. It will not work from a LAN IP or a temporary tunnel URL
+unless that exact origin is added to the OAuth client. For real-phone signed-in testing,
+use the deployed site or register the tunnel origin.
+
+## 9. Test on real phones (audio needs HTTPS)
+
+Microphone access requires HTTPS (or localhost). A temporary Cloudflare tunnel provides
+it for the acoustic pages:
 
 ```bash
-# terminal 1
+# terminal 1 — React dev server plus same-origin API proxy
 cd attendance-frontend && npm run start:shared
 
 # terminal 2
 cloudflared tunnel --url http://localhost:3000
 ```
 
-Open the printed `https://….trycloudflare.com/acoustic-lab` link on each phone. Keep the laptop awake while testing — the tunnel dies with it. The two-phone pages are `/acoustic-tx` and `/acoustic-rx` on the same tunnel origin.
+Open the printed `https://….trycloudflare.com` link on the phones:
 
-For every phone, note down: model, Android version, Chrome version, reported sample rate, and the seven signal margins shown on the lab page (five coarse plus two codec-edge).
+- `/acoustic-lab` — speaker/microphone lab, seven probe tones, sample-rate gate.
+- `/acoustic-tx` — transmitter. Fill in distance/room/notes **before** transmitting.
+- `/acoustic-rx` — receiver. Use **Copy receiver link** on the transmitter so the run ID
+  and conditions match on both phones.
 
-## Test accounts
+The acoustic pages need no sign-in. The signed-in check-in pages do, and Google sign-in will
+not work through a quick tunnel unless its origin is registered with Google. For every
+phone run, record model, Android/Chrome version, sample rate, distance, frames sent,
+frames decoded, margins, room and media volume in `measurements/YYYY-MM-DD/`.
 
-In development, the login page has a **dev-only** section with one-click personas:
-`Demo Teacher`, `Demo Student One`, `Demo Student Two`, `Demo Student Three`. They use
-`@dev.invalid` addresses, need no password, and only exist while the backend runs with
-`npm run dev`. A production build never shows them and the API returns 404.
+Keep the teacher's phone at the front, 1–10 m from student phones. Do not pass it around.
+The 18–19.8 kHz band is near ultrasound: keep runs short, volume moderate, and stop if
+anyone reports discomfort.
 
-Real Google accounts:
-
-- Teacher: `2023ugcs059@nitjsr.ac.in` (in `TEACHER_EMAILS`)
-- Test students: the Gmail addresses in the backend's `TEST_STUDENT_EMAILS` setting
-  (rehearsal only — they are never part of a real roster).
-- Test teacher: the Gmail address in `TEST_TEACHER_EMAILS`, if one is configured. It signs
-  in with the teacher role and can open `/teacher/check-in`; there is no separate admin
-  role.
-
-For a Gmail test account, the server allowlist is only one of three gates: the address must
-also be on the Google OAuth consent screen's **Test users** list while the app is in
-Testing, and the frontend must be built with `REACT_APP_GOOGLE_HOSTED_DOMAIN` set to an
-**empty value** (unset falls back to `nitjsr.ac.in`, which hides Gmail accounts in the
-chooser). Rebuild after changing it.
-
-To rehearse the full check-in flow with a Gmail test student, set
-`ALLOW_TEST_ROSTER_EMAILS=true` in the backend environment while running in development or
-test. The teacher can then add the exact `TEST_STUDENT_EMAILS` addresses to a class roster;
-no other non-college address is accepted. This flag requires at least one entry in
-`TEST_STUDENT_EMAILS`, and **production startup refuses it**. Leave it unset for a real
-class. Dev personas still cannot join a roster; use a Google test student for proof
-rehearsals.
-
-## Run the tests
+## 10. Run the tests
 
 ```bash
-cd attendance-backend && npm test               # 151 tests
-cd attendance-frontend && npm run test:proof    # 15 tests (payload, canonical message, signing and transport helpers)
-cd attendance-frontend && npm run test:acoustic # 51 tests
-cd attendance-frontend && npm run test:checkin  # 7 tests
-cd attendance-frontend && npm run test:studentcheckin # 9 tests (session selection, consent/expiry gate, evidence shape)
-cd attendance-frontend && npm run test:auth     # 2 tests
+cd attendance-backend
+npm test
+npm test -- --test-isolation=none        # also run without file isolation
+
+cd ../attendance-frontend
+npm run test:proof                       # 15
+npm run test:acoustic                    # 51
+npm run test:checkin                     # 7
+npm run test:studentcheckin              # 9
+npm run test:auth                        # 2
+CI=true REACT_APP_API_URL=/api/v1 npm run build
 ```
+
+The current expected counts are **backend 160/160** and **frontend 84/84** across the five
+frontend suites. The production build writes `attendance-frontend/build/`; the backend
+serves it automatically when that folder exists.
+
+## 11. Next steps
+
+- Every page and API path: [routes.md](routes.md).
+- Architecture and flows: [how-it-works.md](how-it-works.md).
+- Production deployment: [deployment.md](deployment.md).
+- Common failures: [troubleshooting.md](troubleshooting.md).
+- Current status and physical measurements: [`progress.md`](../progress.md).

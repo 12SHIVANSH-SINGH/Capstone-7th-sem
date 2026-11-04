@@ -6,6 +6,8 @@ import {
   FiCheckCircle,
   FiClock,
   FiHeadphones,
+  FiHelpCircle,
+  FiMapPin,
   FiMic,
   FiRefreshCw,
   FiShield,
@@ -16,6 +18,8 @@ import { digitsToValue } from "../../acoustic/fsk";
 import { buildProofMessage, submitProof } from "../../acoustic/proofTransport";
 import { useCheckInAudio } from "../../acoustic/useCheckInAudio";
 import { signDeviceMessage } from "../../utils/deviceKey";
+import { getCurrentLocation } from "../../utils/geolocation";
+import { classLabel, formatDateTime, relativeTime, givenName } from "../../utils/format";
 import AppShell from "../../ui/AppShell";
 import Badge from "../../ui/Badge";
 import Button from "../../ui/Button";
@@ -64,6 +68,9 @@ const StudentCheckIn = () => {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [evidence, setEvidence] = useState(null);
+  const [attemptStartedAt, setAttemptStartedAt] = useState(null);
+  const [locationState, setLocationState] = useState("idle");
+  const [recentSessions, setRecentSessions] = useState([]);
 
   const mountedRef = useRef(true);
   const sessionsRequestRef = useRef(0);
@@ -130,6 +137,16 @@ const StudentCheckIn = () => {
     [navigate]
   );
 
+  const refreshRecentSessions = useCallback(async () => {
+    try {
+      const response = await axios.get(`${SERVER_URL}/attendance/me/sessions`, requestConfig);
+      if (!mountedRef.current) return;
+      setRecentSessions(Array.isArray(response.data?.sessions) ? response.data.sessions : []);
+    } catch (error) {
+      // The query shortcut is optional; the check-in must still work.
+    }
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -151,6 +168,7 @@ const StudentCheckIn = () => {
         setDeviceStatus(bindingResponse.data?.status || "unbound");
 
         await loadSessions({ quiet: true });
+        if (!cancelled) await refreshRecentSessions();
       } catch (requestError) {
         if (cancelled) return;
         if (isUnauthorised(requestError)) {
@@ -170,7 +188,7 @@ const StudentCheckIn = () => {
     return () => {
       cancelled = true;
     };
-  }, [loadSessions, navigate, toast]);
+  }, [loadSessions, navigate, refreshRecentSessions, toast]);
 
   useEffect(() => {
     if (!user) return undefined;
@@ -194,6 +212,28 @@ const StudentCheckIn = () => {
     document.addEventListener("visibilitychange", handleVisibility);
     return () => document.removeEventListener("visibilitychange", handleVisibility);
   }, [loadSessions]);
+
+  const captureAttemptLocation = useCallback(async () => {
+    const session = selectedSessionRef.current;
+    if (!session?.id) return;
+    setLocationState("capturing");
+    const location = await getCurrentLocation();
+    if (!mountedRef.current) return;
+    if (!location) {
+      setLocationState("unavailable");
+      return;
+    }
+    try {
+      await axios.post(
+        `${SERVER_URL}/check-in-sessions/${session.id}/location`,
+        { location },
+        requestConfig
+      );
+      if (mountedRef.current) setLocationState("shared");
+    } catch (error) {
+      if (mountedRef.current) setLocationState("unavailable");
+    }
+  }, []);
 
   const handleDecodedFrame = useCallback(
     async (frame) => {
@@ -248,6 +288,7 @@ const StudentCheckIn = () => {
           throw new Error("The proof server returned an unreadable response.");
         }
         if (mountedRef.current) setEvidence(nextEvidence);
+        refreshRecentSessions();
       } catch (error) {
         if (error?.status === 401) {
           navigate("/login");
@@ -267,7 +308,7 @@ const StudentCheckIn = () => {
         if (mountedRef.current) setSubmitting(false);
       }
     },
-    [loadSessions, navigate]
+    [loadSessions, navigate, refreshRecentSessions]
   );
 
   const { phase: audioPhase, error: audioError, start, stop } = useCheckInAudio({
@@ -291,6 +332,8 @@ const StudentCheckIn = () => {
     setConsent(false);
     setEvidence(null);
     setSubmitError("");
+    setAttemptStartedAt(null);
+    setLocationState("idle");
   }, [selectedSession?.id]);
 
   useEffect(() => {
@@ -321,6 +364,8 @@ const StudentCheckIn = () => {
     if (!canJoin) return;
     setSubmitError("");
     setEvidence(null);
+    setAttemptStartedAt(new Date().toISOString());
+    void captureAttemptLocation();
     listeningWaveRef.current = selectedSession?.wave ?? null;
     await start();
   };
@@ -344,7 +389,7 @@ const StudentCheckIn = () => {
   }
 
   const name = user.name || user.email.split("@")[0];
-  const firstName = name.split(" ")[0];
+  const firstName = givenName(name);
 
   const joinLabel = () => {
     if (evidence) return "Evidence recorded";
@@ -357,17 +402,59 @@ const StudentCheckIn = () => {
     return "Join check-in";
   };
 
+  const locationLabel =
+    locationState === "capturing"
+      ? "Capturing location…"
+      : locationState === "shared"
+      ? "Attempt location shared"
+      : locationState === "unavailable"
+      ? "Location not shared"
+      : "Location optional";
+
+  const stageItems = selectedSession
+    ? [
+        {
+          id: "session",
+          label: "Session live",
+          detail: `Opened ${formatTime(selectedSession.startedAt)} · ${roomLabel(selectedSession)}`,
+          state: "done",
+        },
+        {
+          id: "listen",
+          label: listening ? "Listening for the wave" : evidence ? "Wave heard" : "Ready to listen",
+          detail: listening
+            ? "Keep this page visible; listening stops after the first valid frame."
+            : evidence
+            ? `Wave ${evidence.wave} arrived at ${formatTime(evidence.recordedAt)}.`
+            : "Tap Join after acknowledging the notice.",
+          state: evidence ? "done" : listening ? "active" : attemptStartedAt ? "done" : "pending",
+        },
+        {
+          id: "evidence",
+          label: "Signed evidence",
+          detail: evidence
+            ? evidence.duplicate
+              ? "This device had already submitted evidence for this wave."
+              : "The decoded key was signed and recorded by the server."
+            : "The server has not received a signed proof yet.",
+          state: evidence ? "done" : submitting ? "active" : "pending",
+        },
+        {
+          id: "register",
+          label: "Teacher register",
+          detail:
+            "Attendance is finalised by your teacher after close. If you were present but unmarked, the query window opens for 24 hours.",
+          state: "pending",
+        },
+      ]
+    : [];
+
   return (
     <AppShell
       role="student"
       name={name}
       email={user.email}
       onLogout={handleLogout}
-      links={[
-        { to: "/student-dashboard", label: "Dashboard" },
-        { to: "/student/check-in", label: "Check-in", active: true },
-        { to: "/acoustic-lab", label: "Phone audio test" },
-      ]}
     >
       <div className="ui-page-head">
         <div>
@@ -417,8 +504,8 @@ const StudentCheckIn = () => {
           </li>
           <li>
             <strong>This is not an attendance decision.</strong> Hearing the key records
-            evidence. Attendance depends on the full check-in, including the ID round that is
-            not built yet.
+            evidence. Your teacher owns the register and decides attendance; if you were present
+            but missed the register, you can raise a query after the session closes.
           </li>
         </ul>
 
@@ -596,6 +683,40 @@ const StudentCheckIn = () => {
               </Link>
             </div>
 
+            <div className="checkin-progress">
+              <div className="checkin-progress__head">
+                <strong>Check-in progress</strong>
+                <span
+                  className={`chip ${
+                    locationState === "shared"
+                      ? "chip--success"
+                      : locationState === "unavailable"
+                      ? "chip--warning"
+                      : ""
+                  }`}
+                >
+                  <FiMapPin aria-hidden="true" /> {locationLabel}
+                </span>
+              </div>
+              <ol className="checkin-progress__list">
+                {stageItems.map((stage) => (
+                  <li key={stage.id} className={`checkin-progress__item is-${stage.state}`}>
+                    <span className="checkin-progress__dot" aria-hidden="true">
+                      {stage.state === "done" ? <FiCheckCircle /> : stage.state === "active" ? <FiMic /> : null}
+                    </span>
+                    <div>
+                      <strong>{stage.label}</strong>
+                      <p>{stage.detail}</p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+              <p className="student-checkin__fineprint">
+                Location is optional evidence: a denied permission never blocks a check-in. The
+                teacher sees the attempt time and distance when it is available.
+              </p>
+            </div>
+
             <p className="student-checkin__fineprint">
               The transmitter plays from your teacher’s phone at the front. Do not share a
               recording of the key: a forwarded key is evidence, not proof that you were in the
@@ -635,8 +756,8 @@ const StudentCheckIn = () => {
                 </dl>
                 <p className="student-checkin__evidence-note">
                   This proof says this phone heard the current wave and signed it with the
-                  bound device key. It is evidence only; the ID round and attendance decision
-                  come later.
+                  bound device key. It is evidence only; your teacher owns the attendance
+                  decision and can still correct the register from a query.
                 </p>
                 <Link className="ui-btn ui-btn--secondary ui-btn--block" to="/student-dashboard">
                   Back to dashboard
@@ -661,11 +782,61 @@ const StudentCheckIn = () => {
                   </li>
                 </ol>
                 <p className="student-checkin__side-note">
-                  Wave advancement and the ID round are not built yet. This prototype accepts
-                  the current wave only.
+                  Waves and proofs are evidence, not a roll-call. A forwarded key shows that a
+                  phone heard a wave; it does not prove who was in the room. Your teacher judges
+                  the register and any query.
                 </p>
               </Card>
             )}
+
+            <Card
+              title="Were you missed?"
+              subtitle="A session that closed without your mark can still be corrected."
+              actions={
+                <Button variant="ghost" size="sm" onClick={refreshRecentSessions}>
+                  <FiRefreshCw aria-hidden="true" /> Refresh
+                </Button>
+              }
+            >
+              {recentSessions.filter((session) => session.canRaiseQuery).length === 0 ? (
+                <p className="student-checkin__side-note">
+                  No open query windows right now. A window opens for 24 hours after a session
+                  closes and you are not marked present.
+                </p>
+              ) : (
+                <div className="page-stack">
+                  {recentSessions
+                    .filter((session) => session.canRaiseQuery)
+                    .slice(0, 3)
+                    .map((session) => (
+                      <div className="query-card query-card--pending" key={session.id}>
+                        <div className="query-card__head">
+                          <div>
+                            <h3 className="query-card__title">{classLabel(session.class)}</h3>
+                            <p className="query-card__sub">
+                              {formatDateTime(session.startedAt)} · register{" "}
+                              {session.attendance?.status || "missing"}
+                            </p>
+                          </div>
+                          <Badge variant="warning" dot>Window open</Badge>
+                        </div>
+                        <div className="query-card__foot">
+                          <span className="query-window query-window--open">
+                            <FiClock aria-hidden="true" /> Ends{" "}
+                            {relativeTime(session.queryWindowEndsAt)}
+                          </span>
+                          <Link className="ui-btn ui-btn--soft ui-btn--sm" to="/queries">
+                            <FiHelpCircle aria-hidden="true" /> Raise query
+                          </Link>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
+              <Link className="ui-btn ui-btn--ghost ui-btn--block" to="/queries" style={{ marginTop: 10 }}>
+                Open query centre
+              </Link>
+            </Card>
           </div>
         </div>
       )}

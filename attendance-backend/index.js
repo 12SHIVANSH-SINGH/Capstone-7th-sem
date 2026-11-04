@@ -26,7 +26,10 @@ const connectdatabase = require("./config/database");
 const { startServer } = require("./utils/startServer");
 
 // The listener is only assigned after MongoDB and all model indexes are ready.
+// Listener and query sweeper: the API also expires lazily on read, but the
+// interval makes the 24-hour state change happen even when nobody opens a page.
 let server = null;
+let querySweeper = null;
 let shuttingDown = false;
 
 const closeResources = async () => {
@@ -45,6 +48,7 @@ const shutDown = (kind, error, exitCode = 1) => {
     console.log(`shutting down server due to ${kind}`);
 
     const finish = () => {
+        if (querySweeper) clearInterval(querySweeper);
         closeResources().finally(() => process.exit(exitCode));
     };
 
@@ -105,6 +109,13 @@ const start = async () => {
     });
     if (startedServer) {
         server = startedServer;
+        const { expireStaleQueries } = require("./utils/attendance");
+        querySweeper = setInterval(() => {
+            expireStaleQueries().catch((error) => {
+                console.error(`[queries] sweep failed: ${error.message}`);
+            });
+        }, 5 * 60 * 1000);
+        querySweeper.unref();
     }
 };
 

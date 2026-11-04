@@ -1,5 +1,6 @@
 const express = require('express');
-const { logout, isAuth } = require('../controllers/userController');
+const { logout, isAuth, getProfile, updateProfile } = require('../controllers/userController');
+const isAuthenticated = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -16,5 +17,7 @@ router.get('/logout', (req, res) => {
     res.status(405).json({ success: false, message: 'Use POST to log out' });
 });
 router.route('/islogin').get(isAuth);
+router.get('/profile', isAuthenticated, getProfile);
+router.patch('/profile', isAuthenticated, updateProfile);
 
 module.exports = router;

@@ -421,6 +421,92 @@
   padding-top: 13px;
 }
 
+.checkin-progress {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--slate-50);
+  padding: 13px 14px;
+  margin-top: 15px;
+}
+
+.checkin-progress__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 9px;
+  flex-wrap: wrap;
+  margin-bottom: 11px;
+}
+
+.checkin-progress__head strong {
+  font-size: 13px;
+}
+
+.checkin-progress__list {
+  display: grid;
+  gap: 11px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.checkin-progress__item {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  opacity: 0.72;
+}
+
+.checkin-progress__item.is-done,
+.checkin-progress__item.is-active {
+  opacity: 1;
+}
+
+.checkin-progress__dot {
+  width: 19px;
+  height: 19px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-faint);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  font-size: 10px;
+  margin-top: 1px;
+}
+
+.checkin-progress__item.is-done .checkin-progress__dot {
+  background: var(--success-soft);
+  border-color: var(--success-border);
+  color: var(--success);
+}
+
+.checkin-progress__item.is-active .checkin-progress__dot {
+  background: var(--indigo-50);
+  border-color: var(--indigo-200);
+  color: var(--indigo-600);
+}
+
+.checkin-progress__item strong {
+  display: block;
+  font-size: 12.5px;
+  line-height: 1.35;
+}
+
+.checkin-progress__item p {
+  color: var(--text-soft);
+  font-size: 11.5px;
+  line-height: 1.5;
+  margin-top: 1px;
+}
+
+.checkin-progress .student-checkin__fineprint {
+  border-top: 1px solid var(--border);
+  margin-top: 12px;
+  padding-top: 10px;
+}
+
 @keyframes student-checkin-pulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.28); }
   50% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }

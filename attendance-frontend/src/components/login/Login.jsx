@@ -43,7 +43,7 @@ const Login = () => {
             deviceStatus = bindingData.status;
         }
 
-        navigate(data.user.role === "teacher" ? "/teacher-dashboard" : "/student-dashboard", { state: { deviceStatus } });
+        navigate(dashboardPath(data.user.role), { state: { deviceStatus } });
     }, [navigate]);
 
     const handleGoogleCredential = useCallback(async ({ credential }) => {
@@ -139,7 +139,7 @@ const Login = () => {
                         attendance — no GPS tracking, no roll-call, no extra hardware.
                     </p>
                     <ul className="login-brand__points">
-                        <li>College Google sign-in — nothing to remember</li>
+                        <li>Authorized Google sign-in — nothing to remember</li>
                         <li>Each browser binds to a private device key</li>
                         <li>Teachers approve changed devices in seconds</li>
                     </ul>
@@ -155,7 +155,7 @@ const Login = () => {
                 <div className="login-card">
                     <img src={img1} alt="Bio Attend" className="login-card__logo" />
                     <h2>Welcome back</h2>
-                    <p className="login-card__sub">Sign in with your college account to continue.</p>
+                    <p className="login-card__sub">Sign in with your college or approved Google account to continue.</p>
 
                     <div className="google-login-block">
                         <GoogleSignInButton

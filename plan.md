@@ -44,7 +44,7 @@ Three parts:
 | Phones and browsers | Android + Chrome first, phones from 2020 or later, any brand. iOS later | iOS is not part of the Layer 1 test |
 | Band | Lower band is acceptable and preferred if it works | Layer 1 compares 18–20 kHz with a lower band (e.g. 15–17 kHz) and picks the more reliable one |
 | Identity | College Google account (`@nitjsr.ac.in`), one account per student, plus a class roster | The roster decides class membership; batch/branch/roll are derived for display only |
-| Device | Browser-created P-256 key bound to the account | First binding auto-approves; a changed device waits for teacher review |
+| Device | Browser-created P-256 key bound to the account | First binding and changed devices wait for teacher review; dev/test personas auto-approve |
 | Attendance model | **Teacher-confirmed register** | Teacher marks present/absent/excused from evidence, finalises, and every correction is audited |
 | Queries | 24-hour window after a session closes | Student can query a missed mark; teacher approves/rejects/reopens with an audit trail; approval counts as present |
 | Retention | Roster and attendance results for the term; proof evidence about **1 day** | Proof records expire through a TTL index; location snapshots remain attached to attendance/query records |
@@ -72,10 +72,12 @@ Three parts:
 The roster is the list of college emails allowed to check in to a class (one row per
 student, typically 70–120). It decides who can submit evidence and who counts as absent.
 
-- Source: CSV upload or a paste-the-list box.
+- Source: CSV upload, a text-based PDF extraction preview, or a paste-the-list box.
 - One required column: `email`. Name and section are optional.
 - The server lowercases, removes duplicates, rejects non-college addresses and flags
-  malformed roll numbers for teacher review.
+  malformed roll numbers for teacher review. PDF extraction only fills the editable text
+  box; the teacher still runs the normal preview and confirms the save. Scanned PDFs with no
+  text layer are rejected until local OCR is built.
 - The teacher can add/remove rows later (e.g. a late joiner).
 - Non-production rehearsals only: `ALLOW_TEST_ROSTER_EMAILS=true` admits the exact
   `TEST_STUDENT_EMAILS` addresses. Production startup refuses the flag.
@@ -156,9 +158,10 @@ teacher-confirmed attendance instead.
 
 **Current phase:** the product layer is built, including teacher-confirmed registers,
 queries, analytics, exports, notifications, timetable, PWA and a production-capable
-super-admin console. It is still **evidence-only for acoustic proof**: the app does not
-automatically score attendance or run the ID round. The attendance decision belongs to the
-teacher and is audited.
+super-admin console. Roster PDF text extraction with an editable preview is built; timetable
+PDF import, local OCR and Gemini extraction are not. It is still **evidence-only for acoustic
+proof**: the app does not automatically score attendance or run the ID round. The attendance
+decision belongs to the teacher and is audited.
 
 **Next work, in order:**
 
@@ -192,14 +195,65 @@ teacher and is audited.
 - Run the real Google/phone multi-wave rehearsal; the local smokes used a JWT cookie and,
   for the student shell, fake audio.
 - Decide whether device bindings follow the same 1-day retention as proof evidence.
-- Document the first-binding recovery boundary ("once a device is bound").
+- Document the device-recovery boundary: a teacher approves every first or replacement
+  device, and a stolen session cookie cannot bind without that decision.
 - Add a shared-store rate limiter if the service scales past one instance.
 - Keep split-hosting origins in `CLIENT_URLS` if that layout is ever used.
 
-## 11. Out of scope (for now)
+## 11. P1 admin hardening (approved 2026-11-05)
+
+**Status (2026-11-05):** implemented and tested locally. The P1 slice passed at backend
+**227/227** in both test modes and frontend **84/84**; after the roster PDF slice the current
+gate is backend **245/245** and frontend **90/90**. The production build is green, and a
+Chrome virtual-authenticator run passed the full enrollment → 428 → step-up →
+settings-save → chain-verify path.
+
+The P0 layer made sessions revocable and device binding teacher-approved. P1 raises the bar
+for the production super-admin console without adding a paid service.
+
+| Slice | Design | Limit |
+| --- | --- | --- |
+| Audit integrity | Each new audit entry stores `seq`, `prevHash` and a SHA-256 `hash` over the canonical entry. `/admin/audit/verify` recomputes the chain and reports the first break. Pre-P1 entries are reported as legacy, not hashed retroactively. | The chain is serialised in-process, which is correct for the current single Render instance. A future multi-instance deployment needs a transaction or distributed lock. |
+| Audit IP | Audit entries use Express `req.ip` (trusted one-hop proxy result), never a raw client-supplied `X-Forwarded-For` header. | `trust proxy` must stay at exactly one hop on Render. |
+| Exports | Every generated export writes an audit entry, and export routes are rate limited per account and IP. | In-memory limiter; a shared store is needed if the service scales out. |
+| Readiness | `/health/ready` returns 503 until Mongoose is connected; the existing `/health` stays a cheap liveness probe. | It does not test Atlas latency or dependent third-party services. |
+| JWT rotation | `JWT_SECRET_PREVIOUS` is accepted for verification only, so tokens can outlive one deploy while new tokens use `JWT_SECRET`. | Old tokens are not reissued automatically; the operator removes the previous secret after the normal session lifetime. |
+| Admin step-up | A super-admin registers a platform passkey. Destructive actions require a 5-minute, single-purpose cookie minted by a WebAuthn assertion. First enrollment is trust-on-first-use; adding another passkey requires step-up. | A stolen super-admin session can enroll one attacker passkey before the owner notices, exactly as a stolen password could. Google 2FA and audit review remain the outer controls. |
+
+WebAuthn origins are configured server-side (`WEBAUTHN_ORIGINS`, falling back to
+`CLIENT_URL(S)`, `RENDER_EXTERNAL_URL`, then local development origins). The expected origin
+is never derived from a request header. Production must run HTTPS.
+
+## 12. Document ingestion (started 2026-11-05)
+
+The import path is **extract → preview → teacher confirms**. Extraction never writes a
+roster, creates a class or marks attendance. The teacher reviews the extracted content,
+runs the existing validation preview and confirms the save.
+
+| Slice | Status | Design | Limit |
+| --- | --- | --- | --- |
+| A1 Roster PDF text extraction | **Built** | `POST /classes/:classId/roster/pdf/preview` accepts one PDF from the owning teacher. PDF.js reads the embedded text layer, reconstructs visual lines and returns editable text plus page/line/email counts. The frontend fills the roster textarea; the existing preview and explicit save remain unchanged. | Text-layer PDFs only. 10 MB, 20 pages and 200,000 characters; 20 extractions per 10 minutes per account/IP; in-memory, no file persistence. Scanned PDFs return `pdf_no_text_layer`. Real college layouts are unvalidated because no sample PDFs exist. |
+| A2 Timetable PDF import | **Not built** | Extract text, match course code/section to an existing owned class, preview slots and require confirmation. Unmatched rows are flagged for manual class creation. | Must never create a class automatically or overwrite a slot without the teacher seeing the change. Needs representative timetable PDFs before parser work. |
+| A3 Local OCR | **Not built** | Render scanned pages locally and run a free in-process OCR engine. The OCR output still goes through the same editable preview. | No paid service or card. OCR accuracy and runtime must be measured on sample scans before it is offered. |
+| A4 Optional Gemini extraction | **Gated** | A last-resort structured extractor for documents that text extraction and OCR cannot structure. Raw rosters may leave the server only after the consent and risk text below exists. | The Gemini free tier may use content to improve products and may involve human review. No AI path is coded until the owner accepts that risk in this file. |
+
+### Gemini consent and risk acceptance gate (not yet satisfied)
+
+Before any code sends a roster or timetable to Gemini, this section must contain:
+
+1. the exact student-facing notice and where it is shown;
+2. the data fields that may leave the server;
+3. the retention/training risk of the chosen free tier;
+4. the owner's written acceptance and date; and
+5. the fallback when a student or teacher opts out.
+
+That text does **not** exist yet. Until it does, A4 stays unbuilt and raw rosters remain
+server-side.
+
+## 13. Out of scope (for now)
 
 - Student using another student's phone or account.
-- Account/device-key theft beyond the first-binding recovery boundary.
+- Account/device-key theft that can also convince a teacher to approve the attacker's device.
 - iOS and other browsers.
 - Native mobile app (Layer 5).
 - Any extra room hardware.

@@ -133,6 +133,11 @@
   cursor: pointer;
 }
 
+.class-mgmt__file[aria-disabled="true"] {
+  cursor: wait;
+  opacity: 0.65;
+}
+
 .class-mgmt__file input {
   position: absolute;
   inset: 0;
@@ -193,7 +198,7 @@
   background: var(--danger-soft);
   border: 1px solid var(--danger-border);
   border-radius: 8px;
-  color: #991b1b;
+  color: var(--danger-ink);
   font-size: 13px;
   padding: 8px 10px;
 }
@@ -231,7 +236,7 @@
 
 .class-mgmt__confirm-icon {
   align-items: center;
-  background: #fff;
+  background: var(--surface);
   border-radius: 50%;
   color: var(--warning);
   display: flex;
@@ -247,7 +252,7 @@
 }
 
 .class-mgmt__confirm-body p {
-  color: #78350f;
+  color: var(--warning-ink);
   font-size: 13.5px;
   line-height: 1.55;
 }
@@ -270,7 +275,7 @@
   background: var(--danger-soft);
   border: 1px solid var(--danger-border);
   border-radius: var(--radius);
-  color: #991b1b;
+  color: var(--danger-ink);
   font-size: 13.5px;
   margin-bottom: 12px;
   padding: 12px;

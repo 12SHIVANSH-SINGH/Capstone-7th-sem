@@ -14,7 +14,7 @@
   gap: 40px;
   padding: 40px 48px 48px;
   color: #fff;
-  background: linear-gradient(150deg, var(--indigo-600), var(--indigo-800));
+  background: var(--brand-gradient-strong);
   overflow: hidden;
 }
 
@@ -31,7 +31,7 @@
 .login-brand__top { position: relative; }
 .login-brand .ui-brand { color: #fff; }
 .login-brand .ui-brand__mark { background: rgba(255, 255, 255, 0.16); box-shadow: none; }
-.login-brand .ui-brand__name em { color: var(--indigo-200); }
+.login-brand .ui-brand__name em { color: #c7d2fe; }
 
 .login-brand__content { position: relative; margin: auto 0; max-width: 440px; }
 
@@ -113,6 +113,7 @@
 
 /* Right: sign-in card */
 .login-panel {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -121,10 +122,16 @@
   padding: 40px 24px;
 }
 
+.login-theme {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+}
+
 .login-card {
   width: 100%;
   max-width: 400px;
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 20px;
   box-shadow: var(--shadow);
@@ -155,7 +162,7 @@
   border-radius: 10px;
   background: var(--danger-soft);
   border: 1px solid var(--danger-border);
-  color: #b91c1c;
+  color: var(--danger-ink);
   font-size: 13.5px;
   text-align: left;
 }

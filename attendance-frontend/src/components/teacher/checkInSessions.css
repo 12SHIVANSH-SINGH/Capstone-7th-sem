@@ -128,7 +128,7 @@
   background: var(--danger-soft);
   border: 1px solid var(--danger-border);
   border-radius: var(--radius);
-  color: #991b1b;
+  color: var(--danger-ink);
   font-size: 13px;
   line-height: 1.5;
   margin-bottom: 14px;
@@ -153,7 +153,8 @@
 }
 
 .checkin__alert p {
-  color: #7f1d1d;
+  color: var(--danger-ink);
+  opacity: 0.9;
 }
 
 .checkin__alert .ui-btn {
@@ -161,9 +162,9 @@
 }
 
 .checkin__key-panel {
-  background: linear-gradient(135deg, var(--slate-900), #1e1b4b);
+  background: linear-gradient(135deg, #0f172a, #1e1b4b);
   border-radius: var(--radius-lg);
-  color: var(--slate-300);
+  color: #cbd5e1;
   padding: 20px;
 }
 
@@ -179,7 +180,7 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  color: var(--slate-300);
+  color: #cbd5e1;
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -217,12 +218,12 @@
 
 .checkin__key-panel .ui-btn--primary {
   background: #fff;
-  color: var(--indigo-700);
+  color: #4338ca;
 }
 
 .checkin__key-panel .ui-btn--primary:hover:not(:disabled) {
-  background: var(--indigo-50);
-  color: var(--indigo-800);
+  background: #eef2ff;
+  color: #3730a3;
 }
 
 .checkin__key-note,
@@ -234,7 +235,7 @@
 }
 
 .checkin__key-note {
-  color: var(--slate-300);
+  color: #cbd5e1;
 }
 
 .checkin__key-warning {
@@ -285,7 +286,7 @@
 
 .checkin__confirm-icon {
   align-items: center;
-  background: #fff;
+  background: var(--surface);
   border-radius: 50%;
   color: var(--warning);
   display: flex;
@@ -308,7 +309,7 @@
 }
 
 .checkin__confirm-body p {
-  color: #78350f;
+  color: var(--warning-ink);
   font-size: 13.5px;
   line-height: 1.55;
 }

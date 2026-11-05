@@ -6,6 +6,7 @@ const Enrollment = require("../models/enrollmentModels");
 const { Room } = require("../models/roomModels");
 const { parseRosterText } = require("../utils/roster");
 const { rosterOptions } = require("../utils/rehearsalEnrollment");
+const { extractPdfText, PdfTextError } = require("../utils/pdfText");
 
 const getOwnedClass = async (classId, teacherId, next) => {
   if (!mongoose.isValidObjectId(classId)) {
@@ -136,6 +137,58 @@ exports.replaceRoster = catchAsyncError(async (req, res, next) => {
     success: true,
     message: "Roster saved",
     activeStudentCount,
+  });
+});
+
+/**
+ * Extract selectable text from a roster PDF for review.
+ *
+ * This is deliberately preview-only: it does not parse rows into enrollments,
+ * write a roster or mark attendance. The teacher still edits the textarea,
+ * runs the existing validation preview and confirms the save separately.
+ */
+exports.previewRosterPdf = catchAsyncError(async (req, res, next) => {
+  const courseClass = await getOwnedClass(req.params.classId, req.user._id, next);
+  if (!courseClass) return;
+
+  if (!req.file) {
+    const missing = new ErrorHandler("Choose a PDF file to extract.", 400);
+    missing.code = "pdf_missing";
+    return next(missing);
+  }
+
+  let extraction;
+  try {
+    extraction = await extractPdfText(req.file.buffer);
+  } catch (error) {
+    if (error instanceof PdfTextError) {
+      const pdfError = new ErrorHandler(error.message, error.statuscode);
+      pdfError.code = error.code;
+      return next(pdfError);
+    }
+    throw error;
+  }
+
+  if (!extraction.hasText) {
+    const noText = new ErrorHandler(
+      "This PDF has no selectable text layer. Use CSV/paste for now; local OCR is not built yet.",
+      422
+    );
+    noText.code = "pdf_no_text_layer";
+    return next(noText);
+  }
+
+  const institutionalEmailCount = (
+    extraction.text.match(/[^\s@]+@nitjsr\.ac\.in/gi) || []
+  ).length;
+
+  res.status(200).json({
+    success: true,
+    extraction: {
+      ...extraction,
+      institutionalEmailCount,
+      fileName: req.file.originalname,
+    },
   });
 });
 

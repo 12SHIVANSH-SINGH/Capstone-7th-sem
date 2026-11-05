@@ -21,6 +21,7 @@ import EmptyState from "../../ui/EmptyState";
 import Field from "../../ui/Field";
 import { PageLoader } from "../../ui/Spinner";
 import { useToast } from "../../ui/Toast";
+import { extractionSummary, importErrorMessage, isPdfFile } from "../../utils/rosterImport";
 import "./classManagement.css";
 
 const blankClass = { courseCode: "", title: "", section: "", roomId: "" };
@@ -73,6 +74,8 @@ const ClassManagement = () => {
   const [rosterError, setRosterError] = useState("");
   const [preview, setPreview] = useState(null);
   const [pendingSave, setPendingSave] = useState(false);
+  const [pdfExtracting, setPdfExtracting] = useState(false);
+  const [pdfNotice, setPdfNotice] = useState("");
 
   const [sectionErrors, setSectionErrors] = useState({});
   const [loading, setLoading] = useState(true);
@@ -83,6 +86,7 @@ const ClassManagement = () => {
 
   const rosterRequestRef = useRef(0);
   const previewRequestRef = useRef(0);
+  const pdfRequestRef = useRef(0);
 
   const loadClasses = useCallback(async () => {
     try {
@@ -181,12 +185,15 @@ const ClassManagement = () => {
   const resetRosterState = useCallback(() => {
     rosterRequestRef.current += 1;
     previewRequestRef.current += 1;
+    pdfRequestRef.current += 1;
     setRoster([]);
     setRosterText("");
     setRosterLoading(false);
     setRosterError("");
     setPreview(null);
     setPendingSave(false);
+    setPdfExtracting(false);
+    setPdfNotice("");
   }, []);
 
   const selectClass = useCallback(
@@ -355,19 +362,59 @@ const ClassManagement = () => {
     }
   };
 
-  const handleFile = (event) => {
+  const handleFile = async (event) => {
     const file = event.target.files?.[0];
+    event.target.value = "";
     if (!file) return;
+
+    if (isPdfFile(file)) {
+      if (!selectedClass?._id || pdfExtracting) return;
+
+      const classId = selectedClass._id;
+      const requestId = pdfRequestRef.current + 1;
+      pdfRequestRef.current = requestId;
+      setPdfExtracting(true);
+      setPdfNotice("");
+      setPreview(null);
+      setPendingSave(false);
+
+      try {
+        const body = new FormData();
+        body.append("file", file);
+        const response = await axios.post(
+          `${SERVER_URL}/classes/${classId}/roster/pdf/preview`,
+          body,
+          requestConfig
+        );
+        if (requestId !== pdfRequestRef.current) return;
+
+        const extraction = response.data?.extraction || {};
+        setRosterText(String(extraction.text || ""));
+        setPdfNotice(extractionSummary(extraction));
+        toast("PDF text extracted. Review it before previewing the roster.", "success");
+      } catch (requestError) {
+        if (requestId !== pdfRequestRef.current) return;
+        if (isUnauthorised(requestError)) {
+          navigate("/login");
+          return;
+        }
+        setPdfNotice("");
+        toast(importErrorMessage(requestError), "error");
+      } finally {
+        if (requestId === pdfRequestRef.current) setPdfExtracting(false);
+      }
+      return;
+    }
 
     const reader = new FileReader();
     reader.onload = () => {
       setRosterText(String(reader.result || ""));
       setPreview(null);
       setPendingSave(false);
+      setPdfNotice("");
     };
     reader.onerror = () => toast("Could not read that file. Paste its contents instead.", "error");
     reader.readAsText(file);
-    event.target.value = "";
   };
 
   const decideReview = async (reviewId, decision) => {
@@ -409,7 +456,9 @@ const ClassManagement = () => {
     [preview, roster]
   );
   const previewMatchesClass = Boolean(preview && preview.classId === selectedClass?._id);
-  const canPreview = Boolean(selectedClass && rosterText.trim() && !rosterLoading && !previewing);
+  const canPreview = Boolean(
+    selectedClass && rosterText.trim() && !rosterLoading && !previewing && !pdfExtracting
+  );
   const canSave = Boolean(
     previewMatchesClass &&
       preview.errors.length === 0 &&
@@ -668,9 +717,12 @@ const ClassManagement = () => {
           }
         >
           <p className="class-mgmt__muted">
-            Paste one <code>@nitjsr.ac.in</code> email per line, or use <code>email,name</code> CSV.
-            Rehearsal builds may also accept an allowlisted test account. Saving replaces the
-            active roster: students missing from the new list are marked inactive, not deleted.
+            Paste one <code>@nitjsr.ac.in</code> email per line, use <code>email,name</code> CSV, or
+            upload a text-based PDF. PDF extraction only fills the box for review: check the rows,
+            run <strong>Preview roster</strong>, then confirm the save. Scanned PDFs without a text
+            layer need CSV or paste until local OCR lands. Rehearsal builds may also accept an
+            allowlisted test account. Saving replaces the active roster: students missing from the
+            new list are marked inactive, not deleted.
           </p>
 
           {rosterError && (
@@ -683,10 +735,18 @@ const ClassManagement = () => {
           )}
 
           <div className="class-mgmt__roster-tools">
-            <label className="ui-btn ui-btn--secondary ui-btn--sm class-mgmt__file">
+            <label
+              className="ui-btn ui-btn--secondary ui-btn--sm class-mgmt__file"
+              aria-disabled={pdfExtracting}
+            >
               <FiUpload aria-hidden="true" />
-              Upload CSV
-              <input type="file" accept=".csv,text/csv,text/plain" onChange={handleFile} />
+              {pdfExtracting ? "Extracting PDF…" : "Upload CSV or PDF"}
+              <input
+                type="file"
+                accept=".csv,.pdf,text/csv,text/plain,application/pdf"
+                onChange={handleFile}
+                disabled={pdfExtracting || rosterLoading}
+              />
             </label>
             <Button
               variant="ghost"
@@ -700,14 +760,24 @@ const ClassManagement = () => {
               Load sample
             </Button>
             <span className="class-mgmt__muted class-mgmt__roster-count">
-              {rosterLoading ? "Loading roster…" : `${activeNow} currently active`}
+              {pdfExtracting
+                ? "Extracting PDF text…"
+                : rosterLoading
+                  ? "Loading roster…"
+                  : `${activeNow} currently active`}
             </span>
           </div>
 
+          {pdfNotice && (
+            <p className="class-mgmt__muted" role="status">
+              {pdfNotice}
+            </p>
+          )}
+
           <Field
-            label="Roster CSV"
+            label="Roster text (CSV or extracted PDF)"
             htmlFor="roster-text"
-            hint="A header row named email is optional. Duplicate and non-institutional rows are rejected in the preview unless the server has rehearsal enrollment enabled."
+            hint="A header row named email is optional. PDF text is not saved automatically: review it, preview the rows and confirm the save. Duplicate and non-institutional rows are rejected in the preview unless the server has rehearsal enrollment enabled."
           >
             <textarea
               id="roster-text"
@@ -721,7 +791,7 @@ const ClassManagement = () => {
               placeholder={"email,name\n2023ugcs001@nitjsr.ac.in,Aarav Kumar"}
               rows={12}
               spellCheck={false}
-              disabled={rosterLoading}
+              disabled={rosterLoading || pdfExtracting}
             />
           </Field>
 
@@ -815,8 +885,8 @@ const ClassManagement = () => {
 
       <Card
         className="class-mgmt__reviews"
-        title="New-device review queue"
-        subtitle="A student on a new browser must be approved before check-in."
+        title="Device approval queue"
+        subtitle="First bindings and changed browsers wait here before a student can submit proof."
         actions={<Badge variant={reviews.length > 0 ? "warning" : "success"}>{reviews.length} pending</Badge>}
       >
         {sectionErrors.reviews ? (
@@ -830,7 +900,7 @@ const ClassManagement = () => {
           <EmptyState
             icon={<FiShield />}
             title="No device reviews waiting"
-            text="When a student signs in from a new browser, their request appears here for approval."
+            text="When a student signs in for the first time or changes browser, their request appears here for approval."
           />
         ) : (
           <div className="class-mgmt__review-list">

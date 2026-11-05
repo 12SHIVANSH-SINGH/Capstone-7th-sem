@@ -194,7 +194,7 @@
 /* Profile / help */
 .profile-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(260px, 1fr); gap: 16px; align-items: start; }
 .profile-identity { display: flex; gap: 15px; align-items: center; }
-.profile-avatar { width: 58px; height: 58px; border-radius: 16px; display: grid; place-items: center; color: #fff; font-size: 22px; font-weight: 700; background: linear-gradient(135deg, var(--indigo-500), var(--indigo-700)); flex-shrink: 0; }
+.profile-avatar { width: 58px; height: 58px; border-radius: 16px; display: grid; place-items: center; color: #fff; font-size: 22px; font-weight: 700; background: var(--brand-gradient); flex-shrink: 0; }
 .profile-identity__name { font-size: 17px; font-weight: 700; }
 .profile-identity__email { color: var(--text-faint); font-size: 12.5px; margin-top: 2px; }
 .profile-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }

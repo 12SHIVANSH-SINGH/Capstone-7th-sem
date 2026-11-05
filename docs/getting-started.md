@@ -8,7 +8,7 @@ every page/API path is in [routes.md](routes.md).
 
 | Tool | Why |
 | --- | --- |
-| **Node.js 22 or newer** | Backend and frontend. Check with `node -v`. |
+| **Node.js 22.13 or newer** | Backend and frontend. PDF.js 6 requires 22.13+ or 24+. Check with `node -v`. |
 | **MongoDB** | Local database for development. Any recent community edition works. |
 | **Chrome** | The supported browser for the acoustic and check-in flows. |
 | **cloudflared** | Optional: HTTPS tunnel for testing microphone pages on real phones. |
@@ -100,10 +100,14 @@ Check it:
 ```bash
 curl http://localhost:4000/api/v1/health
 # {"success":true,"status":"ok"}
+curl http://localhost:4000/api/v1/health/ready
+# {"success":true,"status":"ready","checks":{"database":true}}
 ```
 
 Startup must log the MongoDB connection and `MongoDB indexes are ready` before
 `server is working`. If an index cannot build, the process refuses to start.
+`/health/ready` returns **503** until MongoDB is connected; `/health` stays green while the
+process is alive so a restart loop and a database outage are distinguishable.
 
 ## 5. Start the frontend
 
@@ -120,8 +124,11 @@ normal development; CORS allows `localhost:3000` and `127.0.0.1:3000`.
 ### As a teacher
 
 1. Sign in with Google, or choose the **Demo Teacher** persona in development.
-2. Open **Classes** (`/teacher/classes`): create a room, create a class, paste a roster and
-   save it. The roster is the list of students allowed to submit evidence.
+2. Open **Classes** (`/teacher/classes`): create a room, create a class, then paste a roster,
+   upload a CSV, or upload a text-based PDF. A PDF only fills the editable box: check the
+   rows, run **Preview roster** and confirm the save. Scanned PDFs without a text layer are
+   rejected until local OCR is built. The roster is the list of students allowed to submit
+   evidence.
 3. Open **Check-in** (`/teacher/check-in`): choose the class and start a session. The
    screen shows wave 0, a two-minute key and a countdown.
 4. Open the transmitter with **Open transmitter**, or inspect live evidence in the
@@ -134,8 +141,9 @@ normal development; CORS allows `localhost:3000` and `127.0.0.1:3000`.
 ### As a student
 
 1. Sign in with Google, or choose a **Demo Student** persona.
-2. The first browser becomes the bound device automatically. A changed browser becomes a
-   pending review that a teacher must approve.
+2. The first browser and a changed browser both become a pending device review that a
+   teacher must approve before the student can submit evidence. In development, dev personas
+   auto-approve.
 3. While a session is live, open **Check-in** (`/student/check-in`), read the retention
    notice, tick consent and tap **Join**. The phone listens for the current wave, decodes
    it locally, signs the proof and shows a recorded-evidence card.
@@ -150,11 +158,20 @@ normal development; CORS allows `localhost:3000` and `127.0.0.1:3000`.
    `/admin`.
 3. Use **Admin** for users, classes, sessions, attendance overrides/deletion, queries,
    audit, settings and impersonation.
-4. In development the **Demo data** tab can seed a showcase class; **Reset demo data**
+4. Open **Admin → Security** and register a passkey. Destructive actions return **428**
+   until a passkey approves them; the approval lasts five minutes. The first passkey is
+   trust-on-first-use, so register it before sharing the account or changing real data.
+5. In development the **Demo data** tab can seed a showcase class; **Reset demo data**
    removes demo users and their records but keeps the signed-in admin.
 
 The role is not a UI toggle. Removing the address from `SUPER_ADMIN_EMAILS` blocks new
 sign-ins and rejects the existing admin session on its next request.
+
+Passkey origin configuration is server-side. Local development accepts
+`http://localhost:3000` and `http://localhost:4000` by default. If the admin console is served
+from another origin, set `WEBAUTHN_ORIGINS` to that exact origin (comma separated) and, if
+needed, `WEBAUTHN_RP_ID` to its hostname or a parent domain. Production requires HTTPS; the
+server never derives the expected origin from a request header.
 
 ## 7. Demo data
 
@@ -238,12 +255,14 @@ npm run test:acoustic                    # 51
 npm run test:checkin                     # 7
 npm run test:studentcheckin              # 9
 npm run test:auth                        # 2
+npm run test:rosterimport                # 6
 CI=true REACT_APP_API_URL=/api/v1 npm run build
 ```
 
-The current expected counts are **backend 160/160** and **frontend 84/84** across the five
-frontend suites. The production build writes `attendance-frontend/build/`; the backend
-serves it automatically when that folder exists.
+The current expected counts are **backend 245/245** in both default and
+`--test-isolation=none` modes, and **frontend 90/90** across the six frontend suites. The
+production build writes `attendance-frontend/build/`; the backend serves it automatically
+when that folder exists.
 
 ## 11. Next steps
 

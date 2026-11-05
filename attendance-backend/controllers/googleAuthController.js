@@ -6,7 +6,7 @@ const User = require("../models/userModels");
 const Enrollment = require("../models/enrollmentModels");
 const DeviceBindingRequest = require("../models/deviceBindingRequestModels");
 const CourseClass = require("../models/classModels");
-const { fingerprintPublicKey } = require("../utils/deviceBinding");
+const { fingerprintPublicKey, sanitizePublicKeyJwk } = require("../utils/deviceBinding");
 const { isDevAuthEnabled, isDevEmail } = require("../utils/devAuth");
 const { writeAudit } = require("../utils/audit");
 const {
@@ -216,37 +216,64 @@ exports.claimDeviceBinding = catchAsyncError(async (req, res, next) => {
     return next(new ErrorHandler("Only student devices need attendance binding", 400));
   }
 
-  const fingerprint = fingerprintPublicKey(req.body.publicKeyJwk);
+  if (req.body?.publicKeyJwk?.d !== undefined) {
+    return next(new ErrorHandler("Private key material must never be uploaded.", 400));
+  }
+  const publicKeyJwk = sanitizePublicKeyJwk(req.body?.publicKeyJwk);
+  const fingerprint = fingerprintPublicKey(publicKeyJwk);
   if (!fingerprint) {
     return next(new ErrorHandler("A valid P-256 device public key is required", 400));
   }
 
   const now = new Date();
-  // Dev personas are for fast two-phone testing; every browser they use is
-  // approved without a review. This branch only exists when dev auth is on and
-  // the account was created by the dev login route.
-  if (req.user.authProvider === "dev" && isDevAuthEnabled()) {
+  // Dev personas and explicit test-student allowlist accounts are for fast
+  // two-phone rehearsals; every browser they use is approved without a review.
+  // Test accounts must be emptied before a real pilot.
+  const devAutoApproved = req.user.authProvider === "dev" && isDevAuthEnabled();
+  const testAutoApproved = isTestStudent(req.user.email);
+  if (devAutoApproved || testAutoApproved) {
     req.user.deviceBinding = {
       fingerprint,
-      publicKeyJwk: req.body.publicKeyJwk,
+      publicKeyJwk,
       approvedAt: now,
       lastSeenAt: now,
     };
     req.user.markModified("deviceBinding");
     await req.user.save();
-    return res.status(201).json({ success: true, status: "approved", devAutoApproved: true });
+    return res.status(201).json({
+      success: true,
+      status: "approved",
+      devAutoApproved,
+      testAutoApproved,
+    });
   }
 
+  // First bindings are not special. A stolen session cookie must not be able
+  // to turn itself into a trusted device without a teacher deciding.
   if (!req.user.deviceBinding?.fingerprint) {
-    req.user.deviceBinding = {
-      fingerprint,
-      publicKeyJwk: req.body.publicKeyJwk,
-      approvedAt: now,
-      lastSeenAt: now,
-    };
-    req.user.markModified("deviceBinding");
-    await req.user.save();
-    return res.status(201).json({ success: true, status: "approved", firstBinding: true });
+    const request = await DeviceBindingRequest.findOneAndUpdate(
+      { student: req.user._id, fingerprint },
+      {
+        $set: { publicKeyJwk, status: "pending" },
+        $setOnInsert: { student: req.user._id, fingerprint },
+      },
+      { new: true, upsert: true, setDefaultsOnInsert: true }
+    );
+
+    await writeAudit(req, {
+      action: "device.binding.first_requested",
+      entityType: "User",
+      entityId: req.user._id,
+      summary: "First device binding requested; waiting for teacher approval.",
+      metadata: { fingerprint },
+    });
+
+    return res.status(202).json({
+      success: true,
+      status: "review",
+      requestId: request._id,
+      firstBinding: true,
+    });
   }
 
   if (req.user.deviceBinding.fingerprint === fingerprint) {
@@ -258,11 +285,19 @@ exports.claimDeviceBinding = catchAsyncError(async (req, res, next) => {
   const request = await DeviceBindingRequest.findOneAndUpdate(
     { student: req.user._id, fingerprint },
     {
-      $set: { publicKeyJwk: req.body.publicKeyJwk, status: "pending" },
+      $set: { publicKeyJwk, status: "pending" },
       $setOnInsert: { student: req.user._id, fingerprint },
     },
     { new: true, upsert: true, setDefaultsOnInsert: true }
   );
+
+  await writeAudit(req, {
+    action: "device.binding.change_requested",
+    entityType: "User",
+    entityId: req.user._id,
+    summary: "Changed device binding requested; waiting for teacher approval.",
+    metadata: { fingerprint },
+  });
 
   res.status(202).json({ success: true, status: "review", requestId: request._id });
 });
@@ -310,21 +345,55 @@ exports.decideDeviceReview = catchAsyncError(async (req, res, next) => {
     return next(new ErrorHandler("Device review not found", 404));
   }
 
+  const reviewedAt = new Date();
   if (decision === "approved") {
     const student = await User.findById(review.student);
+    if (!student) return next(new ErrorHandler("Student not found", 404));
+    const hadDevice = Boolean(student.deviceBinding?.fingerprint);
     student.deviceBinding = {
       fingerprint: review.fingerprint,
       publicKeyJwk: review.publicKeyJwk,
-      approvedAt: new Date(),
-      lastSeenAt: new Date(),
+      approvedAt: reviewedAt,
+      lastSeenAt: reviewedAt,
     };
     student.markModified("deviceBinding");
+    // Replacing an existing trusted device invalidates its old sessions. A
+    // first binding does not need that because there was no old device.
+    if (hadDevice) student.tokenVersion = (student.tokenVersion || 0) + 1;
     await student.save();
+
+    // A student may have requested more than one browser before review. Once
+    // one is approved it is the only trusted device; retire the others so a
+    // stale pending row cannot keep blocking proof submission.
+    const superseded = await DeviceBindingRequest.updateMany(
+      { student: review.student, status: "pending", _id: { $ne: review._id } },
+      { $set: { status: "rejected", reviewedBy: req.user._id, reviewedAt } }
+    );
+
+    await writeAudit(req, {
+      action: "device.binding.approved",
+      entityType: "User",
+      entityId: student._id,
+      summary: `Approved device binding for ${student.email}.`,
+      metadata: {
+        fingerprint: review.fingerprint,
+        firstBinding: !hadDevice,
+        supersededRequests: superseded?.modifiedCount ?? 0,
+      },
+    });
+  } else {
+    await writeAudit(req, {
+      action: "device.binding.rejected",
+      entityType: "User",
+      entityId: review.student,
+      summary: "Rejected a device binding request.",
+      metadata: { fingerprint: review.fingerprint },
+    });
   }
 
   review.status = decision;
   review.reviewedBy = req.user._id;
-  review.reviewedAt = new Date();
+  review.reviewedAt = reviewedAt;
   await review.save();
 
   res.status(200).json({ success: true, status: decision });

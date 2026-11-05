@@ -24,8 +24,7 @@ const getSettings = async () => {
   return settings;
 };
 
-const updateSettings = async (updates, updatedBy = null) => {
-  if (!isDbReady()) return { ...DEFAULTS, ...updates };
+const buildSettingsUpdate = (updates, updatedBy = null) => {
   const allowed = [
     "queryWindowHours",
     "geofenceRadiusMeters",
@@ -44,9 +43,23 @@ const updateSettings = async (updates, updatedBy = null) => {
   }
   if (updatedBy) patch.updatedBy = updatedBy;
 
+  // MongoDB rejects a single update where $set and $setOnInsert touch the
+  // same path ("would create a conflict"). Only insert defaults for fields
+  // this request is not already setting.
+  const insertDefaults = {};
+  for (const [key, value] of Object.entries(DEFAULTS)) {
+    if (!Object.prototype.hasOwnProperty.call(patch, key)) insertDefaults[key] = value;
+  }
+
+  return { $set: patch, $setOnInsert: insertDefaults };
+};
+
+const updateSettings = async (updates, updatedBy = null) => {
+  if (!isDbReady()) return { ...DEFAULTS, ...updates };
+
   return SystemSetting.findOneAndUpdate(
     { key: "global" },
-    { $set: patch, $setOnInsert: DEFAULTS },
+    buildSettingsUpdate(updates, updatedBy),
     { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
   );
 };
@@ -66,6 +79,7 @@ const settingsView = (settings) => ({
 
 module.exports = {
   DEFAULTS,
+  buildSettingsUpdate,
   getSettings,
   updateSettings,
   settingsView,

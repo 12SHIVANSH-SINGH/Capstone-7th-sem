@@ -1,0 +1,65 @@
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "17 3 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    name: Dependency and secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Use Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            attendance-backend/package-lock.json
+            attendance-frontend/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: attendance-backend
+        run: npm ci
+
+      - name: Backend production audit
+        working-directory: attendance-backend
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Install frontend dependencies
+        working-directory: attendance-frontend
+        run: npm ci
+
+      # CRA 5's build chain carries known advisories that are not shipped in
+      # the production bundle. Keep the report visible without making every
+      # unrelated PR red until the CRA-to-Vite migration is scheduled.
+      - name: Frontend build-chain audit (report only)
+        working-directory: attendance-frontend
+        continue-on-error: true
+        run: npm audit --omit=dev --audit-level=critical
+
+      - name: Secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Gitleaks is free for individual repositories. If this repository is
+          # ever moved under a GitHub organization, add a GITLEAKS_LICENSE
+          # repository secret or replace this step with a self-hosted gitleaks
+          # binary.
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}

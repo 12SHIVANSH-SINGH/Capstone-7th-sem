@@ -82,7 +82,7 @@
   background: var(--danger-soft);
   border: 1px solid var(--danger-border);
   border-radius: var(--radius);
-  color: #991b1b;
+  color: var(--danger-ink);
   display: flex;
   font-size: 13px;
   gap: 12px;
@@ -94,7 +94,7 @@
 .student-checkin__alert--soft {
   background: var(--warning-soft);
   border-color: var(--warning-border);
-  color: #92400e;
+  color: var(--warning-ink);
 }
 
 .student-checkin__alert > svg {
@@ -179,7 +179,7 @@
 
 .student-checkin__countdown {
   align-items: center;
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   display: flex;
@@ -206,11 +206,11 @@
 }
 
 .student-checkin__countdown.is-live .student-checkin__countdown-value {
-  color: #047857;
+  color: var(--success-ink);
 }
 
 .student-checkin__countdown.is-expired .student-checkin__countdown-value {
-  color: #b45309;
+  color: var(--warning-ink);
 }
 
 .student-checkin__countdown-label {
@@ -239,7 +239,7 @@
 
 .student-checkin__listen-icon {
   align-items: center;
-  background: #fff;
+  background: var(--surface);
   border-radius: 10px;
   color: var(--indigo-600);
   display: grid;
@@ -252,7 +252,7 @@
 
 .student-checkin__listen.is-listening .student-checkin__listen-icon {
   animation: student-checkin-pulse 1.4s ease-in-out infinite;
-  color: #047857;
+  color: var(--success-ink);
 }
 
 .student-checkin__listen strong {
@@ -281,7 +281,7 @@
 .student-checkin__hint--warning {
   background: var(--warning-soft);
   border-color: var(--warning-border);
-  color: #92400e;
+  color: var(--warning-ink);
 }
 
 .student-checkin__actions {

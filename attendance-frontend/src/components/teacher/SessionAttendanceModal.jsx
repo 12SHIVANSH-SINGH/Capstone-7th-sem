@@ -21,6 +21,7 @@ import Tabs from "../../ui/Tabs";
 import { Spinner } from "../../ui/Spinner";
 import { useToast } from "../../ui/Toast";
 import { classLabel, formatDateTime, formatDistance, percentLabel } from "../../utils/format";
+import { describePasskeyError, withAdminStepUp } from "../../utils/adminStepUp";
 import EventTimeline from "../shared/EventTimeline";
 import LocationEvidence from "../shared/LocationEvidence";
 
@@ -158,15 +159,17 @@ const SessionAttendanceModal = ({ open, session, mode = "teacher", onClose, onCh
     setSaving(true);
     try {
       if (isAdmin) {
-        await Promise.all(
-          dirtyIds.map((recordId) =>
-            axios.patch(
-              `${SERVER_URL}/admin/attendance/${recordId}`,
-              {
-                status: drafts[recordId],
-                note: notes[recordId] || "Super-admin override from the register.",
-              },
-              requestConfig
+        await withAdminStepUp(() =>
+          Promise.all(
+            dirtyIds.map((recordId) =>
+              axios.patch(
+                `${SERVER_URL}/admin/attendance/${recordId}`,
+                {
+                  status: drafts[recordId],
+                  note: notes[recordId] || "Super-admin override from the register.",
+                },
+                requestConfig
+              )
             )
           )
         );
@@ -189,7 +192,7 @@ const SessionAttendanceModal = ({ open, session, mode = "teacher", onClose, onCh
       await loadProofs();
       onChanged?.();
     } catch (requestError) {
-      toast(messageFor(requestError, "The register could not be saved."), "error");
+      toast(describePasskeyError(requestError, "The register could not be saved."), "error");
     } finally {
       setSaving(false);
     }
@@ -223,14 +226,21 @@ const SessionAttendanceModal = ({ open, session, mode = "teacher", onClose, onCh
     if (!selectedRecord?.id) return;
     setDeletingRecord(true);
     try {
-      await axios.delete(`${SERVER_URL}/admin/attendance/${selectedRecord.id}`, requestConfig);
+      // The API requires an explicit confirmation body in addition to the
+      // passkey assertion, so a stray DELETE cannot remove a register row.
+      await withAdminStepUp(() =>
+        axios.delete(`${SERVER_URL}/admin/attendance/${selectedRecord.id}`, {
+          ...requestConfig,
+          data: { confirm: "DELETE" },
+        })
+      );
       toast("Attendance row removed from the register.", "success");
       setConfirmDelete(false);
       setSelectedRecordId("");
       await load({ quiet: true });
       onChanged?.();
     } catch (requestError) {
-      toast(messageFor(requestError, "The attendance row could not be removed."), "error");
+      toast(describePasskeyError(requestError, "The attendance row could not be removed."), "error");
     } finally {
       setDeletingRecord(false);
     }

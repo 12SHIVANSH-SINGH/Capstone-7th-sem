@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@simplewebauthn/browser": "^14.0.0",
     "axios": "^1.7.9",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -20,6 +21,7 @@
     "test:checkin": "node --test src/components/teacher/checkInSessionView.node-tests.js",
     "test:studentcheckin": "node --test src/components/student/studentCheckInView.node-tests.js",
     "test:auth": "node --test src/utils/auth.node-tests.js",
+    "test:rosterimport": "node --test src/utils/rosterImport.node-tests.js",
     "eject": "react-scripts eject"
   },
   "eslintConfig": {

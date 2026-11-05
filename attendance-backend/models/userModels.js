@@ -28,6 +28,15 @@ const userSchema = new mongoose.Schema(
             default: "active",
             index: true,
         },
+        // Incremented whenever live sessions must stop working (account
+        // disabled, role changed, device rebound, "sign out everywhere").
+        // Old tokens carry the previous value and fail closed in the auth
+        // middleware instead of surviving until their normal expiry.
+        tokenVersion: {
+            type: Number,
+            default: 0,
+            min: 0,
+        },
         authProvider: {
             type: String,
             enum: ["google", "dev"],
@@ -58,14 +67,18 @@ const userSchema = new mongoose.Schema(
 // impersonation without changing the normal sign-in path.
 userSchema.methods.getJWTtoken = function (options = {}) {
     const { expiresIn = process.env.JWT_EXPIRE || "5d", ...extraClaims } = options;
-    return jwt.sign({ id: this._id, ...extraClaims }, process.env.JWT_SECRET, {
-        // A token without an expiry would outlive its cookie and stay valid
-        // forever if it ever leaked. Default to the documented five days.
-        expiresIn,
-        // Pin the algorithm so a token can never be reinterpreted under a
-        // different JWT family if the library default changes.
-        algorithm: "HS256",
-    });
+    return jwt.sign(
+        { id: this._id, tokenVersion: this.tokenVersion || 0, ...extraClaims },
+        process.env.JWT_SECRET,
+        {
+            // A token without an expiry would outlive its cookie and stay valid
+            // forever if it ever leaked. Default to the documented five days.
+            expiresIn,
+            // Pin the algorithm so a token can never be reinterpreted under a
+            // different JWT family if the library default changes.
+            algorithm: "HS256",
+        }
+    );
 };
 
 const User = mongoose.model("User", userSchema);

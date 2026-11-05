@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import Brand from '../../ui/Brand';
+import ThemeToggle from '../../ui/ThemeToggle';
 import { dashboardPath } from '../../utils/auth';
 import './Navbar.css';
 
@@ -10,13 +11,16 @@ const Navbar = ({ user, loading = false }) => (
   <nav className="navbar">
     <div className="navbar__inner">
       <Brand />
-      {loading ? (
-        <span className="navbar__status">Checking session…</span>
-      ) : (
-        <Link to={user ? dashboardPath(user.role) : "/login"} className="ui-btn ui-btn--primary ui-btn--sm">
-          {user ? "Open dashboard" : "Sign in"}
-        </Link>
-      )}
+      <div className="navbar__actions">
+        {loading ? (
+          <span className="navbar__status">Checking session…</span>
+        ) : (
+          <Link to={user ? dashboardPath(user.role) : "/login"} className="ui-btn ui-btn--primary ui-btn--sm">
+            {user ? "Open dashboard" : "Sign in"}
+          </Link>
+        )}
+        <ThemeToggle />
+      </div>
     </div>
   </nav>
 );

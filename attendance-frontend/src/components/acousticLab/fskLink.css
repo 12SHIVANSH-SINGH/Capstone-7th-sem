@@ -170,6 +170,8 @@
 .fsk-link__report-fallback textarea {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12px;
   min-height: 220px;
@@ -188,13 +190,13 @@
 .fsk-link__alert--success {
   background: var(--success-soft);
   border-color: var(--success-border);
-  color: #065f46;
+  color: var(--success-ink);
 }
 
 .fsk-link__alert--error {
   background: var(--danger-soft);
   border-color: var(--danger-border);
-  color: #991b1b;
+  color: var(--danger-ink);
 }
 
 .fsk-link__level {
@@ -239,7 +241,7 @@
   background: var(--success-soft);
   border: 1px solid var(--success-border);
   border-radius: var(--radius-sm);
-  color: #065f46;
+  color: var(--success-ink);
   display: flex;
   flex-wrap: wrap;
   font-size: 13px;
@@ -280,7 +282,7 @@
   background: var(--warning-soft);
   border: 1px solid var(--warning-border);
   border-radius: var(--radius-sm);
-  color: #78350f;
+  color: var(--warning-ink);
   font-size: 12.5px;
   line-height: 1.55;
   margin-top: 14px;

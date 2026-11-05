@@ -1,12 +1,14 @@
 const catchAsyncError = require("../middleware/catchasyncerror");
 const User = require("../models/userModels");
 const ErrorHandler = require("../utils/errorhandler");
-const jwt = require("jsonwebtoken");
+const { verifyJwt } = require("../utils/verifyJwt");
 const cookieOptions = require("../utils/cookieOptions");
 const presentUser = require("../utils/presentUser");
 const { isSessionAllowed } = require("../utils/signInPolicy");
 const { isDevAuthEnabled } = require("../utils/devAuth");
 const { tokenFromRequest } = require("../middleware/auth");
+const { assertSessionVersion } = require("../utils/sessionVersion");
+const { writeAudit } = require("../utils/audit");
 
 // 📌 Logout User
 exports.logout = catchAsyncError(async (req, res, next) => {
@@ -19,6 +21,34 @@ exports.logout = catchAsyncError(async (req, res, next) => {
     res.status(200).json({
         success: true,
         message: "Logged out successfully",
+    });
+});
+
+// 📌 Revoke every live session for the current account. The current cookie is
+// cleared too: a revocation endpoint that leaves the caller signed in is easy
+// to misread as "only other devices were affected".
+exports.revokeSessions = catchAsyncError(async (req, res, next) => {
+    const user = await User.findByIdAndUpdate(
+        req.user._id,
+        { $inc: { tokenVersion: 1 } },
+        { new: true }
+    );
+    if (!user) {
+        return next(new ErrorHandler("User account no longer exists", 404));
+    }
+
+    await writeAudit(req, {
+        action: "session.revoked_all",
+        entityType: "User",
+        entityId: user._id,
+        summary: "Revoked every session for this account.",
+    });
+
+    res.clearCookie("token", cookieOptions());
+    res.clearCookie("admin_token", cookieOptions());
+    res.status(200).json({
+        success: true,
+        message: "All sessions have been revoked. Sign in again.",
     });
 });
 
@@ -76,9 +106,7 @@ exports.isAuth = catchAsyncError(async (req, res, next) => {
 
     let decoded;
     try {
-        decoded = jwt.verify(token, process.env.JWT_SECRET, {
-            algorithms: ["HS256"],
-        });
+        decoded = verifyJwt(token);
     } catch (error) {
         return next(new ErrorHandler("Please login to access this resource", 401));
     }
@@ -91,6 +119,12 @@ exports.isAuth = catchAsyncError(async (req, res, next) => {
         return next(new ErrorHandler("This account has been disabled. Contact your administrator.", 401));
     }
 
+    try {
+        assertSessionVersion(decoded, req.user);
+    } catch (error) {
+        return next(error);
+    }
+
     let impersonator = null;
     if (decoded.impersonatorId) {
         impersonator = await User.findById(decoded.impersonatorId);
@@ -99,6 +133,15 @@ exports.isAuth = catchAsyncError(async (req, res, next) => {
         }
         if (!isSessionAllowed(impersonator, { devAuthEnabled: isDevAuthEnabled() })) {
             return next(new ErrorHandler("The impersonation session is no longer valid.", 401));
+        }
+        try {
+            assertSessionVersion(
+                { tokenVersion: decoded.impersonatorVersion },
+                impersonator,
+                "The impersonation session is no longer valid."
+            );
+        } catch (error) {
+            return next(error);
         }
     } else if (!isSessionAllowed(req.user, { devAuthEnabled: isDevAuthEnabled() })) {
         // Keep /islogin consistent with the protected routes: a revoked test

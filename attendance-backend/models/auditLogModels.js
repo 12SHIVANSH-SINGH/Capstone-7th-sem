@@ -5,6 +5,7 @@ const AUDIT_ACTIONS = [
   "session.closed",
   "session.advanced",
   "session.attendance.finalized",
+  "session.revoked_all",
   "attendance.marked",
   "attendance.override",
   "attendance.deleted",
@@ -13,14 +14,29 @@ const AUDIT_ACTIONS = [
   "query.rejected",
   "query.expired",
   "query.reopened",
+  "export.attendance.pdf",
+  "export.attendance.xlsx",
+  "export.queries.pdf",
+  "export.queries.xlsx",
+  "export.session.pdf",
+  "export.session.xlsx",
+  "export.users.xlsx",
+  "export.audit.xlsx",
   "device.reviewed",
+  "device.binding.first_requested",
+  "device.binding.change_requested",
+  "device.binding.approved",
+  "device.binding.rejected",
   "admin.user.created",
   "admin.user.updated",
+  "admin.user.sessions_revoked",
   "admin.class.created",
   "admin.class.updated",
   "admin.settings.updated",
   "admin.impersonation.started",
   "admin.impersonation.stopped",
+  "admin.webauthn.registered",
+  "admin.webauthn.step_up",
   "admin.demo.seeded",
   "admin.demo.reset",
   "auth.superadmin.granted",
@@ -60,12 +76,20 @@ const auditLogSchema = new mongoose.Schema(
     ip: { type: String, trim: true, default: "" },
     userAgent: { type: String, trim: true, maxlength: 500, default: "" },
     isDemo: { type: Boolean, default: false, index: true },
+    // Tamper-evident chain. Legacy entries created before P1 have no seq/hash
+    // and are reported separately by verification; they are never rewritten.
+    seq: { type: Number },
+    prevHash: { type: String, default: "" },
+    hash: { type: String, default: "" },
   },
   { timestamps: true }
 );
 
 auditLogSchema.index({ createdAt: -1 });
 auditLogSchema.index({ actor: 1, createdAt: -1 });
+// A duplicate sequence means two writers forked the chain. Sparse keeps the
+// index valid while legacy rows have no seq.
+auditLogSchema.index({ seq: 1 }, { unique: true, sparse: true });
 
 const AuditLog = mongoose.model("AuditLog", auditLogSchema);
 

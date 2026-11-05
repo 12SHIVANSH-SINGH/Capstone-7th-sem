@@ -7,6 +7,7 @@ import GoogleSignInButton from "./GoogleSignInButton";
 import { getOrCreateDevicePublicKey } from "../../utils/deviceKey";
 import Badge from "../../ui/Badge";
 import Brand from "../../ui/Brand";
+import ThemeToggle from "../../ui/ThemeToggle";
 import { PageLoader, Spinner } from "../../ui/Spinner";
 import useSession from "../../hooks/useSession";
 import { dashboardPath } from "../../utils/auth";
@@ -152,6 +153,7 @@ const Login = () => {
             </aside>
 
             <main className="login-panel">
+                <ThemeToggle className="ui-icon-btn login-theme" />
                 <div className="login-card">
                     <img src={img1} alt="Bio Attend" className="login-card__logo" />
                     <h2>Welcome back</h2>

@@ -83,6 +83,19 @@ test("the real app mounts the proof route behind authentication", async (t) => {
   }
 });
 
+test("the roster PDF preview route is mounted behind authentication", async (t) => {
+  const { server, baseUrl } = await start();
+  t.after(() => stop(server));
+
+  const response = await fetch(
+    `${baseUrl}/api/v1/classes/507f1f77bcf86cd799439011/roster/pdf/preview`,
+    { method: "POST" }
+  );
+
+  assert.equal(response.status, 401);
+  assert.match((await response.json()).message, /login/i);
+});
+
 test("the real app still serves the health route", async (t) => {
   const { server, baseUrl } = await start();
   t.after(() => stop(server));
@@ -90,6 +103,18 @@ test("the real app still serves the health route", async (t) => {
   const response = await fetch(`${baseUrl}/api/v1/health`);
   assert.equal(response.status, 200);
   assert.equal((await response.json()).success, true);
+});
+
+test("readiness fails closed when no database is connected", async (t) => {
+  const { server, baseUrl } = await start();
+  t.after(() => stop(server));
+
+  const response = await fetch(`${baseUrl}/api/v1/health/ready`);
+  assert.equal(response.status, 503);
+  const body = await response.json();
+  assert.equal(body.success, false);
+  assert.equal(body.status, "not-ready");
+  assert.equal(body.checks.database, false);
 });
 
 test("API responses are not cacheable and carry the baseline security headers", async (t) => {
@@ -108,6 +133,10 @@ test("API responses are not cacheable and carry the baseline security headers", 
     response.headers.get("permissions-policy"),
     "camera=(), geolocation=(self), microphone=(self)"
   );
+  const csp = response.headers.get("content-security-policy");
+  assert.match(csp, /script-src 'self' https:\/\/accounts\.google\.com/);
+  assert.doesNotMatch(csp, /script-src[^;]*'unsafe-inline'/);
+  assert.match(csp, /frame-ancestors 'none'/);
   // HSTS is production-only; local HTTP development must not be pinned.
   assert.equal(response.headers.get("strict-transport-security"), null);
 });

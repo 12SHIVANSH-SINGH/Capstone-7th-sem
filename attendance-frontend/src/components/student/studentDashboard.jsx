@@ -32,7 +32,7 @@ const STATUS_VIEW = {
         variant: "warning",
         icon: "⌛",
         title: "Waiting for teacher review",
-        text: "This browser was added from a new device. A teacher needs to approve it before you can check in.",
+        text: "A teacher needs to approve this browser before it can submit proof. The request stays here until they do.",
     },
     unbound: {
         badge: "Not bound",

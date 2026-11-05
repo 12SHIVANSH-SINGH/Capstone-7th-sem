@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-
 /* ============================================================
    Design tokens — Indigo modern SaaS, light theme.
    Kept dark-theme-ready: semantic names, not raw colors, in use.
@@ -47,6 +45,25 @@
   --info: #0284c7;
   --info-soft: #f0f9ff;
   --info-border: #bae6fd;
+
+  /* Status text on tinted surfaces — remapped separately from the accent
+     colour so labels stay readable in both themes. */
+  --success-ink: #047857;
+  --warning-ink: #b45309;
+  --danger-ink: #b91c1c;
+  --info-ink: #0369a1;
+
+  /* Solid brand surfaces keep enough depth for white text even when the
+     indigo scale is lightened for dark-mode text. */
+  --brand-solid: #4f46e5;
+  --brand-solid-hover: #4338ca;
+  --brand-gradient: linear-gradient(135deg, #6366f1, #4338ca);
+  --brand-gradient-strong: linear-gradient(135deg, #4f46e5, #3730a3);
+  --danger-solid: #dc2626;
+  --danger-solid-hover: #b91c1c;
+
+  /* Translucent top bars (app shell and public navbar). */
+  --bar-bg: rgba(255, 255, 255, 0.85);
 
   /* Shape and depth */
   --radius-sm: 8px;
@@ -138,6 +155,14 @@ h4 {
   --indigo-500: #818cf8;
   --indigo-600: #a5b4fc;
   --indigo-700: #c7d2fe;
+  --success: #34d399;
+  --warning: #fbbf24;
+  --danger: #f87171;
+  --info: #38bdf8;
+  --success-ink: #6ee7b7;
+  --warning-ink: #fcd34d;
+  --danger-ink: #fca5a5;
+  --info-ink: #7dd3fc;
   --success-soft: #0c2b26;
   --success-border: #145c50;
   --warning-soft: #33240c;
@@ -146,23 +171,17 @@ h4 {
   --danger-border: #7a2a30;
   --info-soft: #0c2a3d;
   --info-border: #14536f;
+  --bar-bg: rgba(11, 17, 32, 0.86);
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.35), 0 16px 36px -18px rgba(0, 0, 0, 0.8);
   --shadow-lg: 0 22px 50px -16px rgba(0, 0, 0, 0.75);
   color-scheme: dark;
 }
 [data-theme="dark"] body { background: var(--bg); }
-[data-theme="dark"] .ui-shell__bar { background: rgba(11, 17, 32, 0.86); }
-[data-theme="dark"] .ui-btn--secondary { background: var(--surface); color: var(--text); }
-[data-theme="dark"] .ui-btn--secondary:hover:not(:disabled) { background: var(--slate-100); }
-[data-theme="dark"] .ui-input,
-[data-theme="dark"] .ui-textarea { background: var(--slate-50); color: var(--text); }
-[data-theme="dark"] .ui-toast { background: var(--surface); }
-[data-theme="dark"] .ui-toast__message { color: var(--text); }
-[data-theme="dark"] .ui-card__subtitle,
-[data-theme="dark"] .ui-empty__text,
-[data-theme="dark"] .ui-page-head__sub { color: var(--text-soft); }
-[data-theme="dark"] .ui-impersonation { background: #33240c; border-color: #6b4a12; color: #fcd34d; }
-[data-theme="dark"] .ui-bell__item:hover { background: var(--slate-50); }
 [data-theme="dark"] .chart__area { fill: rgba(129, 140, 248, 0.14); }
-[data-theme="dark"] .ui-brand__name em { color: var(--indigo-600); }
+/* The logo art has dark corner brackets; give it a light chip in dark mode. */
+[data-theme="dark"] .login-card__logo {
+  background: #fff;
+  border-radius: 14px;
+  padding: 6px;
+}

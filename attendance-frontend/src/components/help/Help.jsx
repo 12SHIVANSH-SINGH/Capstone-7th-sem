@@ -25,7 +25,7 @@ const STUDENT_STEPS = [
   {
     icon: <FiSmartphone />,
     title: "Bind this browser",
-    text: "Sign in with your college Google account. The first browser becomes your bound device; a changed device needs teacher approval.",
+    text: "Sign in with your college Google account. A teacher approves the first browser and any changed device before you can submit proof.",
   },
   {
     icon: <FiHeadphones />,

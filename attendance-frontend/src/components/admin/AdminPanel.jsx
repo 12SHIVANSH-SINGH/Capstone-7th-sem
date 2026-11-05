@@ -9,6 +9,8 @@ import {
   FiDatabase,
   FiDownload,
   FiEdit3,
+  FiKey,
+  FiLogOut,
   FiPlus,
   FiRefreshCw,
   FiSearch,
@@ -19,6 +21,12 @@ import {
 } from "react-icons/fi";
 import SERVER_URL from "../../config/api";
 import useRoleSession from "../../hooks/useRoleSession";
+import {
+  describePasskeyError,
+  passkeysSupported,
+  registerAdminPasskey,
+  withAdminStepUp,
+} from "../../utils/adminStepUp";
 import {
   classLabel,
   formatDate,
@@ -47,6 +55,7 @@ const TABS = [
   { value: "classes", label: "Classes" },
   { value: "sessions", label: "Sessions" },
   { value: "audit", label: "Audit" },
+  { value: "security", label: "Security" },
   { value: "settings", label: "Settings" },
   { value: "demo", label: "Demo data" },
 ];
@@ -87,6 +96,8 @@ const AdminPanel = () => {
   const [classes, setClasses] = useState([]);
   const [sessions, setSessions] = useState([]);
   const [audit, setAudit] = useState([]);
+  const [auditVerification, setAuditVerification] = useState(null);
+  const [security, setSecurity] = useState(null);
   const [settings, setSettings] = useState(null);
   const [demo, setDemo] = useState(null);
   const [teachers, setTeachers] = useState([]);
@@ -157,6 +168,11 @@ const AdminPanel = () => {
     setAudit(Array.isArray(response.data?.logs) ? response.data.logs : []);
   }, [auditSearch]);
 
+  const loadSecurity = useCallback(async () => {
+    const response = await axios.get(`${SERVER_URL}/admin/webauthn/status`, requestConfig);
+    setSecurity(response.data || null);
+  }, []);
+
   const loadSettings = useCallback(async () => {
     const response = await axios.get(`${SERVER_URL}/admin/settings`, requestConfig);
     const next = response.data?.settings || null;
@@ -189,6 +205,7 @@ const AdminPanel = () => {
           await Promise.all([loadSessions(), loadClasses()]);
         }
         if (nextTab === "audit") await loadAudit();
+        if (nextTab === "security") await loadSecurity();
         if (nextTab === "settings") await loadSettings();
         if (nextTab === "demo") {
           await Promise.all([loadDemo(), loadOverview()]);
@@ -200,7 +217,7 @@ const AdminPanel = () => {
         setBusy("");
       }
     },
-    [loadAudit, loadClasses, loadDemo, loadOverview, loadSessions, loadSettings, loadUsers, tab]
+    [loadAudit, loadClasses, loadDemo, loadOverview, loadSecurity, loadSessions, loadSettings, loadUsers, tab]
   );
 
   useEffect(() => {
@@ -255,20 +272,27 @@ const AdminPanel = () => {
       if (userEditor?.mode === "edit") {
         const payload = {
           name: userForm.name.trim(),
-          status: userForm.status,
           rollNumber: userForm.rollNumber.trim(),
           phoneLabel: userForm.phoneLabel.trim(),
           demoLabel: userForm.demoLabel.trim(),
         };
-        // Super-admin is an environment grant. Sending it back would make the
-        // server reject an otherwise harmless profile edit.
-        if (userForm.role === "student" || userForm.role === "teacher") {
+        // Omit fields that did not change so a profile-only edit does not ask
+        // for a passkey. Role and status changes are step-up protected.
+        if (userForm.status !== userEditor.entry.status) {
+          payload.status = userForm.status;
+        }
+        if (
+          (userForm.role === "student" || userForm.role === "teacher") &&
+          userForm.role !== userEditor.entry.role
+        ) {
           payload.role = userForm.role;
         }
-        await axios.patch(
-          `${SERVER_URL}/admin/users/${userEditor.entry.id}`,
-          payload,
-          requestConfig
+        await withAdminStepUp(() =>
+          axios.patch(
+            `${SERVER_URL}/admin/users/${userEditor.entry.id}`,
+            payload,
+            requestConfig
+          )
         );
         toast("User updated.", "success");
       } else {
@@ -291,7 +315,26 @@ const AdminPanel = () => {
       await loadUsers();
       await loadOverview();
     } catch (requestError) {
-      toast(messageFor(requestError, "The user could not be saved."), "error");
+      toast(describePasskeyError(requestError, "The user could not be saved."), "error");
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const revokeUserSessions = async (entry) => {
+    setBusy(`revoke-${entry.id}`);
+    try {
+      await withAdminStepUp(() =>
+        axios.post(
+          `${SERVER_URL}/admin/users/${entry.id}/revoke-sessions`,
+          null,
+          requestConfig
+        )
+      );
+      toast(`All sessions for ${entry.email} were revoked.`, "success");
+      await loadUsers();
+    } catch (requestError) {
+      toast(describePasskeyError(requestError, "Sessions could not be revoked."), "error");
     } finally {
       setBusy("");
     }
@@ -388,14 +431,16 @@ const AdminPanel = () => {
         termStart: settingsForm.termStart || null,
         termEnd: settingsForm.termEnd || null,
       };
-      const response = await axios.patch(`${SERVER_URL}/admin/settings`, payload, requestConfig);
+      const response = await withAdminStepUp(() =>
+        axios.patch(`${SERVER_URL}/admin/settings`, payload, requestConfig)
+      );
       const next = response.data?.settings || null;
       setSettings(next);
       setSettingsForm(next ? { ...next, termStart: dateInput(next.termStart), termEnd: dateInput(next.termEnd) } : null);
       toast("System settings saved.", "success");
       await loadOverview();
     } catch (requestError) {
-      toast(messageFor(requestError, "Settings could not be saved."), "error");
+      toast(describePasskeyError(requestError, "Settings could not be saved."), "error");
     } finally {
       setBusy("");
     }
@@ -404,12 +449,14 @@ const AdminPanel = () => {
   const runDemo = async (action) => {
     setBusy(`demo-${action}`);
     try {
-      const response = await axios.post(`${SERVER_URL}/admin/demo/${action}`, null, requestConfig);
+      const request = () =>
+        axios.post(`${SERVER_URL}/admin/demo/${action}`, null, requestConfig);
+      const response = action === "reset" ? await withAdminStepUp(request) : await request();
       toast(response.data?.message || (action === "seed" ? "Demo data seeded." : "Demo data cleared."), "success");
       setDemoConfirm("");
       await Promise.all([loadDemo(), loadOverview()]);
     } catch (requestError) {
-      toast(messageFor(requestError, "The demo action could not complete."), "error");
+      toast(describePasskeyError(requestError, "The demo action could not complete."), "error");
     } finally {
       setBusy("");
     }
@@ -419,15 +466,51 @@ const AdminPanel = () => {
     if (!impersonateTarget) return;
     setBusy("impersonate");
     try {
-      await axios.post(`${SERVER_URL}/admin/impersonate/${impersonateTarget.id}`, null, requestConfig);
+      await withAdminStepUp(() =>
+        axios.post(
+          `${SERVER_URL}/admin/impersonate/${impersonateTarget.id}`,
+          null,
+          requestConfig
+        )
+      );
       window.location.assign(impersonateTarget.role === "teacher" ? "/teacher-dashboard" : "/student-dashboard");
     } catch (requestError) {
-      toast(messageFor(requestError, "Impersonation could not start."), "error");
+      toast(describePasskeyError(requestError, "Impersonation could not start."), "error");
+      setBusy("");
+    }
+  };
+
+  const verifyAuditLog = async () => {
+    setBusy("verify-audit");
+    try {
+      const response = await axios.get(`${SERVER_URL}/admin/audit/verify`, requestConfig);
+      setAuditVerification(response.data || null);
+      toast(
+        response.data?.ok ? "Audit chain verified." : "Audit chain break detected.",
+        response.data?.ok ? "success" : "error"
+      );
+    } catch (requestError) {
+      toast(messageFor(requestError, "The audit chain could not be checked."), "error");
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const registerPasskey = async () => {
+    setBusy("register-passkey");
+    try {
+      await withAdminStepUp(registerAdminPasskey);
+      await loadSecurity();
+      toast("Passkey registered. Destructive actions can now be approved.", "success");
+    } catch (requestError) {
+      toast(describePasskeyError(requestError, "The passkey could not be registered."), "error");
+    } finally {
       setBusy("");
     }
   };
 
   const counts = overview?.counts || null;
+  const canUsePasskeys = passkeysSupported();
   const filteredUsers = useMemo(() => users, [users]);
   const filteredClasses = useMemo(
     () => (classFilter ? classes.filter((entry) => entry.id === classFilter) : classes),
@@ -631,6 +714,16 @@ const AdminPanel = () => {
                                 {entry.role !== "superadmin" && entry.status !== "disabled" && entry.id !== (user._id || user.id) && (
                                   <Button variant="soft" size="sm" onClick={() => setImpersonateTarget(entry)}><FiUserCheck aria-hidden="true" /> View as</Button>
                                 )}
+                                {entry.id !== (user._id || user.id) && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => revokeUserSessions(entry)}
+                                    loading={busy === `revoke-${entry.id}`}
+                                  >
+                                    <FiLogOut aria-hidden="true" /> Sign out
+                                  </Button>
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -758,7 +851,14 @@ const AdminPanel = () => {
             <Card
               title="Audit log"
               subtitle="Append-only. Includes impersonation and both identities when applicable."
-              actions={<Button variant="ghost" size="sm" onClick={loadAudit} loading={busy === "load-audit"}><FiRefreshCw aria-hidden="true" /> Refresh</Button>}
+              actions={
+                <>
+                  <Button variant="secondary" size="sm" onClick={verifyAuditLog} loading={busy === "verify-audit"}>
+                    <FiShield aria-hidden="true" /> Verify chain
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={loadAudit} loading={busy === "load-audit"}><FiRefreshCw aria-hidden="true" /> Refresh</Button>
+                </>
+              }
             >
               <div className="filters" style={{ marginBottom: 14 }}>
                 <Field label="Search" htmlFor="admin-audit-search" hint="Action, summary, email or entity id.">
@@ -766,6 +866,23 @@ const AdminPanel = () => {
                 </Field>
                 <Button variant="secondary" onClick={loadAudit}>Search</Button>
               </div>
+              {auditVerification && (
+                <div
+                  className={`notice ${auditVerification.ok ? "notice--info" : "notice--danger"}`}
+                  role="status"
+                  style={{ marginBottom: 14 }}
+                >
+                  <FiShield className="notice__icon" aria-hidden="true" />
+                  <div>
+                    <strong>{auditVerification.ok ? "Audit chain intact" : "Audit chain broken"}</strong>
+                    <p>
+                      {auditVerification.ok
+                        ? `Checked ${auditVerification.checked || 0} chained entries from #${auditVerification.firstSeq ?? "—"} to #${auditVerification.lastSeq ?? "—"}. ${auditVerification.legacy || 0} legacy entries predate the chain.`
+                        : `First break at sequence ${auditVerification.brokenSeq ?? "—"} (${auditVerification.reason || "unknown"}). ${auditVerification.checked || 0} entries verified before it.`}
+                    </p>
+                  </div>
+                </div>
+              )}
               {busy === "load-audit" ? (
                 <div className="loading-inline"><Spinner /> Loading audit…</div>
               ) : audit.length === 0 ? (
@@ -782,6 +899,7 @@ const AdminPanel = () => {
                       <>
                         <span className="chip">{entry.actorEmail || "system"}</span>
                         <span className="chip">{entry.actorRole || "—"}</span>
+                        {entry.seq != null && <span className="chip">#{entry.seq}</span>}
                         {entry.impersonatorEmail && <span className="chip chip--warning">via {entry.impersonatorEmail}</span>}
                         {entry.isDemo && <span className="chip chip--warning">demo</span>}
                       </>
@@ -790,6 +908,124 @@ const AdminPanel = () => {
                 />
               )}
             </Card>
+          )}
+
+          {tab === "security" && (
+            <>
+              {busy === "load-security" ? (
+                <Card><div className="loading-inline"><Spinner /> Loading security status…</div></Card>
+              ) : !security ? (
+                <Card>
+                  <EmptyState
+                    icon={<FiKey />}
+                    title="Security status unavailable"
+                    text="The passkey status could not be loaded. Refresh the tab to try again."
+                    action={<Button variant="soft" onClick={() => loadTab("security")}>Retry</Button>}
+                  />
+                </Card>
+              ) : (
+                <>
+                  <div className="metric-strip">
+                    <div className={`metric ${security.enrolled ? "metric--success" : "metric--warning"}`}>
+                      <div className="metric__label">Passkey</div>
+                      <div className="metric__value">{security.enrolled ? "Registered" : "Not registered"}</div>
+                      <div className="metric__hint">{security.count || 0} credential{security.count === 1 ? "" : "s"} on this account</div>
+                    </div>
+                    <div className={`metric ${security.stepUp ? "metric--success" : "metric"}`}>
+                      <div className="metric__label">Step-up window</div>
+                      <div className="metric__value">{security.stepUp ? "Open" : "Locked"}</div>
+                      <div className="metric__hint">Up to 5 minutes after a passkey approval</div>
+                    </div>
+                    <div className="metric">
+                      <div className="metric__label">Protected actions</div>
+                      <div className="metric__value">7</div>
+                      <div className="metric__hint">Settings, roles, sessions, impersonation, demo reset, register edits</div>
+                    </div>
+                  </div>
+
+                  <Card
+                    title="Admin passkey"
+                    subtitle="Destructive super-admin actions require a fresh passkey assertion, not just a signed-in session."
+                    actions={
+                      <Button
+                        variant={security.enrolled ? "secondary" : "primary"}
+                        onClick={registerPasskey}
+                        loading={busy === "register-passkey"}
+                        disabled={!canUsePasskeys}
+                      >
+                        <FiKey aria-hidden="true" /> {security.enrolled ? "Register another passkey" : "Register passkey"}
+                      </Button>
+                    }
+                  >
+                    <div className="page-stack">
+                      {!canUsePasskeys && (
+                        <div className="notice notice--danger" role="alert">
+                          <FiAlertTriangle className="notice__icon" aria-hidden="true" />
+                          <div>
+                            <strong>This browser cannot create a passkey</strong>
+                            <p>Use a current Chrome, Edge, Safari or Firefox build over HTTPS (or localhost). WebAuthn is not exposed in this context.</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {!security.enrolled ? (
+                        <div className="notice notice--warning" role="alert">
+                          <FiAlertTriangle className="notice__icon" aria-hidden="true" />
+                          <div>
+                            <strong>Register a passkey before changing protected data</strong>
+                            <p>
+                              Until a passkey exists, destructive admin requests return <span className="code-chip">428 step_up_required</span>.
+                              The first registration is trust-on-first-use: it is accepted from the current super-admin session.
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="data-table-wrap">
+                          <table className="data-table">
+                            <thead><tr><th>Registered</th><th>Device</th><th>Backed up</th><th>Last used</th><th>Credential</th></tr></thead>
+                            <tbody>
+                              {security.passkeys.map((passkey) => (
+                                <tr key={passkey.id}>
+                                  <td>{formatDateTime(passkey.createdAt)}</td>
+                                  <td>{passkey.deviceType === "multiDevice" ? "Synced passkey" : "This device"}</td>
+                                  <td><Badge variant={passkey.backedUp ? "success" : "neutral"}>{passkey.backedUp ? "yes" : "no"}</Badge></td>
+                                  <td>{passkey.lastUsedAt ? formatDateTime(passkey.lastUsedAt) : "Never"}</td>
+                                  <td><span className="code-chip">{String(passkey.id).slice(0, 10)}…</span></td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+
+                      <div className="notice notice--info">
+                        <FiShield className="notice__icon" aria-hidden="true" />
+                        <div>
+                          <strong>Five-minute approval window</strong>
+                          <p>
+                            A successful assertion sets an HttpOnly cookie scoped to the admin API for five minutes.
+                            After it expires, the next protected action asks again. Adding another passkey needs an
+                            existing one, so a stolen session cannot silently enroll a second credential.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="notice notice--warning">
+                        <FiAlertTriangle className="notice__icon" aria-hidden="true" />
+                        <div>
+                          <strong>No self-service recovery</strong>
+                          <p>
+                            If every passkey for this account is lost, destructive admin actions stay locked.
+                            An operator with database access must remove the stale <span className="code-chip">adminpasskeys</span> rows
+                            before a new first passkey can be enrolled. Keep a second passkey on a different device.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+                </>
+              )}
+            </>
           )}
 
           {tab === "settings" && settingsForm && (

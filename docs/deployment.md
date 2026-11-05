@@ -2,7 +2,7 @@
 
 This is the production guide for Bio Attend. All account-level setup (GitHub, Render,
 MongoDB Atlas, Google Cloud) is done by the project owner. The current tree is built and
-tested locally but **not deployed**; production still runs `b7fd8b1`.
+tested locally but **not deployed**; production still runs `029d18e`.
 
 Recommended shape:
 
@@ -32,7 +32,7 @@ because Render deploys from GitHub.
 | Render | Hosts the Node service and the built React app | Free tier works; Starter avoids sleep |
 | MongoDB Atlas | Managed MongoDB | M0 free tier |
 | Google Cloud | OAuth Web client for sign-in | Free |
-| Node.js 22+ locally | Build and test before pushing | Free |
+| Node.js 22.13+ locally | Build and test before pushing; PDF.js 6 requires 22.13+ or 24+ | Free |
 | Chrome on Android phones | Acoustic testing | — |
 
 ## 1. Pre-flight checks
@@ -53,7 +53,7 @@ print **nothing**. `config.env` holds the database URL and JWT secret and must s
 ```bash
 cd attendance-backend
 npm test
-npm test -- --test-isolation=none         # 160/160 both modes
+npm test -- --test-isolation=none         # 245/245 both modes
 
 cd ../attendance-frontend
 npm run test:proof                        # 15
@@ -61,6 +61,7 @@ npm run test:acoustic                     # 51
 npm run test:checkin                      # 7
 npm run test:studentcheckin               # 9
 npm run test:auth                         # 2
+npm run test:rosterimport                 # 6
 
 CI=true REACT_APP_API_URL=/api/v1 \
   REACT_APP_GOOGLE_CLIENT_ID=YOUR-GOOGLE-CLIENT-ID.apps.googleusercontent.com \
@@ -68,8 +69,9 @@ CI=true REACT_APP_API_URL=/api/v1 \
   npm run build
 ```
 
-Expected frontend total: **84/84** across the five suites. The build must pass; Render sets
-`CI=true`, so warnings are errors.
+Expected frontend total: **90/90** across the six suites. The build must pass; Render sets
+`CI=true`, so warnings are errors. Roster PDF extraction uses PDF.js 6 and multer; the
+service must run Node 22.13+ or 24+ (the documented `NODE_VERSION=24` is fine).
 
 ### 1.3 Commit and push
 
@@ -102,8 +104,9 @@ git push origin main
 mongodb+srv://bioattend:PASSWORD@cluster0.xxxxx.mongodb.net/attendance?retryWrites=true&w=majority
 ```
 
-That is `DB_URI`. The M0 tier has no automated backups; export occasionally with
-`mongodump --uri="…" --out="backups/$(date +%F)"`.
+That is `DB_URI`. The M0 tier has no automated backups. Use the encrypted backup and
+restore drill in [`backup-restore.md`](backup-restore.md) before every deploy and weekly
+during the pilot. Do not use a plaintext `mongodump` directory as the only copy.
 
 ## 3. Render service
 
@@ -120,7 +123,7 @@ That is `DB_URI`. The M0 tier has no automated backups; export occasionally with
 | Runtime | `Node` |
 | Build Command | `cd attendance-frontend && npm ci && npm run build && cd ../attendance-backend && npm ci` |
 | Start Command | `cd attendance-backend && npm start` |
-| Health Check Path | `/api/v1/health` |
+| Health Check Path | `/api/v1/health/ready` (503 until MongoDB is connected; `/api/v1/health` stays the cheap liveness probe) |
 | Instance Type | Free to try; Starter for a real pilot |
 
 4. Create the service. The first deploy may fail until the environment variables and Google
@@ -138,10 +141,15 @@ Add these under **Environment**:
 | `NODE_VERSION` | `24` |
 | `DB_URI` | the full Atlas `mongodb+srv://…/attendance?…` string |
 | `JWT_SECRET` | output of `openssl rand -base64 48` (32+ characters) |
+| `JWT_SECRET_PREVIOUS` | omit except during a rotation window; verification-only, removed after the normal session lifetime |
 | `JWT_EXPIRE` | `5d` |
 | `COOKIE_EXPIRE` | `7` |
+| `COOKIE_SAMESITE` | omit for the one-service deployment (defaults to `lax`); set `none` only for deliberate split hosting |
 | `GOOGLE_CLIENT_ID` | the OAuth Web client ID |
 | `CLIENT_URL` | `https://YOUR-SERVICE.onrender.com` |
+| `WEBAUTHN_ORIGINS` | `https://YOUR-SERVICE.onrender.com`. Required in production unless `RENDER_EXTERNAL_URL` supplies the same HTTPS origin. Read from server configuration only, never from a request header |
+| `WEBAUTHN_RP_ID` | optional; defaults to the first origin's hostname. If set, it must be that hostname or a parent domain |
+| `WEBAUTHN_RP_NAME` | optional; defaults to `Bio Attend` |
 | `TEACHER_EMAILS` | comma-separated college teacher addresses, e.g. `2023ugcs059@nitjsr.ac.in`. Removing one does not demote an existing teacher |
 | `SUPER_ADMIN_EMAILS` | exact addresses that receive `superadmin`, e.g. `12shivanshsingha@gmail.com`. Must not overlap `TEACHER_EMAILS` or a `TEST_*` list |
 | `SUPER_ADMIN_SESSION_HOURS` | `12` (allowed `1`–`72`) |
@@ -170,6 +178,29 @@ Notes:
   still work.
 - The server sends HSTS in production, `no-store` on every API response, immutable caching
   for hashed `static/` assets, and `no-cache` for `index.html`/deep links.
+- The server sends a strict Content-Security-Policy on every response. Scripts are limited to
+  this origin and Google Identity Services; the dark-theme bootstrap is the external
+  `theme-init.js`, not an inline script. If Google sign-in or the service worker is blocked,
+  check the browser console before widening the policy.
+- Cookies are `HttpOnly`, `Secure` in production and `SameSite=Lax` by default. Split hosting
+  is the only reason to set `COOKIE_SAMESITE=none`.
+- Destructive super-admin actions — settings, role/status changes, session revocation,
+  attendance override/delete, impersonation and demo reset — require a passkey assertion.
+  Until the owner registers one under **Admin → Security**, those routes return **428** with
+  `code: "step_up_required"`. A successful assertion sets a five-minute `HttpOnly` cookie
+  scoped to `/api/v1/admin`; the browser asks again after it expires. The first passkey is
+  trust-on-first-use; adding another requires an existing approval. Register a second passkey
+  on another device.
+- New audit rows form a SHA-256 hash chain. `GET /api/v1/admin/audit/verify` and the **Verify
+  chain** button in **Admin → Audit** recompute it and report the first break. Pre-P1 rows are
+  counted as legacy, not rewritten. Chain serialisation is in-process, which is correct for
+  one Render instance; a multi-instance deployment needs a transaction or distributed lock.
+- Every export writes an audit entry and is limited to **30 downloads per 10 minutes** per
+  account/IP. Both limits are in-memory, like the other rate limiters.
+- `JWT_SECRET_PREVIOUS` is accepted for verification only. It lets live sessions survive one
+  rotation deploy; signing always uses `JWT_SECRET`. Remove it after the normal session
+  lifetime. Production startup rejects a placeholder, a short value or the same value as
+  `JWT_SECRET`.
 
 ### 3.2 Deploy
 
@@ -259,6 +290,8 @@ BASE=https://YOUR-SERVICE.onrender.com
 # Health
 curl -s "$BASE/api/v1/health"
 # {"success":true,"status":"ok"}
+curl -s "$BASE/api/v1/health/ready"
+# {"success":true,"status":"ready","checks":{"database":true}}
 
 # Security headers and no framework banner
 curl -sI "$BASE/" | grep -Ei 'x-content-type-options|x-frame-options|permissions-policy|strict-transport-security|x-powered-by'
@@ -273,6 +306,8 @@ curl -sI "$BASE$ASSET" | grep -i '^cache-control:'
 # Dev routes absent; protected routes still closed
 curl -s -o /dev/null -w '%{http_code}\n' "$BASE/api/v1/auth/dev/accounts"          # 404
 curl -s -o /dev/null -w '%{http_code}\n' "$BASE/api/v1/classes/000000000000000000000000/check-in-sessions" # 401
+curl -s -o /dev/null -w '%{http_code}\n' "$BASE/api/v1/admin/webauthn/status"      # 401
+curl -s -o /dev/null -w '%{http_code}\n' "$BASE/api/v1/admin/audit/verify"         # 401
 curl -s -o /dev/null -w '%{http_code}\n' -X POST -H 'Content-Type: application/json' -d '{}' \
   "$BASE/api/v1/check-in-sessions/000000000000000000000000/proofs"                 # 401
 
@@ -297,8 +332,9 @@ Browser walkthrough:
 1. Open `BASE`. The login page shows Google and **no dev persona picker**.
 2. Sign in as a college teacher in `TEACHER_EMAILS`. Create a room, class and roster; save
    and refresh.
-3. Sign in on a second profile as a rostered student. The first device auto-approves; a
-   different browser becomes a pending device. Approve it as the teacher.
+3. Sign in on a second profile as a rostered student. The first device enters the teacher
+   review queue. Approve it as the teacher, then sign in from a different browser and
+   confirm that it also waits for approval.
 4. Open `/teacher/check-in`, start a session, confirm the key/countdown, open the
    transmitter and verify the key matches.
 5. Have the student open `/student/check-in`, accept consent, join, and record evidence.
@@ -308,8 +344,12 @@ Browser walkthrough:
    confirm the result; raise a query and approve it as the teacher if testing that flow.
 7. Sign in as the super-admin. Confirm `/admin` opens with the production badge and demo
    controls are hidden.
-8. In devtools → Application → Cookies, confirm `token` is `HttpOnly`, `Secure` and
-   `SameSite=None`.
+8. Open **Admin → Security** and register a passkey. Change a setting: the browser asks for
+   the passkey, then the save succeeds. **Admin → Audit → Verify chain** must report the new
+   entries as intact.
+9. In devtools → Application → Cookies, confirm `token` is `HttpOnly`, `Secure` and
+   `SameSite=Lax` for the single-service deployment. After a protected action, confirm
+   `admin_step_up` is `HttpOnly` and scoped to `/api/v1/admin`.
 
 For the physical two-phone TX/RX procedure and measurement archive, see
 [`measurements/README.md`](../measurements/README.md). Do not use that procedure as proof
@@ -350,9 +390,25 @@ Restore with `mongorestore`; keep backups outside the repository.
 ### Secret rotation
 
 1. Generate a new `JWT_SECRET`.
-2. Update it on Render and redeploy. Everyone is signed out and signs in again.
-3. To rotate Atlas credentials, change the password in Atlas, update `DB_URI`, and redeploy
+2. Move the current value to `JWT_SECRET_PREVIOUS`, set the new value in `JWT_SECRET`, and
+   redeploy. New tokens are signed with the new secret; tokens signed with the old one keep
+   verifying during the window.
+3. After the normal session lifetime (`COOKIE_EXPIRE`, or `SUPER_ADMIN_SESSION_HOURS` for
+   admins if longer), remove `JWT_SECRET_PREVIOUS` and redeploy. Do not leave it in place
+   indefinitely.
+4. To rotate Atlas credentials, change the password in Atlas, update `DB_URI`, and redeploy
    in the same window.
+
+Removing `JWT_SECRET` without a rotation window signs everyone out immediately, which is a
+valid emergency response to a suspected leak.
+
+### Passkey recovery
+
+Passkeys replace neither Google 2FA nor owner vigilance. If every passkey for the super-admin
+is lost, destructive admin routes stay at **428** by design. There is no self-service reset:
+an operator with database access must remove that account's rows from `adminpasskeys`, then
+the owner can register a new first passkey from a signed-in super-admin session. Keep a second
+passkey on a different device so this is not the normal path.
 
 ## 8. Split hosting (alternative only)
 
@@ -367,34 +423,41 @@ third-party, which Safari and some Chrome modes block.
    `REACT_APP_GOOGLE_CLIENT_ID`, and leave `REACT_APP_GOOGLE_HOSTED_DOMAIN` empty for a
    Gmail owner.
 3. Add both origins to the Google OAuth client.
-4. Leave production cookies as `SameSite=None; Secure`. If sign-in appears to succeed but
-   the session does not persist, the browser is blocking third-party cookies; move back to
-   the single-service layout.
+4. Set `COOKIE_SAMESITE=none` for split hosting; the cookie remains `Secure`. If sign-in
+   appears to succeed but the session does not persist, the browser is blocking third-party
+   cookies; move back to the single-service layout and remove `COOKIE_SAMESITE`.
 
 ## 9. Deployment checklist
 
 - [ ] `config.env` is ignored; no secrets in `git ls-files`
-- [ ] Backend **160/160** (`npm test` and `--test-isolation=none`)
-- [ ] Frontend **84/84** (proof 15, acoustic 51, check-in 7, student check-in 9, auth 2)
+- [ ] Backend **245/245** (`npm test` and `npm test -- --test-isolation=none`)
+- [ ] Frontend **90/90** (proof 15, acoustic 51, check-in 7, student check-in 9, auth 2, roster import 6)
 - [ ] `CI=true` production build passes locally
+- [ ] CSP browser audit shows zero violations on `/`, `/login`, a teacher page, analytics,
+      help and `/admin`; Google button renders; service worker is active
 - [ ] Code pushed to GitHub `main`
 - [ ] Atlas cluster, user and network access created; `DB_URI` includes `/attendance`
 - [ ] Render service created with the build/start commands and health path
 - [ ] All environment variables set; `DEV_AUTH_ENABLED` and `ALLOW_TEST_ROSTER_EMAILS` absent
 - [ ] `SUPER_ADMIN_EMAILS=12shivanshsingha@gmail.com` on the production backend
 - [ ] `SUPER_ADMIN_SESSION_HOURS=12` (or another value in `1`–`72`)
+- [ ] `WEBAUTHN_ORIGINS` is the HTTPS service origin (or `RENDER_EXTERNAL_URL` resolves it); `WEBAUTHN_RP_ID` matches if set
 - [ ] The super-admin address is absent from `TEACHER_EMAILS` and both `TEST_*` lists
 - [ ] Split hosting only: exact frontend origin in `CLIENT_URLS`
 - [ ] Google OAuth Web client created with the Render origin; no redirect URI needed
 - [ ] `GOOGLE_CLIENT_ID` and `REACT_APP_GOOGLE_CLIENT_ID` match; redeployed
 - [ ] `REACT_APP_GOOGLE_HOSTED_DOMAIN` empty/unset for the Gmail owner
-- [ ] `/api/v1/health` returns 200 and `/api/v1/auth/dev/accounts` returns 404
-- [ ] Anonymous proof POST returns 401; SPA deep links return 200; GET logout returns 405
+- [ ] `/api/v1/health` returns 200, `/api/v1/health/ready` returns 200/`database: true`, and `/api/v1/auth/dev/accounts` returns 404
+- [ ] Anonymous proof POST returns 401; anonymous admin passkey/audit-verify routes return 401; SPA deep links return 200; GET logout returns 405
 - [ ] Startup log shows indexes ready; proof/session indexes exist
 - [ ] Teacher sign-in, room/class/roster save survive a refresh
-- [ ] Student first device auto-approves; a changed device waits for review
+- [ ] First student device and a changed device both wait for teacher review
+- [ ] Encrypted backup taken and one restore drill completed in a scratch database
 - [ ] Gmail super-admin signs in, `/islogin` reports `superadmin`, `/admin` shows the
       production badge, and demo endpoints return 404
+- [ ] Super-admin registers a passkey; a protected action returns 428 before approval and
+      succeeds after it; **Admin → Audit → Verify chain** is intact
+- [ ] A second passkey exists on another device, or the recovery boundary is accepted
 - [ ] TX/RX pages render over HTTPS and two phones complete a run
 - [ ] Muted-transmitter control decodes 0 frames
 - [ ] Results recorded in `progress.md` with real numbers

@@ -13,7 +13,7 @@ The server mints keys, records signed proof evidence and keeps an audited attend
 register. A **teacher confirms attendance**; a decoded tone is not an automatic verdict.
 Full detail is in `plan.md`; do not restate or redesign it here.
 
-## Current phase (2026-11-04)
+## Current phase (2026-11-05, session 24)
 
 - **Layer 1 is assumed passed by owner direction (2026-10-29) for build planning only.** This
   is **not** a measured pass. The 2026-10-25 sweep decoded 10/10 at 1 m, 9/10 at 2 m, 9/10 at
@@ -21,26 +21,44 @@ Full detail is in `plan.md`; do not restate or redesign it here.
   unmeasured. The 2026-10-24 5 m claim was not a true 5 m result. Never describe the physical
   gate as measured-passed.
 - **The product is built through the attendance/admin layer:** Google sign-in, classes,
-  rosters, device binding, check-in sessions, signed proof evidence, student discovery and
-  shell, evidence-gated wave advancement, teacher evidence view, teacher-confirmed register,
-  24-hour queries, analytics, PDF/Excel exports, session history, notifications, timetable,
-  profile/help, PWA/dark theme and a production-capable super-admin console.
+  rosters, teacher-approved device binding, check-in sessions, signed proof evidence, student
+  discovery and shell, evidence-gated wave advancement, teacher evidence view,
+  teacher-confirmed register, 24-hour queries, analytics, PDF/Excel exports, session history,
+  notifications, timetable, profile/help, PWA/dark theme and a production-capable super-admin
+  console.
+- **P0 and P1 security are built and tested locally:** strict CSP, first-party cookies,
+  `tokenVersion` session revocation, impersonation hardening, teacher-approved first device
+  binding, WebAuthn/passkey step-up (5-minute `admin_step_up` cookie, **428** without it),
+  SHA-256 audit hash chain plus verification, audited/rate-limited exports,
+  `/health/ready`, verification-only `JWT_SECRET_PREVIOUS` rotation and the settings
+  `$set`/`$setOnInsert` conflict fix.
 - **Acoustic proof remains evidence-only.** The proof endpoint does not mark attendance or
   score. The teacher opens the register, sees evidence/optional location and marks
   present/absent/excused; finalisation and every correction are audited. Scoring, the ID
   round and the student cascade remain unbuilt.
-- **Production is `b7fd8b1`** at <https://bio-attend.onrender.com> and does not include this
-  product layer. Local `HEAD` and `origin/main` are `35ad5a2`; the current work is
-  **uncommitted** in the working tree. No push, tag, merge or deploy was performed.
+- **Production is `029d18e`** at <https://bio-attend.onrender.com> and does **not** include the
+  P0/P1 hardening. Local `HEAD` and `origin/main` are `029d18e`; the P0/P1 security, PWA and
+  dark-mode work is **uncommitted** in the working tree. No push, tag, merge or deploy was
+  performed.
 - **The owner controls every push and deploy.** Never push, tag, merge, or deploy unless the
   owner explicitly asks in that session. A green local suite is not permission to publish.
-- **Next slice:** 2.6 multi-wave rehearsal with real Google accounts and physical phones
-  (10–20 phones, 5–6 minutes), measuring wave timing and range. Physical 5 m/10 m diagnosis
-  remains the top risk. The owner must also configure Render with
-  `SUPER_ADMIN_EMAILS=12shivanshsingha@gmail.com`,
-  `SUPER_ADMIN_SESSION_HOURS=12`, and an empty `REACT_APP_GOOGLE_HOSTED_DOMAIN`.
-- **Still blocked:** automatic scoring, the ID round, the student cascade and the "lowest
-  wave heard" join rule. The mobile app remains deferred until Layer 4.
+- **Roster PDF extraction is built (A1):** an authenticated teacher uploads a text-based
+  PDF to `POST /classes/:classId/roster/pdf/preview`; the server extracts the text layer with
+  PDF.js, returns editable text and the teacher still runs the normal validation preview and
+  confirms the save. Scanned PDFs are rejected; nothing is auto-saved. The path is tested with
+  generated PDF fixtures, **not real college PDFs**; do not claim layout accuracy without
+  samples.
+- **Next slice (A2):** timetable PDF import, then local OCR, then optional Gemini extraction.
+  **No sample timetable or roster PDFs have been supplied yet**, so do not invent parser
+  behaviour or claim extraction accuracy. Timetable import must schedule existing classes
+  only; unmatched rows are flagged for manual class creation. Local OCR comes after
+  text-layer extraction, and optional Gemini extraction comes last.
+- **Gemini gate:** raw rosters may go to the free tier only after an explicit student notice
+  and a documented risk acceptance are written into `plan.md`. That text does not exist yet;
+  do not write the AI path before it does.
+- **Still blocked:** automatic scoring, the ID round, the student cascade, the "lowest wave
+  heard" join rule, the mobile app, a real Google/phone rehearsal, physical 5 m/10 m range
+  diagnosis and the encrypted Atlas restore drill.
 
 ## Core working rule: small slices, one session at a time
 
@@ -96,13 +114,14 @@ Full detail is in `plan.md`; do not restate or redesign it here.
 Current local gate (all must pass before asking the owner to deploy):
 
 ```bash
-cd attendance-backend && npm test                              # 160/160
-cd attendance-backend && npm test -- --test-isolation=none     # 160/160
+cd attendance-backend && npm test                              # 245/245
+cd attendance-backend && npm test -- --test-isolation=none     # 245/245
 cd attendance-frontend && npm run test:proof                    # 15/15
 cd attendance-frontend && npm run test:acoustic                 # 51/51
 cd attendance-frontend && npm run test:checkin                  # 7/7
 cd attendance-frontend && npm run test:studentcheckin           # 9/9
 cd attendance-frontend && npm run test:auth                     # 2/2
+cd attendance-frontend && npm run test:rosterimport             # 6/6
 ```
 
 Production build (same API path and empty hosted-domain hint as the deployed site):
@@ -125,9 +144,10 @@ checks. A pure unit test is not enough for those routes.
 - `attendance-frontend/` — React SPA: public pages, role dashboards, classes, check-in,
   attendance, queries, exports, sessions, admin, notifications, timetable, profile, help,
   sound lab, TX/RX and the student shell.
-- `attendance-backend/` — Express API: Google sign-in, classes/rosters, device binding,
-  check-in sessions, proof transport, attendance register, queries, exports, notifications,
-  timetable, admin, startup/index readiness and CSRF origin guard.
+- `attendance-backend/` — Express API: Google sign-in, classes/rosters, text-layer PDF roster
+  extraction, teacher-approved device binding, check-in sessions, proof transport, attendance
+  register, queries, exports, notifications, timetable, admin, passkey step-up, audit hash
+  chain, startup/index readiness and CSRF origin guard.
 - `docs/routes.md` — every page/API path and its access rule.
 - `docs/diagrams/` — `system-components.puml`, `check-in-flow.puml`,
   `proof-transport.puml`.
@@ -165,6 +185,17 @@ checks. A pure unit test is not enough for those routes.
 - **Super-admin is an exact-match environment grant.** No UI role toggle, no hardcoded
   privileged email in source. `SUPER_ADMIN_EMAILS` must be disjoint from every other list.
   Demo routes must remain 404 in production.
+- **Destructive super-admin actions stay passkey-protected.** Never bypass
+  `requireAdminStepUp`, never derive WebAuthn origins from a request header, and never
+  auto-approve a production first passkey outside the documented trust-on-first-use flow.
+- **Audit integrity stays append-only.** New entries keep `seq`, `prevHash` and the canonical
+  SHA-256 `hash`; never rewrite legacy rows to make verification pass. Exports stay audited
+  and rate-limited.
+- **PDF/timetable ingestion is extract → preview → teacher confirms.** Never auto-save an
+  imported roster, never create classes from a timetable, and never mark attendance from an
+  import. An unmatched timetable row is flagged for manual class creation. The current
+  extractor reads only an embedded text layer; never present OCR output as implemented until
+  local OCR is actually built and tested.
 - **No room hardware.** The teacher's ordinary phone starts the process and is never passed
   around.
 - **Mic/audio need a user tap and HTTPS.** Disable echoCancellation, noiseSuppression and

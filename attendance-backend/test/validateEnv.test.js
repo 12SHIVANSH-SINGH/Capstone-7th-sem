@@ -10,6 +10,7 @@ const validProduction = {
   COOKIE_EXPIRE: "7",
   SUPER_ADMIN_EMAILS: "12shivanshsingha@gmail.com",
   SUPER_ADMIN_SESSION_HOURS: "12",
+  WEBAUTHN_ORIGINS: "https://bio-attend.onrender.com",
 };
 
 test("development and test never require production secrets", () => {
@@ -31,6 +32,32 @@ test("production refuses a missing, placeholder or short JWT secret", () => {
   for (const [environment, pattern] of cases) {
     assert.throws(() => envCheck.assertProductionEnv(environment, { warn() {} }), pattern);
   }
+});
+
+test("a previous JWT secret is optional but must be a distinct real secret", () => {
+  const previous = "b".repeat(48);
+  assert.doesNotThrow(() =>
+    envCheck.assertProductionEnv(
+      { ...validProduction, JWT_SECRET_PREVIOUS: previous },
+      { warn() {} }
+    )
+  );
+  assert.throws(
+    () =>
+      envCheck.assertProductionEnv(
+        { ...validProduction, JWT_SECRET_PREVIOUS: "short" },
+        { warn() {} }
+      ),
+    /JWT_SECRET_PREVIOUS/
+  );
+  assert.throws(
+    () =>
+      envCheck.assertProductionEnv(
+        { ...validProduction, JWT_SECRET_PREVIOUS: validProduction.JWT_SECRET },
+        { warn() {} }
+      ),
+    /differ/
+  );
 });
 
 test("production requires a MongoDB URI and a valid cookie lifetime", () => {
@@ -97,6 +124,85 @@ test("production validates the shorter super-admin session lifetime", () => {
   assert.doesNotThrow(() =>
     envCheck.assertProductionEnv(
       { ...validProduction, SUPER_ADMIN_SESSION_HOURS: "72" },
+      { warn() {} }
+    )
+  );
+});
+
+test("COOKIE_SAMESITE only accepts lax, strict or none", () => {
+  assert.throws(
+    () =>
+      envCheck.assertProductionEnv(
+        { ...validProduction, COOKIE_SAMESITE: "sometimes" },
+        { warn() {} }
+      ),
+    /COOKIE_SAMESITE/
+  );
+  assert.doesNotThrow(() =>
+    envCheck.assertProductionEnv(
+      {
+        ...validProduction,
+        COOKIE_SAMESITE: "none",
+        CLIENT_URLS: "https://app.example.com",
+      },
+      { warn() {} }
+    )
+  );
+});
+
+test("production requires a resolvable HTTPS WebAuthn origin", () => {
+  const withoutOrigin = {
+    ...validProduction,
+    WEBAUTHN_ORIGINS: "",
+    CLIENT_URL: "",
+    CLIENT_URLS: "",
+    RENDER_EXTERNAL_URL: "",
+  };
+
+  assert.throws(
+    () => envCheck.assertProductionEnv(withoutOrigin, { warn() {} }),
+    /WEBAUTHN_ORIGINS/
+  );
+  assert.throws(
+    () =>
+      envCheck.assertProductionEnv(
+        { ...validProduction, WEBAUTHN_ORIGINS: "http://bio.example.com" },
+        { warn() {} }
+      ),
+    /HTTPS/
+  );
+  assert.doesNotThrow(() =>
+    envCheck.assertProductionEnv(
+      {
+        ...validProduction,
+        WEBAUTHN_ORIGINS: "",
+        RENDER_EXTERNAL_URL: "https://bio.example.com",
+      },
+      { warn() {} }
+    )
+  );
+});
+
+test("the WebAuthn relying-party ID must match the configured origin", () => {
+  assert.throws(
+    () =>
+      envCheck.assertProductionEnv(
+        { ...validProduction, WEBAUTHN_RP_ID: "https://bio-attend.onrender.com" },
+        { warn() {} }
+      ),
+    /domain name/
+  );
+  assert.throws(
+    () =>
+      envCheck.assertProductionEnv(
+        { ...validProduction, WEBAUTHN_RP_ID: "other.example.com" },
+        { warn() {} }
+      ),
+    /suffix/
+  );
+  assert.doesNotThrow(() =>
+    envCheck.assertProductionEnv(
+      { ...validProduction, WEBAUTHN_RP_ID: "onrender.com" },
       { warn() {} }
     )
   );

@@ -1,13 +1,11 @@
-const AuditLog = require("../models/auditLogModels");
 const { isDbReady } = require("./dbReady");
+const { appendAuditEntry } = require("./auditChain");
 
+// Express resolves req.ip through the trusted one-hop proxy configured in
+// app.js. Reading X-Forwarded-For directly would let a client prepend a fake
+// address to every audit entry.
 const requestIp = (req) =>
-  String(
-    req?.headers?.["x-forwarded-for"]?.split(",")[0]?.trim() ||
-      req?.ip ||
-      req?.socket?.remoteAddress ||
-      ""
-  );
+  String(req?.ip || req?.socket?.remoteAddress || "").trim();
 
 const actorSnapshot = (req, explicitActor = null) => {
   const actor = explicitActor || req?.user || null;
@@ -29,7 +27,7 @@ const writeAudit = async (req, entry) => {
   if (!isDbReady()) return null;
   try {
     const actor = actorSnapshot(req, entry.actor);
-    return await AuditLog.create({
+    return await appendAuditEntry({
       action: entry.action,
       entityType: entry.entityType,
       entityId: entry.entityId ? String(entry.entityId) : "",
@@ -50,6 +48,9 @@ const writeAudit = async (req, entry) => {
 
 const toAuditView = (log) => ({
   id: String(log._id),
+  seq: Number.isInteger(log.seq) ? log.seq : null,
+  hash: String(log.hash || ""),
+  prevHash: String(log.prevHash || ""),
   action: log.action,
   entityType: log.entityType,
   entityId: log.entityId,

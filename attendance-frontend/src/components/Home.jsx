@@ -83,7 +83,7 @@ function Home() {
             <article className="feature">
               <span className="feature__icon"><FaMobileAlt /></span>
               <h3>One device per student</h3>
-              <p>Each browser binds to a device key; a changed device waits for teacher approval. The first binding is auto-approved.</p>
+              <p>Each browser binds to a device key. A teacher approves the first binding and any later device change before check-in is allowed.</p>
             </article>
             <article className="feature">
               <span className="feature__icon"><FaFileCsv /></span>

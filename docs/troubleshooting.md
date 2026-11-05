@@ -17,7 +17,8 @@ ask the project owner. Startup must print the MongoDB connection, `MongoDB index
 ready`, then `server is working`. If an index cannot build, it exits on purpose.
 
 **Node version error**
-Node 22 or newer is required. Check `node -v`.
+Node 22.13 or newer (or 24+) is required; PDF.js 6 will not load on older Node 22 builds.
+Check `node -v` and the Render `NODE_VERSION`.
 
 **"Port 3000/4000 already in use"**
 
@@ -61,6 +62,56 @@ invalid.
 The session is valid but the role or class ownership is wrong. Teacher-owned class routes
 do not accept a super-admin; use the `/admin` console for cross-teacher actions. A student
 can only read their own queries and records.
+
+**A destructive admin action returns 428 `step_up_required`**
+The super-admin session is valid but has no recent passkey approval. Open **Admin →
+Security**, register a passkey if needed, then retry the action and approve the browser
+prompt. The approval cookie lasts five minutes. If the browser cannot create a passkey, use
+a current Chrome, Edge, Safari or Firefox build over HTTPS (or localhost) and confirm
+`WEBAUTHN_ORIGINS` matches the console's exact origin.
+
+**The passkey prompt is cancelled, times out or says the origin is wrong**
+`NotAllowedError`/`AbortError` means the prompt was dismissed or timed out; retry and approve
+it. `SecurityError` means the page origin does not match the server's WebAuthn origin.
+`InvalidStateError` means that passkey is already registered on this account — register a
+different one or use the existing passkey. A super-admin cannot self-recover from lost
+passkeys; see [deployment.md](deployment.md#passkey-recovery).
+
+**Exports return 429**
+Exports are limited to 30 downloads per 10 minutes per account/IP, and every download is
+audited. Wait for the window to reset. If several people share one IP, expect the shared
+bucket to fill faster.
+
+**Roster PDF upload returns `pdf_no_text_layer`**
+The PDF is a scan or has no embedded text layer. Use CSV/paste for now; local OCR is not
+built. A password-protected PDF returns `pdf_password_protected`, a damaged/non-PDF file
+returns `pdf_invalid` or `pdf_unreadable`, a file over 10 MB returns `pdf_too_large`, and a
+document over 20 pages or 200,000 characters is refused rather than partially imported.
+
+**Roster PDF upload returns 429**
+PDF extraction is limited to 20 requests per 10 minutes per account/IP. Wait for the window
+to reset. The limit is in-memory on the single Render instance.
+
+**PDF extraction worked but the roster is wrong**
+Extraction only fills the editable text box. Correct the rows, run **Preview roster** and
+check the validation errors before **Save roster**. A saved roster still needs the separate
+confirmation step; extraction itself never writes enrollments. Real college PDF layouts are
+unvalidated until sample documents are supplied.
+
+**PDF upload returns 401 or 404**
+The session expired, the caller is not a teacher, or the class is not owned by that teacher.
+Sign in again and open the class from **Classes**.
+
+**`/health/ready` returns 503**
+The process is alive but MongoDB is not connected. Check `DB_URI`, Atlas network access and
+the startup log. `/health` staying 200 while `/health/ready` is 503 is the intended split
+between liveness and readiness.
+
+**The audit chain verification reports a break**
+Stop changing audit data and restore from a known-good encrypted backup. Break details name
+the first bad `seq` and whether the stored hash or link is wrong; legacy rows written before
+P1 are counted separately and do not fail verification. Do not edit audit rows to "fix" the
+chain.
 
 **A student is rejected at sign-in**
 Their email is not on an active roster and is not in `TEST_STUDENT_EMAILS`. Add the college

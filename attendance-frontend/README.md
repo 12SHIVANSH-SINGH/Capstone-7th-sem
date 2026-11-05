@@ -28,6 +28,7 @@ tones and a teacher-confirmed register. Project overview: [root README](../READM
 | `src/acoustic/fsk.js` | The FSK tone codec (encode/decode). |
 | `src/acoustic/proofTransport.js` | Proof payload, canonical message and device-signing helpers. |
 | `src/acoustic/useCheckInAudio.js` | Microphone capture and local decode for `/student/check-in`. |
+| `src/utils/adminStepUp.js` | Admin passkey registration, five-minute approval and 428 retry helper. |
 | `public/tone-detector-worklet.js` | AudioWorklet that listens for tones in real time. |
 | `public/sw.js` | Service-worker shell; API responses are never cached. |
 | `src/setupProxy.js` | Dev-only `/api` proxy used by `npm run start:shared`. |

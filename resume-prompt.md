@@ -1,27 +1,28 @@
 # Resume prompt
 
 Paste everything between the lines into a new session. Keep `agent.md`, `plan.md`,
-`progress.md`, `docs/routes.md` and `docs/diagrams/` in the project folder.
+`progress.md`, `docs/routes.md`, `docs/how-it-works.md` and `docs/diagrams/` in the project
+folder.
 
 ---
 
-I am continuing **Bio Attend** (Acoustic Presence Check-in): a web app that produces
-evidence students were physically inside a 20 m × 20 m classroom by passing short-lived keys
-between phones as near-ultrasonic tones. The teacher's phone stays at the front; student
-phones are **1–10 m** away. Use **TX/RX** terminology. A **teacher confirms attendance** from
-the evidence; a decoded tone is not an automatic verdict.
+I am continuing **Bio Attend** (Acoustic Presence Check-in): a web app that produces evidence
+students were physically inside a 20 m × 20 m classroom by passing short-lived keys between
+phones as near-ultrasonic tones. The teacher's phone stays at the front; student phones are
+**1–10 m** away. Use **TX/RX** terminology. A **teacher confirms attendance** from the
+evidence; a decoded tone is never an automatic verdict.
 
 Before doing anything:
 
 1. Read `agent.md`, then `plan.md`, then `progress.md`. Follow the rules in `agent.md`.
 2. Open `docs/routes.md` and the relevant PlantUML diagram in `docs/diagrams/`
    (`system-components.puml`, `check-in-flow.puml`, `proof-transport.puml`).
-3. Inspect the actual project files. If `progress.md` disagrees with the code, trust the
-   code, correct `progress.md`, and tell me.
+3. Inspect the actual project files. If `progress.md` disagrees with the code, trust the code,
+   correct `progress.md`, and tell me.
 4. Tell me in a few lines: the current layer, the single slice you will work on, and its
    pass/fail test.
 
-Current state (2026-11-04, session 21; details in `progress.md`):
+Current state (2026-11-05, session 24; details in `progress.md`):
 
 - **Layer 1 is assumed passed by owner direction (2026-10-29) for build planning only. This
   is not a measurement.** The 2026-10-25 sweep recorded **1 m 10/10, 2 m 9/10, 3 m 9/10,
@@ -30,8 +31,24 @@ Current state (2026-11-04, session 21; details in `progress.md`):
   measured-passed.
 - **The product is built:** teacher-confirmed attendance registers, 24-hour student queries,
   analytics, PDF/Excel exports, session history, notifications, timetable, profile/help,
-  PWA/dark theme, and a production-capable super-admin console with audit, settings,
-  impersonation and development-only demo data.
+  PWA/dark theme, and a production-capable super-admin console with users, classes, sessions,
+  attendance overrides, queries, audit, settings, impersonation and development-only demo
+  data.
+- **P0 security is built:** strict CSP with an external theme bootstrap, first-party
+  `SameSite=Lax` cookies, per-account `tokenVersion` revocation, impersonation hardening,
+  teacher approval for first and replacement student devices, JWK sanitisation, encrypted
+  backup/restore scripts, Dependabot and a GitHub security workflow.
+- **P1 admin hardening is built and tested:** WebAuthn/passkey step-up for destructive
+  super-admin actions (settings, role/status changes, session revocation, attendance
+  override/delete, impersonation and demo reset). Missing approval returns **428** with
+  `code: "step_up_required"`; a successful assertion sets a five-minute `HttpOnly`
+  `admin_step_up` cookie scoped to `/api/v1/admin`. The first passkey is trust-on-first-use;
+  adding another requires step-up. New audit rows carry `seq`, `prevHash` and a canonical
+  SHA-256 `hash`; `GET /admin/audit/verify` verifies the chain and reports legacy rows.
+  Exports are audited and limited to **30 downloads per 10 minutes** per account/IP.
+  `/health/ready` returns 503 until MongoDB is connected, `JWT_SECRET_PREVIOUS` is
+  verification-only during rotation, and the settings patch no longer causes a Mongo
+  `$set`/`$setOnInsert` path conflict.
 - **Acoustic proof remains evidence-only:** keys stay server-side, proofs are signed by the
   bound P-256 key, one proof per student/wave, 1-day TTL, wave advancement is teacher-only
   and evidence-gated. The student cascade, automatic scoring and the ID round are **not
@@ -39,27 +56,51 @@ Current state (2026-11-04, session 21; details in `progress.md`):
 - **Super-admin:** exact-match `SUPER_ADMIN_EMAILS` environment grant. For this project:
   `12shivanshsingha@gmail.com`; admin sessions default to 12 hours. It must not overlap
   `TEACHER_EMAILS` or a `TEST_*` list. Demo routes return 404 in production.
-- **Local gates:** backend **160/160** under `npm test` and `--test-isolation=none`;
+- **Local gates:** backend **227/227** under `npm test` and `--test-isolation=none`;
   frontend **84/84** (proof 15, acoustic 51, check-in 7, student check-in 9, auth 2); the
-  clean `CI=true` same-origin production build compiles successfully.
-- **Browser smokes:** dev **65/65**, production-mode Gmail-admin **13/13**, mobile/dark
-  **27/27**, production PWA/offline **16/16**. These use a temporary Playwright setup, not
-  repo npm commands.
-- **Production:** Render runs **`b7fd8b1`** at https://bio-attend.onrender.com and does not
-  include this product layer. Local `HEAD` and `origin/main` are **`35ad5a2`**; the current
-  work is **uncommitted**. The owner reviews, commits, pushes and deploys manually.
-- **Next slice:** **2.6 multi-wave rehearsal** with real Google accounts and physical phones
-  (10–20 phones, 5–6 minutes), measuring waves, timing and range. Physical 5 m/10 m range
-  diagnosis and reverse/muted-control runs remain the top risk. The owner must also set
-  Render `SUPER_ADMIN_EMAILS=12shivanshsingha@gmail.com`,
-  `SUPER_ADMIN_SESSION_HOURS=12`, and leave `REACT_APP_GOOGLE_HOSTED_DOMAIN` empty/unset.
+  clean `CI=true REACT_APP_API_URL=/api/v1 npm run build` compiles successfully. The WebAuthn
+  browser E2E passed with a Chrome virtual authenticator: 428 before enrollment, passkey
+  registration, five-minute cookie, settings retry and a 3-entry verified audit chain with
+  zero console errors.
+- **Other recorded smokes:** dev **65/65**, production-mode Gmail-admin **13/13**, mobile/dark
+  **27/27**, production PWA/offline **16/16**, CSP production-build audit **7/7** page loads.
+  These use temporary browser harnesses, not repo npm commands.
+- **Production:** Render runs **`029d18e`** at https://bio-attend.onrender.com and does **not**
+  include the P0/P1 security work. Local `HEAD` and `origin/main` are also **`029d18e`**; the
+  current P0/P1, PWA and dark-mode work is **uncommitted** in the working tree. No push, tag,
+  merge or deploy has been performed. The owner reviews, commits, pushes and deploys manually.
+- **Next slice:** **PDF/timetable/roster ingestion**, in this order: deterministic text
+  extraction → preview → local OCR → optional LLM extraction → teacher confirmation. **No
+  sample PDFs have been supplied yet**, so do not invent parser behaviour or claim accuracy;
+  ask for representative timetable and roster PDFs first. Timetable import must schedule
+  **existing classes only** and flag unmatched rows for manual class creation. Roster import
+  must preview and require teacher confirmation; never auto-save a roster or auto-mark
+  attendance. Use free options only and never require a payment card.
+- **Gemini gate:** raw rosters may go to the free tier only after an explicit student notice
+  and a documented risk acceptance are written into `plan.md`. That text does not exist yet;
+  do not write the AI path before it does.
+- **Remaining blockers:** sample PDFs, the Gemini consent/risk text, the encrypted Atlas
+  restore drill (needs URI, passphrase and `mongodb-database-tools`), a real Google/phone
+  multi-wave rehearsal, and physical 5 m/10 m range diagnosis with reverse/muted control.
+- **Production environment additions:** `SUPER_ADMIN_EMAILS=12shivanshsingha@gmail.com`,
+  `SUPER_ADMIN_SESSION_HOURS=12`, an HTTPS `WEBAUTHN_ORIGINS` (or Render's
+  `RENDER_EXTERNAL_URL`), optional `WEBAUTHN_RP_ID`/`WEBAUTHN_RP_NAME`, and an empty/unset
+  `REACT_APP_GOOGLE_HOSTED_DOMAIN`. Register a passkey under **Admin → Security** after the
+  first deploy. The temporary WebAuthn E2E server is stopped and its throwaway Mongo
+  databases were dropped.
 
 Rules for this session:
 
 - Build only one small slice, test it, and record the real result in `progress.md`.
 - Start the next slice only if this one passed. If it failed, fix it or stop and report.
-- Do not add automatic scoring, the ID round, the student cascade, or any exposure of keys
-  or key history to students. Attendance is teacher-confirmed and audited.
+- Do not add automatic scoring, the ID round, the student cascade, or any exposure of keys or
+  key history to students. Attendance is teacher-confirmed and audited.
+- Do not weaken or bypass passkey step-up, the audit hash chain, export limits, readiness or
+  the teacher device-approval boundary.
+- PDF/timetable imports must follow **extract → preview → teacher confirms**. Never create
+  classes automatically from a timetable and never auto-save imported rosters.
+- Do not use a paid service, a free tier that requires a card, or send raw rosters to an LLM
+  before the consent notice and risk acceptance exist in `plan.md`.
 - **Do not push, tag, merge or deploy.** The owner controls all publication.
 - Do not invent state you cannot see.
 - If a route, component, endpoint or gate changes, update `docs/routes.md`, the matching
@@ -72,7 +113,8 @@ teacher's phone only starts the process; server mints keys; location is optional
 college Google accounts plus a class roster for identity; teacher owns the register; queries
 are open for 24 hours after the session closes. Test accounts are env-gated and non-college;
 `TEACHER_EMAILS` and real rosters are college-only, with the non-production-only
-`ALLOW_TEST_ROSTER_EMAILS` rehearsal exception for exact test students.
+`ALLOW_TEST_ROSTER_EMAILS` rehearsal exception for exact test students. The code is built for
+one Render instance; the audit-chain serialisation and in-memory rate limits assume that.
 
 ---
 
@@ -80,8 +122,10 @@ Short version if the files are unavailable:
 
 > Read `agent.md`, `plan.md`, `progress.md` and `docs/routes.md` first. Work on exactly one
 > small slice, test it, record the real result, and move on only if it passed. The product
-> includes teacher-confirmed attendance, queries, analytics, exports and a production
-> super-admin console. Acoustic proof is evidence-only. Backend **160/160**, frontend
-> **84/84**. The next slice is a real Google/phone multi-wave rehearsal (2.6); physical
-> 5 m/10 m range work and reverse/muted control remain open. Layer 1 is an owner assumption
-> for build planning only, not a measured pass. Never push, tag, merge or deploy.
+> includes teacher-confirmed attendance, queries, analytics, exports, a production
+> super-admin console, passkey step-up and an audit hash chain. Acoustic proof is evidence-only.
+> Backend **227/227**, frontend **84/84**. The next slice is PDF/timetable/roster ingestion,
+> but sample PDFs and the Gemini consent/risk text are still missing, so ask before building.
+> Physical 5 m/10 m range work, reverse/muted control and a real Google/phone rehearsal remain
+> open. Layer 1 is an owner assumption for build planning only, not a measured pass. Never
+> push, tag, merge or deploy.

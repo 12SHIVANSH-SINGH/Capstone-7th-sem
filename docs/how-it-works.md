@@ -30,18 +30,49 @@ Sign-in uses Google only — there are no passwords. The server:
 Allowlists are validated at startup. An address may appear in only one list; removing a
 Gmail test address rejects its live session on the next request. Removing a college
 teacher from `TEACHER_EMAILS` does not demote an existing teacher. Rotating `JWT_SECRET`
-signs everyone out.
+signs everyone out; setting `JWT_SECRET_PREVIOUS` to the old value keeps existing sessions
+verifiable for one rotation window while new tokens use the new secret.
 
 On the first successful sign-in the browser creates a P-256 key pair. The public key is
-registered as the **device binding**; the private key stays in IndexedDB. The first
-binding auto-approves. A different browser becomes a **pending changed-device request**
-that a teacher approves or rejects from the review queue. A pending change blocks proof
-submission.
+registered as the **device binding**; the private key stays in IndexedDB. Both the first
+binding and a different browser become a **pending device request** that a teacher approves
+or rejects from the review queue. Dev/test personas auto-approve. A pending request blocks
+proof submission, and approving a replacement device revokes the old session.
 
 The super-admin console is available in production. Its **Demo data** tab and demo metric
 appear only outside production; `/api/v1/admin/demo/*` returns 404 in production. The rest
 of the console — users, classes, sessions, attendance overrides, queries, audit, settings
 and impersonation — stays available.
+
+## Admin security and audit integrity
+
+A signed-in super-admin session is not enough for destructive console actions. Settings,
+role/status changes, session revocation, attendance override/delete, impersonation and demo
+reset require a fresh **WebAuthn/passkey assertion**:
+
+1. The owner registers a platform passkey once under **Admin → Security**. The first
+   enrollment is trust-on-first-use; adding another passkey requires an existing approval.
+2. A protected request without approval returns **428** with
+   `code: "step_up_required"`.
+3. The frontend asks for the passkey, verifies the assertion server-side, and sets a
+   five-minute `HttpOnly` cookie scoped to `/api/v1/admin`. The original request is retried.
+4. The expected origin and relying-party ID come from server configuration
+   (`WEBAUTHN_ORIGINS`, `CLIENT_URL(S)` or `RENDER_EXTERNAL_URL`), never from a request
+   header. Production requires HTTPS.
+5. If every passkey is lost, destructive actions stay locked until an operator removes the
+   stale `adminpasskeys` rows. Keep a second passkey on another device.
+
+Audit entries now form a **SHA-256 hash chain**. Each row stores `seq`, `prevHash` and a
+`hash` over its canonical fields. `GET /admin/audit/verify`, and the **Verify chain** button
+in the console, recomputes the chain in order and reports the first break; rows written
+before P1 are reported as legacy rather than rewritten. The chain append is serialised
+in-process, which is correct for the single Render instance.
+
+Every export is itself audited (`export.attendance.pdf`, `export.audit.xlsx`, and so on) and
+limited to 30 downloads per 10 minutes per account/IP. `/health/ready` reports 503 until
+MongoDB is connected, while `/health` remains a liveness probe. A settings patch only inserts
+defaults for fields it is not already setting, avoiding Mongo's `$set`/`$setOnInsert`
+path-conflict error.
 
 ## Classes, rooms and rosters
 
@@ -49,11 +80,33 @@ and impersonation — stays available.
 - A **class** has a course code, title, section, default room and a **roster**.
 - The roster is the list of college emails allowed to submit evidence for that class. It
   also creates one attendance row per active student when a session starts.
-- Teachers import the roster from CSV or paste it. The server lowercases and de-duplicates
-  addresses, rejects non-college addresses and flags malformed roll numbers.
+- Teachers import the roster from CSV, paste it, or upload a text-based PDF. The server
+  lowercases and de-duplicates addresses, rejects non-college addresses and flags malformed
+  roll numbers.
 - For non-production rehearsals only, `ALLOW_TEST_ROSTER_EMAILS=true` admits the exact
   `TEST_STUDENT_EMAILS` addresses to a roster. Production startup refuses the flag. Dev
   personas never join a roster.
+
+### Roster PDF extraction
+
+The teacher opens **Classes → roster → Upload CSV or PDF**. The browser sends one PDF to
+`POST /classes/:classId/roster/pdf/preview`; the server:
+
+1. checks that the caller owns the class and that the file starts with a PDF header;
+2. reads the embedded text layer with PDF.js — it does not render or OCR the page;
+3. groups text items by their visual `y` position, sorts each line left-to-right and joins
+   character/word fragments back into readable lines;
+4. returns the text plus page, line and college-email counts.
+
+The frontend puts that text into the existing roster textarea. The teacher can correct it,
+then **Preview roster** validates rows and **Save roster** still needs a separate confirmation.
+Extraction never writes enrollments, creates a class or marks attendance.
+
+The endpoint accepts at most **10 MB**, **20 pages** and **200,000 characters**, and is
+limited to **20 extractions per 10 minutes** per account/IP. A scanned PDF returns
+`pdf_no_text_layer`; a password-protected, oversized or damaged PDF also gets a stable error
+code. Local OCR is not built yet. No real college PDFs have been supplied, so layout accuracy
+on those documents is unvalidated.
 
 ## Check-in sessions and evidence
 
@@ -113,7 +166,8 @@ percentage. Every action is appended to the query audit log.
 **Analytics** turn the same records into class averages, per-student percentages, session
 trends, term totals and query counts. Pending rows are shown separately from absences.
 **Exports** generate PDF and Excel files for a class register, one session, queries, the
-user directory and the audit log from the same records as the screen.
+user directory and the audit log from the same records as the screen. Each download writes
+an audit entry and is rate limited.
 
 Location is **optional evidence**, not a gate. A denied browser permission never blocks a
 session start, check-in or query.
@@ -158,12 +212,15 @@ that is an assumption, not a measurement.
 | --- | --- |
 | Google sign-in, allowlists, device review | `attendance-backend/controllers/googleAuthController.js`, `utils/signInPolicy.js` |
 | Classes, rooms, rosters | `attendance-backend/controllers/classController.js`, `utils/roster.js` |
+| Roster PDF extraction | `attendance-backend/utils/pdfText.js`, `middleware/pdfUpload.js`, `controllers/classController.js` |
 | Check-in sessions and wave history | `attendance-backend/controllers/checkInSessionController.js`, `utils/checkInSession.js` |
 | Proof transport | `attendance-backend/controllers/checkInProofController.js`, `utils/checkInProof.js` |
 | Attendance register, analytics and history | `attendance-backend/controllers/attendanceController.js`, `utils/attendance.js` |
 | Queries and audit | `attendance-backend/controllers/queryController.js`, `models/attendanceQueryModels.js` |
 | PDF / Excel exports | `attendance-backend/controllers/exportController.js` |
 | Super-admin, settings, impersonation, demo data | `attendance-backend/controllers/adminController.js`, `utils/audit.js`, `utils/settings.js` |
+| Admin passkeys and step-up | `attendance-backend/controllers/adminPasskeyController.js`, `utils/webauthn.js`, `utils/adminStepUp.js`, `middleware/adminStepUp.js` |
+| Audit hash chain and JWT rotation | `attendance-backend/utils/auditChain.js`, `utils/verifyJwt.js` |
 | Teacher check-in screen | `attendance-frontend/src/components/teacher/checkInSessions.jsx`, `checkInSessionView.js`, `SessionAttendanceModal.jsx` |
 | Student check-in shell | `attendance-frontend/src/components/student/studentCheckIn.jsx`, `studentCheckInView.js`, `src/acoustic/useCheckInAudio.js` |
 | Attendance, query, export, session and admin pages | `attendance-frontend/src/components/{attendance,queries,exports,sessions,admin}/` |

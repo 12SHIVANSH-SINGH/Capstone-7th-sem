@@ -1,5 +1,4 @@
 const mongoose = require("mongoose");
-const jwt = require("jsonwebtoken");
 const catchAsyncError = require("../middleware/catchasyncerror");
 const ErrorHandler = require("../utils/errorhandler");
 const User = require("../models/userModels");
@@ -14,14 +13,17 @@ const Timetable = require("../models/timetableModels");
 const DeviceBindingRequest = require("../models/deviceBindingRequestModels");
 const { Room } = require("../models/roomModels");
 const { writeAudit, toAuditView } = require("../utils/audit");
+const { verifyAuditChain } = require("../utils/auditChain");
 const { getSettings, updateSettings, settingsView, DEFAULTS } = require("../utils/settings");
 const { expireStaleQueries, summariseRecords, randomKey, queryWindowEnd } = require("../utils/attendance");
-const { normaliseEmail, isValidEmail } = require("../utils/signInPolicy");
+const { normaliseEmail, isValidEmail, isSessionAllowed } = require("../utils/signInPolicy");
 const presentUser = require("../utils/presentUser");
 const { normaliseLocation, distanceMeters, locationView } = require("../utils/location");
 const cookieOptions = require("../utils/cookieOptions");
 const { STATUS_CLOSED } = require("../utils/checkInSession");
 const { isDevAuthEnabled } = require("../utils/devAuth");
+const { sessionVersionMatches } = require("../utils/sessionVersion");
+const { verifyJwt } = require("../utils/verifyJwt");
 
 const isProduction = () =>
   String(process.env.NODE_ENV || "").trim().toLowerCase() === "production";
@@ -197,6 +199,8 @@ exports.updateUser = catchAsyncError(async (req, res, next) => {
   if (!user) return next(new ErrorHandler("User not found", 404));
 
   const before = userView(user);
+  const previousStatus = user.status;
+  const previousRole = user.role;
   const allowed = ["name", "status", "phoneLabel", "demoLabel", "rollNumber", "role"];
   for (const key of allowed) {
     if (!Object.prototype.hasOwnProperty.call(req.body || {}, key)) continue;
@@ -231,6 +235,13 @@ exports.updateUser = catchAsyncError(async (req, res, next) => {
   }
   if (!user.name) return next(new ErrorHandler("Name is required.", 400));
 
+  // A status or role change must not leave the old cookie alive. This covers
+  // disabling, re-enabling and role changes; profile-only edits do not bump.
+  const sessionsRevoked = previousStatus !== user.status || previousRole !== user.role;
+  if (sessionsRevoked) {
+    user.tokenVersion = (user.tokenVersion || 0) + 1;
+  }
+
   await user.save();
   await writeAudit(req, {
     action: "admin.user.updated",
@@ -239,6 +250,7 @@ exports.updateUser = catchAsyncError(async (req, res, next) => {
     summary: `Updated account ${user.email}.`,
     before,
     after: userView(user),
+    metadata: { sessionsRevoked },
     isDemo: user.isDemo,
   });
 
@@ -562,6 +574,11 @@ exports.listAudit = catchAsyncError(async (req, res) => {
   res.status(200).json({ success: true, total, logs: logs.map(toAuditView) });
 });
 
+exports.verifyAudit = catchAsyncError(async (req, res) => {
+  const result = await verifyAuditChain();
+  res.status(200).json({ success: true, ...result });
+});
+
 exports.getSettings = catchAsyncError(async (req, res) => {
   const settings = await getSettings();
   res.status(200).json({ success: true, settings: settingsView(settings) });
@@ -584,6 +601,30 @@ exports.updateSettings = catchAsyncError(async (req, res, next) => {
   res.status(200).json({ success: true, settings: settingsView(settings) });
 });
 
+exports.revokeUserSessions = catchAsyncError(async (req, res, next) => {
+  if (!mongoose.isValidObjectId(req.params.userId)) {
+    return next(new ErrorHandler("User not found", 404));
+  }
+  const user = await User.findById(req.params.userId);
+  if (!user) return next(new ErrorHandler("User not found", 404));
+
+  user.tokenVersion = (user.tokenVersion || 0) + 1;
+  await user.save();
+
+  await writeAudit(req, {
+    action: "admin.user.sessions_revoked",
+    entityType: "User",
+    entityId: user._id,
+    summary: `Revoked all sessions for ${user.email}.`,
+    isDemo: user.isDemo,
+  });
+
+  res.status(200).json({
+    success: true,
+    message: "All sessions for this account have been revoked.",
+  });
+});
+
 exports.impersonate = catchAsyncError(async (req, res, next) => {
   if (!mongoose.isValidObjectId(req.params.userId)) {
     return next(new ErrorHandler("User not found", 404));
@@ -603,6 +644,7 @@ exports.impersonate = catchAsyncError(async (req, res, next) => {
   const token = target.getJWTtoken({
     expiresIn: "15m",
     impersonatorId: String(req.user._id),
+    impersonatorVersion: req.user.tokenVersion || 0,
   });
   const cookieSession = Boolean(req.cookies?.token);
   if (cookieSession) {
@@ -620,7 +662,9 @@ exports.impersonate = catchAsyncError(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    token,
+    // A cookie session already holds the token in an httpOnly cookie. Echoing
+    // it in JSON would let any page script read and exfiltrate it.
+    ...(cookieSession ? {} : { token }),
     cookieSession,
     impersonating: true,
     user: presentUser(target),
@@ -635,23 +679,38 @@ exports.stopImpersonation = catchAsyncError(async (req, res, next) => {
 
   let decoded;
   try {
-    decoded = jwt.verify(original, process.env.JWT_SECRET, {
-      algorithms: ["HS256"],
-    });
+    decoded = verifyJwt(original);
   } catch (error) {
     res.clearCookie("admin_token", cookieOptions());
     return next(new ErrorHandler("The original admin session has expired. Sign in again.", 401));
   }
 
   const admin = await User.findById(decoded.id);
-  if (!admin || admin.role !== "superadmin") {
+  const adminStillAllowed =
+    admin &&
+    admin.role === "superadmin" &&
+    admin.status !== "disabled" &&
+    isSessionAllowed(admin, { devAuthEnabled: isDevAuthEnabled() }) &&
+    sessionVersionMatches(decoded, admin);
+  if (!adminStillAllowed) {
     res.clearCookie("admin_token", cookieOptions());
     return next(new ErrorHandler("The original admin session is no longer valid.", 401));
   }
 
+  // The route no longer authenticates the impersonated cookie, so decode it
+  // only to identify the target for the audit entry. A missing or expired
+  // target token must not block the owner from leaving impersonation.
+  let impersonatedId = "";
+  try {
+    const current = verifyJwt(req.cookies?.token);
+    impersonatedId = current?.id ? String(current.id) : "";
+  } catch (error) {
+    impersonatedId = "";
+  }
+
   // Preserve the original token's real expiry; a fixed 24-hour cookie could
   // outlive the short admin token (and confuse the browser about a dead
-  // session). jwt.verify above guarantees exp is still in the future.
+  // session). verifyJwt above guarantees exp is still in the future.
   const restoredExpiry = decoded.exp
     ? new Date(decoded.exp * 1000)
     : new Date(Date.now() + 12 * 60 * 60 * 1000);
@@ -662,7 +721,7 @@ exports.stopImpersonation = catchAsyncError(async (req, res, next) => {
     {
       action: "admin.impersonation.stopped",
       entityType: "User",
-      entityId: req.user?._id,
+      entityId: impersonatedId || admin._id,
       summary: `Impersonation ended; returned to ${admin.email}.`,
     }
   );

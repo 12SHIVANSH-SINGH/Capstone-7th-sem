@@ -13,6 +13,7 @@
 
 const crypto = require("crypto");
 const { MAX_KEY_VALUE, MAX_WAVE, STATUS_ACTIVE, keyIsFresh } = require("./checkInSession");
+const { sanitizePublicKeyJwk } = require("./deviceBinding");
 
 const PROOF_MESSAGE_VERSION = "bioattend-proof:v1";
 const SIGNATURE_BYTES = 64;
@@ -60,10 +61,11 @@ const buildProofMessage = ({ sessionId, wave, key, studentId }) => {
 const verifyProofSignature = ({ publicKeyJwk, message, signature }) => {
   const bytes = decodeSignature(signature);
   if (!bytes || typeof message !== "string" || !message) return false;
-  if (publicKeyJwk?.kty !== "EC" || publicKeyJwk?.crv !== "P-256") return false;
+  const keyJwk = sanitizePublicKeyJwk(publicKeyJwk);
+  if (!keyJwk) return false;
 
   try {
-    const key = crypto.createPublicKey({ key: publicKeyJwk, format: "jwk" });
+    const key = crypto.createPublicKey({ key: keyJwk, format: "jwk" });
     return crypto.verify(
       "sha256",
       Buffer.from(message, "utf8"),

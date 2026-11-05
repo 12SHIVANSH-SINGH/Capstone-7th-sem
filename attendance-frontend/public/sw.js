@@ -5,11 +5,12 @@
  * worklets and any authenticated document are never cached: attendance and
  * query data must always come from the server.
  */
-const CACHE_NAME = "bioattend-shell-v1";
+const CACHE_NAME = "bioattend-shell-v2";
 const SHELL = [
   "/",
   "/index.html",
   "/manifest.json",
+  "/theme-init.js",
   "/icon-192.png",
   "/icon-512.png",
   "/apple-touch-icon.png",

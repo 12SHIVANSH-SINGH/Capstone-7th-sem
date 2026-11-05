@@ -18,7 +18,7 @@
   margin-bottom: 22px;
   padding: 6px 14px;
   border-radius: 999px;
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--indigo-200);
   color: var(--indigo-700);
   font-size: 12.5px;
@@ -113,7 +113,7 @@
 }
 
 .step {
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 26px 24px;
@@ -129,7 +129,7 @@
   font-weight: 700;
   font-size: 15px;
   color: #fff;
-  background: linear-gradient(135deg, var(--indigo-500), var(--indigo-700));
+  background: var(--brand-gradient);
   margin-bottom: 16px;
 }
 
@@ -144,7 +144,7 @@
 }
 
 .feature {
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 22px;
@@ -174,18 +174,18 @@
   padding: 56px 28px;
   border-radius: 24px;
   color: #fff;
-  background: linear-gradient(135deg, var(--indigo-600), var(--indigo-800));
+  background: var(--brand-gradient-strong);
   box-shadow: var(--shadow-lg);
 }
 
 .cta h2 { font-size: clamp(22px, 3vw, 30px); font-weight: 700; letter-spacing: -0.02em; }
 .cta p { margin-top: 10px; color: rgba(255, 255, 255, 0.82); font-size: 15px; }
 
-.cta .ui-btn { margin-top: 24px; background: #fff; color: var(--indigo-700); }
-.cta .ui-btn:hover { background: var(--indigo-50); color: var(--indigo-700); }
+.cta .ui-btn { margin-top: 24px; background: #fff; color: #4338ca; }
+.cta .ui-btn:hover { background: #eef2ff; color: #3730a3; }
 
 /* Footer */
-.footer { border-top: 1px solid var(--border); background: #fff; }
+.footer { border-top: 1px solid var(--border); background: var(--surface); }
 
 .footer__inner {
   max-width: 1040px;

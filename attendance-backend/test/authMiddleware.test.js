@@ -58,7 +58,8 @@ const makeUser = (data) =>
     ...data,
   });
 
-const tokenFor = (user) => jwt.sign({ id: String(user._id) }, SECRET, { expiresIn: "1h" });
+const tokenFor = (user, claims = {}) =>
+  jwt.sign({ id: String(user._id), ...claims }, SECRET, { expiresIn: "1h" });
 
 const get = (path, user) =>
   fetch(`${baseUrl}${path}`, {
@@ -144,6 +145,33 @@ testWithEnv("a dev persona needs the dev gate to still be open", async (t) => {
   process.env.DEV_AUTH_ENABLED = "true";
   response = await get("/protected", user);
   assert.equal(response.status, 200);
+});
+
+testWithEnv("a token from before a session-version bump is refused", async (t) => {
+  const user = makeUser({
+    email: "guide@nitjsr.ac.in",
+    role: "teacher",
+    tokenVersion: 2,
+  });
+  t.mock.method(User, "findById", async () => user);
+
+  const stale = await fetch(`${baseUrl}/protected`, {
+    headers: { Cookie: `token=${tokenFor(user, { tokenVersion: 1 })}` },
+  });
+  assert.equal(stale.status, 401);
+  assert.match((await stale.json()).message, /revoked/i);
+
+  const current = await fetch(`${baseUrl}/protected`, {
+    headers: { Cookie: `token=${tokenFor(user, { tokenVersion: 2 })}` },
+  });
+  assert.equal(current.status, 200);
+
+  // Tokens issued before tokenVersion existed are version 0 and must also
+  // fail once the account has been bumped.
+  const legacy = await fetch(`${baseUrl}/protected`, {
+    headers: { Cookie: `token=${tokenFor(user)}` },
+  });
+  assert.equal(legacy.status, 401);
 });
 
 testWithEnv("a missing token or a missing user is refused", async (t) => {

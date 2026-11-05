@@ -64,6 +64,7 @@ test("the same validation runs in production", () => {
       JWT_SECRET: "a-production-secret-that-is-long-enough",
       DB_URI: "mongodb://127.0.0.1:27018/bio-attend-startup-test",
       COOKIE_EXPIRE: "7",
+      WEBAUTHN_ORIGINS: "https://bio-attend.onrender.com",
       TEST_TEACHER_EMAILS: "2023ugcs059@nitjsr.ac.in",
     }),
     /non-college test accounts/
@@ -77,6 +78,7 @@ test("production refuses the rehearsal roster flag", () => {
       JWT_SECRET: "a-production-secret-that-is-long-enough",
       DB_URI: "mongodb://127.0.0.1:27018/bio-attend-startup-test",
       COOKIE_EXPIRE: "7",
+      WEBAUTHN_ORIGINS: "https://bio-attend.onrender.com",
       ALLOW_TEST_ROSTER_EMAILS: "true",
       TEST_STUDENT_EMAILS: "tester@gmail.com",
     }),
@@ -111,6 +113,7 @@ test("a database connection failure exits 1 before listening", () => {
     // No server listens on port 1; the short selector timeout keeps the test fast.
     DB_URI: "mongodb://127.0.0.1:1/bio-attend-startup-unreachable?serverSelectionTimeoutMS=200",
     COOKIE_EXPIRE: "7",
+    WEBAUTHN_ORIGINS: "https://bio-attend.onrender.com",
   });
 
   assert.equal(result.status, 1);

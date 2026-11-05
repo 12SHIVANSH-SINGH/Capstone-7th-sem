@@ -6,14 +6,14 @@
 
 Capstone project · NIT Jamshedpur
 
-![Node](https://img.shields.io/badge/node-%3E%3D22-339933?logo=node.js&logoColor=white)
+![Node](https://img.shields.io/badge/node-%3E%3D22.13-339933?logo=node.js&logoColor=white)
 ![React](https://img.shields.io/badge/react-19-61dafb?logo=react&logoColor=white)
 ![MongoDB](https://img.shields.io/badge/mongodb-8-47A248?logo=mongodb&logoColor=white)
 ![Status](https://img.shields.io/badge/status-prototype-orange)
 
 </div>
 
-**Live prototype:** [https://bio-attend.onrender.com](https://bio-attend.onrender.com) — the public deployment is an older acoustic pilot (`b7fd8b1`). The current tree adds the full attendance product: teacher-confirmed registers, student queries, analytics, PDF/Excel exports, a production-capable super-admin console, demo mode, notifications, timetable, profile/help and an installable web shell. It is **built and tested locally but not committed or deployed**. The owner controls every push and deploy.
+**Live prototype:** [https://bio-attend.onrender.com](https://bio-attend.onrender.com) — the public deployment is an earlier build (`029d18e`) of the full attendance product. The current tree adds P0/P1 security hardening (strict CSP, revocable sessions, teacher-approved device binding, passkey step-up and an audit hash chain) plus the latest docs. It is **built and tested locally but not committed or deployed**. The owner controls every push and deploy.
 
 > **Layer 1 gate status:** the owner has directed that Layer 1 be treated as **passed for build planning only**. This is an assumption, not a measurement. The 2026-10-25 sweep still fails at 5 m (4/10) and 10 m (1/10), and the reverse direction and muted control are unmeasured. Do not read this build as proof that the physical gate passed.
 
@@ -32,11 +32,12 @@ The student cascade (phones retransmitting the next key), automatic scoring and 
 
 ## What is built
 
-- **Accounts and access** — Google-only sign-in, college-domain and roster gates, environment-gated Gmail test accounts, exact-match `SUPER_ADMIN_EMAILS` grant, one bound device per student with a teacher review queue for changed devices.
-- **Teacher tools** — rooms, classes, CSV/paste rosters, check-in sessions, live two-minute wave keys, evidence-gated wave advancement, session history, teacher-confirmed registers and audit.
+- **Accounts and access** — Google-only sign-in, college-domain and roster gates, environment-gated Gmail test accounts, exact-match `SUPER_ADMIN_EMAILS` grant, and one bound device per student. A first or replacement device waits for teacher approval in production; dev/test personas auto-approve.
+- **Teacher tools** — rooms, classes, CSV/paste rosters, text-based PDF roster extraction with an editable preview, check-in sessions, live two-minute wave keys, evidence-gated wave advancement, session history, teacher-confirmed registers and audit.
 - **Student flow** — live-session discovery, consent-gated `/student/check-in`, local decode, signed evidence, recorded-evidence card, attendance history and 24-hour queries.
 - **Operations** — class/per-student analytics, session trends, branded PDF/Excel exports, notifications, timetable, profile/settings, help and a dark theme.
 - **Super-admin console** — users, classes, sessions, attendance overrides/deletion, queries, audit, settings and time-limited impersonation. Demo seed/reset is development-only and returns 404 in production.
+- **Admin security** — passkey step-up for destructive console actions, a five-minute `HttpOnly` approval cookie, a SHA-256 audit hash chain with a verification view, audited and rate-limited exports, `/health/ready`, and verification-only `JWT_SECRET_PREVIOUS` rotation.
 - **PWA and hardening** — installable shell, offline cache for static assets only, production HSTS, `no-store` API responses, immutable hashed assets, revalidated shell/deep links and graceful SIGTERM/SIGINT shutdown.
 
 ## Status
@@ -48,7 +49,10 @@ The student cascade (phones retransmitting the next key), automatic scoring and 
 | Session core, teacher screen, signed proof transport, student discovery and shell, wave advancement, teacher evidence view | ✅ built and tested locally |
 | Teacher-confirmed attendance, queries, analytics, exports, notifications, timetable, profile/help | ✅ built and browser-smoke-tested locally |
 | Super-admin console, audit, settings, impersonation, demo data | ✅ built and locally verified, including a Gmail super-admin in a production-mode check |
-| Production deployment of this tree | ⏳ not done — Render still runs `b7fd8b1`; the owner must configure and deploy |
+| Passkey step-up, audit hash chain, export limits, readiness, JWT rotation | ✅ built; browser E2E passed with a Chrome virtual authenticator |
+| Roster PDF extraction → editable preview | ✅ text-based PDFs only, verified with generated fixtures; real college PDFs and scanned OCR still unvalidated |
+| Timetable PDF import | ⛔ not built; needs sample timetable PDFs |
+| Production deployment of this tree | ⏳ not done — Render still runs `029d18e`; the owner must configure and deploy |
 | Real Google/phone multi-wave rehearsal | ⏳ pending |
 | Student cascade, automatic scoring, ID round, mobile app | ⛔ not built / gated |
 
@@ -59,7 +63,7 @@ This is a demo-ready capstone prototype — not yet used for real attendance.
 | Layer | Uses |
 | --- | --- |
 | Frontend | React 19 (Create React App), React Router, Axios, react-icons, PWA service worker |
-| Backend | Node.js ≥ 22, Express, MongoDB + Mongoose, Google Identity Services, PDFKit, ExcelJS |
+| Backend | Node.js ≥ 22.13, Express, MongoDB + Mongoose, Google Identity Services, PDF.js, multer, PDFKit, ExcelJS |
 | Attendance | Teacher-confirmed register, optional location evidence, 24-hour queries, append-only audit |
 | Audio | Web Audio API + AudioWorklet, custom FSK codec (no audio libraries) |
 | Tests | Node's built-in test runner, production build, browser smoke tests |
@@ -107,20 +111,22 @@ available in production. Resetting demo data preserves the signed-in admin accou
 ## Tests
 
 ```bash
-cd attendance-backend && npm test                     # 160 tests
+cd attendance-backend && npm test                     # 245 tests
 cd attendance-backend && npm test -- --test-isolation=none
 cd attendance-frontend && npm run test:proof          # 15 tests
 cd attendance-frontend && npm run test:acoustic       # 51 tests
 cd attendance-frontend && npm run test:checkin        # 7 tests
 cd attendance-frontend && npm run test:studentcheckin # 9 tests
 cd attendance-frontend && npm run test:auth           # 2 tests
+cd attendance-frontend && npm run test:rosterimport   # 6 tests
 cd attendance-frontend && CI=true REACT_APP_API_URL=/api/v1 npm run build
 ```
 
 The working tree also passed a 65-check browser smoke across the super-admin, teacher,
-student and query flows, a 13-check production-mode Gmail-admin check, mobile/dark checks
-and production PWA/offline checks. Those temporary Playwright scripts are not part of the
-repo's npm test commands.
+student and query flows, a 13-check production-mode Gmail-admin check, mobile/dark checks,
+production PWA/offline checks, and a WebAuthn end-to-end flow using Chrome's virtual
+authenticator (428 before enrollment, passkey registration, settings retry and a verified
+audit chain). Those temporary harnesses are not part of the repo's npm test commands.
 
 ## Documentation
 
@@ -140,3 +146,4 @@ repo's npm test commands.
 - Attendance queries expire 24 hours after a session closes. Expired queries stay reviewable and can be reopened with an audit entry; approving a query marks the student present.
 - Demo data is available only outside production and is clearly marked `@demo.invalid`; it never replaces the signed-in admin account.
 - The production layout is one service so cookies stay first-party. The older split Vercel/Render option is documented only as an alternative.
+- Roster PDF import reads only an embedded text layer and fills an editable box; it never saves automatically. Scanned PDFs are rejected until local OCR is built. No real college PDFs have been supplied, so layout accuracy on those documents is unvalidated. Timetable PDF import and any Gemini extraction remain gated.

@@ -535,8 +535,8 @@ const StudentCheckIn = () => {
             </strong>
             <p>
               {deviceStatus === "review"
-                ? "A teacher must approve the new device before this phone can submit a proof. You can still test the phone audio."
-                : "Sign in again with your college Google account to bind this browser, then ask a teacher to approve a changed device."}
+                ? "A teacher must approve this browser before it can submit a proof. You can still test the phone audio while you wait."
+                : "Sign in again with your college Google account to request this browser, then ask a teacher to approve it."}
             </p>
           </div>
           <Link className="ui-btn ui-btn--soft ui-btn--sm" to="/student-dashboard">

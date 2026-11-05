@@ -11,9 +11,20 @@ const AuditLog = require("../models/auditLogModels");
 const User = require("../models/userModels");
 const { getSettings } = require("../utils/settings");
 const { resolveTermRange, summariseRecords, percentage, expireStaleQueries } = require("../utils/attendance");
-const { toAuditView } = require("../utils/audit");
+const { toAuditView, writeAudit } = require("../utils/audit");
 
 const BRAND = { indigo: "#4f46e5", teal: "#0f766e", slate: "#334155", light: "#eef2ff" };
+
+// Every successful download is auditable: exports contain rosters, registers
+// or the audit trail itself, so "who took data out" must be answerable.
+const auditExport = (req, action, metadata = {}) =>
+  writeAudit(req, {
+    action: `export.${action}`,
+    entityType: "Export",
+    entityId: req.params?.sessionId || "",
+    summary: `Generated ${action} export.`,
+    metadata,
+  });
 
 const safeFilename = (value) =>
   String(value || "bio-attend")
@@ -268,6 +279,10 @@ exports.attendancePdf = catchAsyncError(async (req, res) => {
       );
     }
   });
+  await auditExport(req, "attendance.pdf", {
+    format: "pdf",
+    classes: reports.map((report) => report.courseClass.courseCode),
+  });
 });
 
 exports.attendanceXlsx = catchAsyncError(async (req, res) => {
@@ -390,6 +405,10 @@ exports.attendanceXlsx = catchAsyncError(async (req, res) => {
   rawSheet.getRow(1).font = { bold: true };
 
   await sendXlsx(res, safeFilename(`bio-attend-${reports.map((r) => r.courseClass.courseCode).join("-") || "attendance"}`), workbook);
+  await auditExport(req, "attendance.xlsx", {
+    format: "xlsx",
+    classes: reports.map((report) => report.courseClass.courseCode),
+  });
 });
 
 const queryReportData = async (user, query) => {
@@ -434,6 +453,7 @@ exports.queriesPdf = catchAsyncError(async (req, res) => {
       ])
     );
   });
+  await auditExport(req, "queries.pdf", { format: "pdf", rows: queries.length });
 });
 
 exports.queriesXlsx = catchAsyncError(async (req, res) => {
@@ -471,6 +491,7 @@ exports.queriesXlsx = catchAsyncError(async (req, res) => {
   sheet.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
   sheet.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF4F46E5" } };
   await sendXlsx(res, safeFilename(`bio-attend-queries-${Date.now()}`), workbook);
+  await auditExport(req, "queries.xlsx", { format: "xlsx", rows: queries.length });
 });
 
 exports.auditXlsx = catchAsyncError(async (req, res) => {
@@ -500,6 +521,7 @@ exports.auditXlsx = catchAsyncError(async (req, res) => {
   sheet.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
   sheet.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF0F766E" } };
   await sendXlsx(res, safeFilename(`bio-attend-audit-${Date.now()}`), workbook);
+  await auditExport(req, "audit.xlsx", { format: "xlsx", rows: logs.length });
 });
 
 exports.sessionPdf = catchAsyncError(async (req, res, next) => {
@@ -547,6 +569,11 @@ exports.sessionPdf = catchAsyncError(async (req, res, next) => {
         record.evidence?.proofCount || 0,
       ])
     );
+  });
+  await auditExport(req, "session.pdf", {
+    format: "pdf",
+    rows: records.length,
+    classCode: session.classSnapshot?.courseCode || session.courseClass?.courseCode || "",
   });
 });
 
@@ -608,6 +635,11 @@ exports.sessionXlsx = catchAsyncError(async (req, res, next) => {
   roster.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF4F46E5" } };
 
   await sendXlsx(res, safeFilename(`bio-attend-session-${session._id}`), workbook);
+  await auditExport(req, "session.xlsx", {
+    format: "xlsx",
+    rows: records.length,
+    classCode: session.classSnapshot?.courseCode || session.courseClass?.courseCode || "",
+  });
 });
 
 exports.exportUsersXlsx = catchAsyncError(async (req, res) => {
@@ -639,4 +671,5 @@ exports.exportUsersXlsx = catchAsyncError(async (req, res) => {
   sheet.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
   sheet.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF4F46E5" } };
   await sendXlsx(res, safeFilename(`bio-attend-users-${Date.now()}`), workbook);
+  await auditExport(req, "users.xlsx", { format: "xlsx", rows: users.length });
 });

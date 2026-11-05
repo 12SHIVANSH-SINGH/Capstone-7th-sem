@@ -1,6 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import Brand from "../../ui/Brand";
+import ThemeToggle from "../../ui/ThemeToggle";
 
 const LinkShell = ({ eyebrow, title, description, status, actions, backLink, children }) => (
   <main className="fsk-link">
@@ -8,6 +9,7 @@ const LinkShell = ({ eyebrow, title, description, status, actions, backLink, chi
       <div className="fsk-link__topbar">
         <Brand />
         <div className="fsk-link__topbar-actions">
+          <ThemeToggle />
           <Link to="/acoustic-lab" className="ui-btn ui-btn--secondary ui-btn--sm">
             Acoustic lab
           </Link>

@@ -1,9 +1,10 @@
 const userModels = require("../models/userModels");
 const ErrorHandler = require("../utils/errorhandler");
 const catchasyncerror = require("./catchasyncerror");
-const jwt = require("jsonwebtoken");
+const { verifyJwt } = require("../utils/verifyJwt");
 const { isSessionAllowed } = require("../utils/signInPolicy");
 const { isDevAuthEnabled } = require("../utils/devAuth");
+const { assertSessionVersion } = require("../utils/sessionVersion");
 
 const bearerToken = (req) => {
   const header = String(req.headers?.authorization || "");
@@ -16,9 +17,7 @@ const bearerToken = (req) => {
 const tokenFromRequest = (req) => req.cookies?.token || bearerToken(req);
 
 const loadSessionUser = async (req, token) => {
-  const decoded = jwt.verify(token, process.env.JWT_SECRET, {
-    algorithms: ["HS256"],
-  });
+  const decoded = verifyJwt(token);
   const user = await userModels.findById(decoded.id);
   if (!user) {
     const error = new ErrorHandler("User account no longer exists", 401);
@@ -27,6 +26,10 @@ const loadSessionUser = async (req, token) => {
   if (user.status === "disabled") {
     throw new ErrorHandler("This account has been disabled. Contact your administrator.", 401);
   }
+
+  // A token from before a disable/role-change/device-rebind is not a valid
+  // session just because its signature still verifies.
+  assertSessionVersion(decoded, user);
 
   let impersonator = null;
   if (decoded.impersonatorId) {
@@ -37,6 +40,13 @@ const loadSessionUser = async (req, token) => {
     if (!isSessionAllowed(impersonator, { devAuthEnabled: isDevAuthEnabled() })) {
       throw new ErrorHandler("The impersonation session is no longer valid.", 401);
     }
+    // The short impersonation token carries the admin's version at issue
+    // time. If the admin's sessions were revoked, the impersonation ends too.
+    assertSessionVersion(
+      { tokenVersion: decoded.impersonatorVersion },
+      impersonator,
+      "The impersonation session is no longer valid."
+    );
     // The super admin's live grant is the authority for this short session;
     // target eligibility rules (which include a dev-only gate) do not apply to
     // the impersonated account itself.

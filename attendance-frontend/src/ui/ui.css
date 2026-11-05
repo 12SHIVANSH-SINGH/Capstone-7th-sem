@@ -28,10 +28,10 @@
 .ui-btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
 .ui-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.28); }
 
-.ui-btn--primary { background: var(--indigo-600); color: #fff; box-shadow: var(--shadow-sm); }
-.ui-btn--primary:hover:not(:disabled) { background: var(--indigo-700); color: #fff; }
+.ui-btn--primary { background: var(--brand-solid); color: #fff; box-shadow: var(--shadow-sm); }
+.ui-btn--primary:hover:not(:disabled) { background: var(--brand-solid-hover); color: #fff; }
 
-.ui-btn--secondary { background: #fff; border-color: var(--slate-300); color: var(--slate-700); }
+.ui-btn--secondary { background: var(--surface); border-color: var(--slate-300); color: var(--slate-700); }
 .ui-btn--secondary:hover:not(:disabled) { background: var(--slate-50); border-color: var(--slate-400); color: var(--slate-800); }
 
 .ui-btn--ghost { background: transparent; color: var(--slate-600); }
@@ -40,8 +40,8 @@
 .ui-btn--soft { background: var(--indigo-50); color: var(--indigo-700); }
 .ui-btn--soft:hover:not(:disabled) { background: var(--indigo-100); }
 
-.ui-btn--danger { background: var(--danger); color: #fff; }
-.ui-btn--danger:hover:not(:disabled) { background: #b91c1c; color: #fff; }
+.ui-btn--danger { background: var(--danger-solid); color: #fff; }
+.ui-btn--danger:hover:not(:disabled) { background: var(--danger-solid-hover); color: #fff; }
 
 .ui-btn--sm { padding: 8px 12px; font-size: 13px; border-radius: 8px; }
 .ui-btn--lg { padding: 14px 22px; font-size: 15px; border-radius: 12px; }
@@ -118,10 +118,10 @@
 
 .ui-badge--primary { background: var(--indigo-50); color: var(--indigo-700); border-color: var(--indigo-200); }
 .ui-badge--neutral { background: var(--slate-100); color: var(--slate-600); border-color: var(--slate-200); }
-.ui-badge--success { background: var(--success-soft); color: #047857; border-color: var(--success-border); }
-.ui-badge--warning { background: var(--warning-soft); color: #b45309; border-color: var(--warning-border); }
-.ui-badge--danger { background: var(--danger-soft); color: #b91c1c; border-color: var(--danger-border); }
-.ui-badge--info { background: var(--info-soft); color: #0369a1; border-color: var(--info-border); }
+.ui-badge--success { background: var(--success-soft); color: var(--success-ink); border-color: var(--success-border); }
+.ui-badge--warning { background: var(--warning-soft); color: var(--warning-ink); border-color: var(--warning-border); }
+.ui-badge--danger { background: var(--danger-soft); color: var(--danger-ink); border-color: var(--danger-border); }
+.ui-badge--info { background: var(--info-soft); color: var(--info-ink); border-color: var(--info-border); }
 
 /* ---------------- Form fields ---------------- */
 .ui-field { display: flex; flex-direction: column; gap: 6px; }
@@ -133,7 +133,7 @@
   font: inherit;
   font-size: 14px;
   color: var(--text);
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--slate-300);
   border-radius: 10px;
   padding: 10px 12px;
@@ -237,7 +237,7 @@
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--border);
   border-left: 4px solid var(--slate-400);
   border-radius: 12px;
@@ -266,7 +266,7 @@
 .ui-toast--error .ui-toast__icon { background: var(--danger-soft); color: var(--danger); }
 .ui-toast--info .ui-toast__icon { background: var(--indigo-50); color: var(--indigo-600); }
 
-.ui-toast__message { flex: 1; font-size: 13.5px; color: var(--slate-700); line-height: 1.45; }
+.ui-toast__message { flex: 1; font-size: 13.5px; color: var(--text); line-height: 1.45; }
 
 .ui-toast__close {
   border: 0;
@@ -304,7 +304,7 @@
   display: grid;
   place-items: center;
   color: #fff;
-  background: linear-gradient(135deg, var(--indigo-500), var(--indigo-700));
+  background: var(--brand-gradient);
   box-shadow: 0 4px 10px -4px rgba(79, 70, 229, 0.5);
 }
 
@@ -317,7 +317,7 @@
   position: sticky;
   top: 0;
   z-index: 100;
-  background: rgba(255, 255, 255, 0.85);
+  background: var(--bar-bg);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border);
@@ -363,7 +363,7 @@
   color: #fff;
   font-size: 14px;
   font-weight: 700;
-  background: linear-gradient(135deg, var(--indigo-500), var(--indigo-700));
+  background: var(--brand-gradient);
 }
 
 .ui-icon-btn {
@@ -422,7 +422,7 @@
   font-weight: 800;
   letter-spacing: -0.04em;
   line-height: 1;
-  background: linear-gradient(135deg, var(--indigo-500), var(--indigo-700));
+  background: var(--brand-gradient);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -452,7 +452,7 @@
 .ui-shell__nav::-webkit-scrollbar { display: none; }
 .ui-shell__link { white-space: nowrap; }
 
-.ui-more { position: relative; display: flex; }
+.ui-more { position: sticky; right: 0; flex-shrink: 0; display: flex; background: var(--bar-bg); }
 .ui-more__button {
   border: 0;
   background: transparent;
@@ -463,16 +463,17 @@
 }
 .ui-more__button > svg { font-size: 13px; }
 .ui-more__menu {
-  position: absolute;
-  top: calc(100% + 8px);
+  position: fixed;
+  top: 0;
   left: 0;
-  z-index: 120;
-  min-width: 180px;
+  z-index: 300;
+  min-width: 190px;
+  max-width: min(320px, calc(100vw - 24px));
   padding: 6px;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--surface);
-  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.16);
+  box-shadow: var(--shadow-lg);
   display: grid;
   gap: 2px;
 }
@@ -505,7 +506,7 @@
   height: 16px;
   padding: 0 4px;
   border-radius: 999px;
-  background: var(--danger);
+  background: var(--danger-solid);
   color: #fff;
   font-size: 10px;
   font-weight: 700;
@@ -611,9 +612,9 @@
   gap: 16px;
   flex-wrap: wrap;
   padding: 9px 20px;
-  background: #fffbeb;
-  border-bottom: 1px solid #fde68a;
-  color: #92400e;
+  background: var(--warning-soft);
+  border-bottom: 1px solid var(--warning-border);
+  color: var(--warning-ink);
   font-size: 12.8px;
   line-height: 1.4;
 }
@@ -806,5 +807,4 @@
   .ui-shell__main { padding: 20px 16px 56px; }
   .ui-shell__user { gap: 6px; }
   .ui-bell__panel { position: fixed; top: 64px; left: 16px; right: 16px; width: auto; }
-  .ui-more__menu { position: fixed; top: 64px; left: 16px; right: 16px; min-width: 0; }
 }

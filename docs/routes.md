@@ -18,12 +18,14 @@ All API responses are JSON except the PDF/Excel downloads. API responses send
 | **Teacher** | `role: "teacher"` only. Class-owned routes also check ownership in the controller. |
 | **Staff** | Teacher or super-admin. |
 | **Super-admin** | `role: "superadmin"` only. Granted by `SUPER_ADMIN_EMAILS`. |
+| **Super-admin + step-up** | Super-admin **and** a fresh WebAuthn assertion. Without it the route returns **428** `step_up_required`. |
 | **Dev-only** | Mounted only when `NODE_ENV=development|test` **and** `DEV_AUTH_ENABLED=true`. Absent in production. |
 
 A missing or expired session returns **401**. A valid session with the wrong role or
-class ownership returns **403**. Teacher-owned routes deliberately do **not** accept a
-super-admin; the console uses the `/admin/*` routes so the audit trail names the right
-authority.
+class ownership returns **403**. A valid super-admin session without a recent passkey
+approval returns **428** on step-up routes. Teacher-owned routes deliberately do **not**
+accept a super-admin; the console uses the `/admin/*` routes so the audit trail names the
+right authority.
 
 ## Frontend pages
 
@@ -37,13 +39,13 @@ then checks `/islogin`; the access column describes where the page sends you.
 | `/student-dashboard` | Student | Student home: device-binding state, live-session card, check-in and sound-lab actions. A teacher is redirected to `/teacher-dashboard`; signed-out visitors go to `/login`. |
 | `/student/check-in` | Student | Consent-gated microphone capture. Decodes the current wave locally, signs the session/wave/key proof with the bound device key, and shows the recorded-evidence card. Never displays the key. |
 | `/teacher-dashboard` | Teacher | Teacher home: class/student counts, device-review queue, quick actions. Non-teachers are redirected. |
-| `/teacher/classes` | Teacher | Rooms, classes, roster preview/save and the changed-device review queue. |
+| `/teacher/classes` | Teacher | Rooms, classes, CSV/paste roster preview/save, text-based PDF roster extraction and the device approval queue. |
 | `/teacher/check-in` | Teacher | Start/close a check-in session, show the live two-minute key, advance a wave after evidence, open the transmitter, inspect live evidence and history. |
 | `/teacher/sessions` | Staff | Closed-session history, registers, attendance edits and the teacher audit log. A super-admin sees every teacher's sessions and can open any register. |
 | `/attendance` | Signed in | Analytics. A student sees their own percentages and sessions; a teacher sees class overviews and per-student detail; a super-admin can switch across classes. |
 | `/queries` | Signed in | Students raise and track 24-hour queries; teachers review, approve, reject and reopen; a super-admin sees every query. |
 | `/exports` | Staff | Branded PDF/Excel downloads for registers, queries, sessions, users and the audit log. Admin-only user/audit exports appear for a super-admin. |
-| `/admin` | Super-admin | Production console: overview, users, classes, sessions, attendance overrides/deletion, queries, audit, settings and impersonation. Demo controls appear only outside production. |
+| `/admin` | Super-admin | Production console: overview, users, classes, sessions, attendance overrides/deletion, queries, audit, passkey security, settings and impersonation. Demo controls appear only outside production. Destructive actions ask for a passkey. |
 | `/notifications` | Signed in | Personal notification centre; mark one/all read or clear read items. |
 | `/profile` | Signed in | Account identity, role badge, phone label and display-name settings. The role cannot be changed here. |
 | `/timetable` | Signed in | Weekly timetable. Students read; teachers and super-admins can add, edit and delete slots. A slot never starts attendance by itself. |
@@ -59,13 +61,15 @@ then checks `/islogin`; the access column describes where the page sends you.
 
 | Method | Path | Access | Purpose |
 | --- | --- | --- | --- |
-| GET | `/health` | Public | Liveness probe used by Render and local checks. |
+| GET | `/health` | Public | Liveness probe used by Render and local checks. Stays green while the process is alive. |
+| GET | `/health/ready` | Public | Readiness probe: **200** when MongoDB is connected, **503** with `checks.database: false` otherwise. |
 | GET | `/islogin` | Public (returns 401 without a session) | Resolve the cookie/bearer session and return the current user, including role and binding state. |
 | POST | `/logout` | Public | Clear the session cookie. State change is POST-only. |
 | GET | `/logout` | Public | Return **405** with `Allow: POST`; protects against link/image logout. |
-| POST | `/auth/google` | Public, rate limited | Verify a Google ID token, apply the email/roster policy, create or promote the user, bind the first device and set the session cookie. |
+| POST | `/auth/google` | Public, rate limited | Verify a Google ID token, apply the email/roster policy, create or promote the user and set the session cookie. Device binding is a separate claim. |
 | GET | `/profile` | Signed in | Read the caller's profile. |
 | PATCH | `/profile` | Signed in | Update display fields such as name and phone label; never the role or sign-in email. |
+| POST | `/profile/sessions/revoke` | Signed in | Bump the caller's `tokenVersion`, revoking every existing session for the account. |
 | GET | `/auth/dev/accounts` | Dev-only | List one-click dev personas. **404** in production. |
 | POST | `/auth/dev/login` | Dev-only, rate limited | Start a dev-persona session. **404** in production. |
 
@@ -73,10 +77,10 @@ then checks `/islogin`; the access column describes where the page sends you.
 
 | Method | Path | Access | Purpose |
 | --- | --- | --- | --- |
-| POST | `/device-bindings/claim` | Signed in | Register the browser's P-256 public key. The first binding auto-approves; a changed device becomes a review request. |
+| POST | `/device-bindings/claim` | Signed in | Register the browser's P-256 public key. First and changed devices both become a review request; only dev/test personas auto-approve. |
 | GET | `/device-bindings/status` | Signed in | Current binding state for the signed-in account. |
-| GET | `/device-reviews` | Teacher | Pending changed-device requests visible to teachers. |
-| POST | `/device-reviews/:reviewId` | Teacher | Approve or reject a changed-device request. |
+| GET | `/device-reviews` | Teacher | Pending first-binding and changed-device requests visible to teachers. |
+| POST | `/device-reviews/:reviewId` | Teacher | Approve or reject a device request. |
 
 ### Rooms, classes and rosters
 
@@ -87,6 +91,7 @@ then checks `/islogin`; the access column describes where the page sends you.
 | GET | `/classes` | Teacher | List classes owned by the signed-in teacher. |
 | POST | `/classes` | Teacher | Create a class with course code, title, section and default room. |
 | POST | `/classes/:classId/roster/preview` | Teacher | Parse a pasted/CSV roster and return accepted rows plus validation errors without saving. |
+| POST | `/classes/:classId/roster/pdf/preview` | Teacher, rate limited | Multipart upload of one text-based PDF (field `file`). Extract the embedded text layer and return editable text plus page/line/email counts. It never saves a roster. 10 MB, 20 pages, 200,000 characters, 20 requests per 10 minutes per account/IP. |
 | PUT | `/classes/:classId/roster` | Teacher | Replace the class roster and sync enrollments. |
 | GET | `/classes/:classId/roster` | Teacher | Read the current roster. |
 
@@ -145,46 +150,58 @@ then checks `/islogin`; the access column describes where the page sends you.
 | PATCH | `/timetable/:entryId` | Staff | Edit a slot. |
 | DELETE | `/timetable/:entryId` | Staff | Delete a slot. |
 
+Timetable PDF import is **not built**. The future route must schedule existing owned classes
+only, preview every slot and flag unmatched rows for manual class creation.
+
 ### Exports
 
 All export routes require **Staff** and generate the file on the server from the same
-records as the on-screen views.
+records as the on-screen views. Each successful download writes an audit entry and the
+routes share a limit of **30 downloads per 10 minutes** per account/IP. The two admin
+workbooks require **Super-admin**.
 
-| Method | Path | Purpose |
-| --- | --- | --- |
-| GET | `/exports/attendance.pdf` | Class attendance register as PDF. |
-| GET | `/exports/attendance.xlsx` | Class register workbook with summary, percentages and raw rows. |
-| GET | `/exports/queries.pdf` | Query evidence report as PDF. |
-| GET | `/exports/queries.xlsx` | Query report as Excel. |
-| GET | `/exports/sessions/:sessionId.pdf` | One session sheet as PDF. |
-| GET | `/exports/sessions/:sessionId.xlsx` | One session sheet as Excel. |
+| Method | Path | Access | Purpose |
+| --- | --- | --- | --- |
+| GET | `/exports/attendance.pdf` | Staff | Class attendance register as PDF. |
+| GET | `/exports/attendance.xlsx` | Staff | Class register workbook with summary, percentages and raw rows. |
+| GET | `/exports/queries.pdf` | Staff | Query evidence report as PDF. |
+| GET | `/exports/queries.xlsx` | Staff | Query report as Excel. |
+| GET | `/exports/sessions/:sessionId.pdf` | Staff | One session sheet as PDF. |
+| GET | `/exports/sessions/:sessionId.xlsx` | Staff | One session sheet as Excel. |
+| GET | `/admin/export/users.xlsx` | Super-admin | User directory workbook. |
+| GET | `/admin/export/audit.xlsx` | Super-admin | Audit log workbook. |
 
 ### Super-admin console
 
 | Method | Path | Access | Purpose |
 | --- | --- | --- | --- |
 | POST | `/admin/stop-impersonation` | Signed in | End an impersonation session. Mounted before the admin guard so the impersonated cookie can still call it. |
+| GET | `/admin/webauthn/status` | Super-admin | Passkey count, enrollment state and whether the five-minute step-up window is open. |
+| POST | `/admin/webauthn/register/options` | Super-admin, rate limited | Start passkey registration. The first passkey is trust-on-first-use; an additional one needs step-up. |
+| POST | `/admin/webauthn/register/verify` | Super-admin, rate limited | Verify the registration and store only the public credential. Writes `admin.webauthn.registered`. |
+| POST | `/admin/webauthn/step-up/options` | Super-admin, rate limited | Start a step-up assertion for the signed-in account. |
+| POST | `/admin/webauthn/step-up/verify` | Super-admin, rate limited | Verify the assertion, set the five-minute `admin_step_up` cookie and write `admin.webauthn.step_up`. |
 | GET | `/admin/overview` | Super-admin | Counts, recent activity and production/demo flags. |
 | GET | `/admin/users` | Super-admin | Search/filter all users. |
 | POST | `/admin/users` | Super-admin | Create a student or teacher account. |
-| PATCH | `/admin/users/:userId` | Super-admin | Update role, status or profile fields. Super-admin rows are protected from demotion/disable. |
+| PATCH | `/admin/users/:userId` | Super-admin, step-up for role/status | Update profile fields; role or status changes require a passkey. Super-admin rows are protected from demotion/disable. |
+| POST | `/admin/users/:userId/revoke-sessions` | Super-admin + step-up | Bump the target account's `tokenVersion` and audit the revocation. |
 | GET | `/admin/classes` | Super-admin | List every class with its teacher. |
 | POST | `/admin/classes` | Super-admin | Create a class and assign its teacher. |
 | PATCH | `/admin/classes/:classId` | Super-admin | Reassign or update a class. |
 | GET | `/admin/sessions` | Super-admin | List sessions across every teacher. |
 | GET | `/admin/sessions/:sessionId/attendance` | Super-admin | Open any session register. |
-| PATCH | `/admin/attendance/:recordId` | Super-admin | Override a register row with an audit note. |
-| DELETE | `/admin/attendance/:recordId` | Super-admin | Delete a register row with an audit note. |
+| PATCH | `/admin/attendance/:recordId` | Super-admin + step-up | Override a register row with an audit note. |
+| DELETE | `/admin/attendance/:recordId` | Super-admin + step-up | Delete a register row with an audit note and an explicit `confirm: "DELETE"` body. |
 | GET | `/admin/queries` | Super-admin | List all queries. |
-| GET | `/admin/audit` | Super-admin | Filterable append-only audit log. |
+| GET | `/admin/audit` | Super-admin | Filterable append-only audit log, including `seq` and chain hashes on new rows. |
+| GET | `/admin/audit/verify` | Super-admin | Recompute the SHA-256 audit chain and report the first break plus the legacy count. |
 | GET | `/admin/settings` | Super-admin | Read term dates, attendance window and demo-mode settings. |
-| PATCH | `/admin/settings` | Super-admin | Update settings; audited. |
-| POST | `/admin/impersonate/:userId` | Super-admin | Start a time-limited impersonation session. |
+| PATCH | `/admin/settings` | Super-admin + step-up | Update settings; audited. |
+| POST | `/admin/impersonate/:userId` | Super-admin + step-up | Start a time-limited impersonation session. |
 | GET | `/admin/demo/status` | Super-admin, non-production | Demo record counts. **404** in production. |
 | POST | `/admin/demo/seed` | Super-admin, non-production | Create the demo teacher, students, class, sessions and queries. **404** in production. |
-| POST | `/admin/demo/reset` | Super-admin, non-production | Remove demo data while preserving the signed-in admin. **404** in production. |
-| GET | `/admin/export/users.xlsx` | Super-admin | User directory workbook. |
-| GET | `/admin/export/audit.xlsx` | Super-admin | Audit log workbook. |
+| POST | `/admin/demo/reset` | Super-admin + step-up, non-production | Remove demo data while preserving the signed-in admin. **404** in production. |
 
 ## Related documents
 

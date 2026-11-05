@@ -11,6 +11,11 @@
 # LiteLLM Configuration (contains sensitive keys)
 litellm_config.yaml
 
+# Encrypted database dumps still contain student PII. Never commit them.
+backups/
+*.archive.gz.enc
+*.archive.gz.enc.sha256
+
 # Virtual Environment
 .venv/
 env/

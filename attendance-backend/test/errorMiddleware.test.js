@@ -67,6 +67,20 @@ test("malformed JSON becomes a safe 400 without parser internals", () => {
   assert.doesNotMatch(JSON.stringify(result.body), /Unexpected token|position|bad/);
 });
 
+test("a stable string code is returned for recoverable import errors", () => {
+  const importError = new Error("This PDF has no selectable text layer.");
+  importError.statuscode = 422;
+  importError.code = "pdf_no_text_layer";
+
+  const result = run(importError);
+  assert.equal(result.status, 422);
+  assert.equal(result.body.code, "pdf_no_text_layer");
+
+  const mongoError = new Error("duplicate key");
+  mongoError.code = 11000;
+  assert.equal(run(mongoError).body.code, undefined);
+});
+
 test("statusCode and status are accepted when statuscode is absent", () => {
   const statusCodeError = new Error("teapot");
   statusCodeError.statusCode = 418;

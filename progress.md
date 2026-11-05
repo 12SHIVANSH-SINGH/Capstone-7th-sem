@@ -3,17 +3,24 @@
 Update this at the end of every session. If it disagrees with the real code, the code wins:
 fix this file and tell the owner.
 
-Last updated: **2026-11-04** (session 21: production-capable super-admin, attendance product
-and admin hardening; backend **160/160**, frontend **84/84**).
+Last updated: **2026-11-05** (session 25: roster PDF extraction A1; backend **245/245**,
+frontend **90/90**, production build green, CSP browser audit **7/7** page loads,
+WebAuthn browser E2E passed).
 
 ## Status
 
 - **Current layer:** Layer 1 is treated as **passed by owner assumption for build planning
   only**. It is **not measured-passed**. The 2026-10-25 sweep still fails at 5 m and 10 m;
   reverse direction and muted control are unmeasured.
-- **Current slice:** the attendance product and production super-admin console are built and
-  tested locally. The next slice is a real Google/phone multi-wave rehearsal (2.6). Scoring,
-  automatic attendance decisions and the ID round are not built.
+- **Current slice:** security P0 and P1 are built and tested locally. P0 covers strict CSP,
+  first-party cookies, session revocation, impersonation hardening, teacher-approved device
+  binding, encrypted backup scripts and supply-chain scanning. P1 adds WebAuthn/passkey
+  step-up for destructive admin actions, an audit hash chain with verification, export auditing
+  and rate limits, `/health/ready`, JWT rotation and the settings-patch fix. The document
+  phase has started: **A1 roster PDF text extraction → editable preview** is built and tested
+  with generated fixtures. Timetable PDF import (A2), local OCR (A3) and consent-gated Gemini
+  extraction (A4) are not built. Scoring, automatic attendance decisions and the ID round are
+  not built.
 - **Production super-admin access is built:** `SUPER_ADMIN_EMAILS` grants the exact owner
   address the `superadmin` role in production as well as development. A verified Gmail
   identity is accepted for this grant; the Google button no longer forces the college hosted
@@ -21,21 +28,40 @@ and admin hardening; backend **160/160**, frontend **84/84**).
   hours (`SUPER_ADMIN_SESSION_HOURS`, max 72), and promotion/creation writes an
   `auth.superadmin.granted` audit entry.
 - **Admin console:** production features are users, classes, sessions, attendance
-  override/delete, queries, audit, settings and impersonation. Demo controls are hidden in
-  production and every `/api/v1/admin/demo/*` route returns 404.
-- **Hardening:** HS256 JWT pinning, 200 kB JSON limit, `trust proxy=1`, extra security
-  headers, super-admin rows protected from demotion/disable, disabled accounts cannot
+  override/delete, queries, audit with chain verification, passkey security, settings and
+  impersonation. Demo controls are hidden in production and every `/api/v1/admin/demo/*`
+  route returns 404.
+- **Hardening:** HS256 JWT pinning, 200 kB JSON limit, `trust proxy=1`, strict
+  Content-Security-Policy with no inline scripts, `HttpOnly; Secure; SameSite=Lax` cookies in
+  production, per-account `tokenVersion` revocation, impersonation without a JSON token echo,
+  JWK sanitisation, super-admin rows protected from demotion/disable, disabled accounts cannot
   reactivate through Google sign-in, and a startup warning when no account can open `/admin`.
-- **Production state:** Render runs **`b7fd8b1`** at
-  <https://bio-attend.onrender.com> and does not include this product layer. Local `HEAD` and
-  `origin/main` are **`35ad5a2`**; the attendance/admin work is **uncommitted** in the
-  working tree. No push, tag, merge or deploy was performed.
-- **Next action:** configure Render and deploy, then run a real Google/phone multi-wave
-  rehearsal. Production needs
+- **P1 admin hardening:** destructive console actions require a fresh WebAuthn assertion.
+  A successful assertion sets a five-minute, `HttpOnly`, admin-path-scoped `admin_step_up`
+  cookie; missing approval returns **428** with `code: "step_up_required"`. The first passkey
+  is trust-on-first-use; adding another passkey requires an existing approval. New audit rows
+  carry `seq`, `prevHash` and a canonical SHA-256 `hash`, and `GET /admin/audit/verify`
+  recomputes the chain and reports the first break plus a legacy count. Every export writes an
+  audit entry and is limited to 30 downloads per 10 minutes per account/IP. `/health/ready`
+  returns 503 until MongoDB is connected. `JWT_SECRET_PREVIOUS` is verification-only during a
+  rotation window; signing always uses `JWT_SECRET`. The settings patch filters `$setOnInsert`
+  defaults against `$set` keys, fixing the Mongo path-conflict 500.
+- **Device binding:** a student's first browser and every changed browser now enter the
+  teacher device-review queue; only dev/test personas auto-approve. Replacing an approved
+  device bumps `tokenVersion`, so the old session cannot submit proofs.
+- **Production state:** Render runs **`029d18e`** at
+  <https://bio-attend.onrender.com> and does not include the P0/P1 security work. Local
+  `HEAD` is also **`029d18e`**; the P0/P1 security, PWA and dark-mode work is **uncommitted**
+  in the working tree. No push, tag, merge or deploy was performed.
+- **Next action:** obtain representative timetable and roster PDFs, then build A2 timetable
+  import (existing classes only, unmatched rows flagged) and A3 local OCR. In parallel, the
+  owner can configure Render and deploy, then run a real Google/phone multi-wave rehearsal.
+  Production needs
   `SUPER_ADMIN_EMAILS=12shivanshsingha@gmail.com`,
-  `SUPER_ADMIN_SESSION_HOURS=12`, and an empty/unset
-  `REACT_APP_GOOGLE_HOSTED_DOMAIN`. The address must not appear in `TEACHER_EMAILS` or any
-  `TEST_*` list.
+  `SUPER_ADMIN_SESSION_HOURS=12`, an HTTPS `WEBAUTHN_ORIGINS` (or `RENDER_EXTERNAL_URL`), and
+  an empty/unset `REACT_APP_GOOGLE_HOSTED_DOMAIN`. The address must not appear in
+  `TEACHER_EMAILS` or any `TEST_*` list. After the first deploy, sign in as the super-admin,
+  open **Admin → Security** and register a passkey before changing settings or roles.
 
 ## What is built
 
@@ -43,6 +69,8 @@ and admin hardening; backend **160/160**, frontend **84/84**).
 | --- | --- |
 | Google sign-in, allowlists, device binding and review | ✅ built and tested |
 | Rooms, classes, CSV/paste rosters and enrollment | ✅ built and tested |
+| Roster PDF text extraction → editable preview | ✅ built and tested with generated PDF fixtures; no auto-save; scanned OCR and real-college layouts unvalidated |
+| Timetable PDF import, local OCR, Gemini extraction | ⛔ not built / gated |
 | Check-in sessions, wave keys, teacher check-in screen | ✅ built and tested |
 | Signed proof transport, student discovery, student check-in shell | ✅ built and tested; evidence only |
 | Evidence-gated wave advancement and bounded key history | ✅ built and tested |
@@ -53,8 +81,9 @@ and admin hardening; backend **160/160**, frontend **84/84**).
 | PDF/Excel exports for registers, queries, sessions, users, audit | ✅ built and browser-smoke-tested |
 | Notifications, timetable, profile and help | ✅ built and browser-smoke-tested |
 | Super-admin console, settings, impersonation and audit | ✅ built and browser-smoke-tested |
+| Admin passkey step-up, audit hash chain, export limits and readiness | ✅ built and browser-E2E-tested |
 | Demo seed/reset (`@demo.invalid`) | ✅ development only; 404 in production |
-| PWA manifest, service worker, offline shell and dark theme | ✅ production build verified |
+| PWA manifest, service worker, offline shell, dark theme and overflow-aware navigation | ✅ production build verified |
 | Student cascade, automatic scoring, ID round, mobile app | ⛔ not built / gated |
 | Real Google + physical-phone multi-wave rehearsal | ⏳ pending |
 
@@ -62,24 +91,34 @@ and admin hardening; backend **160/160**, frontend **84/84**).
 
 | Gate | Result |
 | --- | --- |
-| Backend (`npm test`) | **160/160** |
-| Backend (`npm test -- --test-isolation=none`) | **160/160** |
+| Backend (`npm test`) | **245/245** |
+| Backend (`npm test -- --test-isolation=none`) | **245/245** |
 | Proof transport | **15/15** |
 | Acoustic (codec, lab, worklets, TX/RX link) | **51/51** |
 | Teacher check-in view | **7/7** |
 | Student check-in view | **9/9** |
 | Auth routing | **2/2** |
-| Frontend total | **84/84** |
-| Production build | ✅ compiles successfully (`CI=true`, same-origin API, empty hosted-domain hint) |
+| Roster PDF import helpers | **6/6** |
+| Frontend total | **90/90** |
+| Production build | ✅ compiles successfully (`CI=true REACT_APP_API_URL=/api/v1 npm run build`) |
 | Browser smoke (dev) | **65/65** |
+| CSP production-build audit | **7/7 page loads**, zero CSP violations, Google button rendered, service worker active, dark theme applied |
+| WebAuthn browser E2E (Chrome virtual authenticator) | ✅ 428 before enrollment, passkey registration, five-minute step-up cookie, settings retry, audit chain **3/3** verified, zero console errors |
+| Dark-mode, More-menu and mobile audit | **95/95** |
+| Desktop More visibility sweep | **21/21** (1101–1920 px; super-admin, teacher, student) |
 | Production-mode Gmail-admin smoke | **13/13** |
 | Mobile/dark smoke | **27/27** |
 | Production PWA/offline smoke | **16/16** |
+| Backend production audit | **0 high / 0 critical**, 2 moderate (`uuid` via `exceljs`, no non-breaking fix) |
+| Frontend audit | **4 critical / 36 high**, mostly CRA 5 build-chain debt; CI keeps this report-only until a Vite migration |
+| Backup encryption pipeline | ✅ stub-tool test: encrypt, decrypt, gzip check, scratch-database namespace mapping, wrong passphrase rejected; **real Atlas drill pending** |
 
-The browser smokes used a temporary Playwright setup outside the repo's npm test commands.
+The browser smokes used temporary browser harnesses outside the repo's npm test commands.
 The backend suite covers auth policy, controllers, middleware, startup, env guards, origin
-guard, cookies, rate limits, rosters, device binding, session core, wave advancement, proof
-transport, teacher evidence, student discovery, rehearsal enrollment and super-admin access.
+guard, cookies, rate limits, rosters, PDF text reconstruction and upload preview, device
+binding, session core, wave advancement, proof transport, teacher evidence, student
+discovery, rehearsal enrollment, super-admin access, WebAuthn step-up, audit-chain
+integrity, export auditing, readiness and JWT rotation.
 
 ## Layer 1 measurements
 
@@ -136,8 +175,9 @@ build planning only; never call the physical gate measured-passed.
 - **Scoring and ID round:** not built and still gated.
 - **Device-binding retention:** bindings persist indefinitely while proof evidence is TTL'd
   after about one day. Decide whether bindings should follow the same retention.
-- **First-binding boundary:** a never-bound account auto-approves its first device, so a
-  stolen session cookie can bind a device. Account/device theft is out of current scope.
+- **Device approval is human:** a stolen session cookie can create a pending request, but it
+  cannot bind without a teacher approving it. Teacher decisions are the remaining trust
+  boundary; audit both approval and rejection.
 - **Split-hosting CSRF:** the exact frontend origin must be in `CLIENT_URLS`.
 - **Startup fails closed:** duplicate data that prevents a unique index stops the service;
   clean it before deploying.
@@ -145,11 +185,32 @@ build planning only; never call the physical gate measured-passed.
 - **Old MongoDB data directory:** `~/data/db` is partially root-owned; use
   `~/data/db-attendance-dev` instead.
 - **Render free tier:** confirm behaviour during a live 5–6 minute check-in.
+- **Backup drill not yet run:** scripts and runbook exist, but no real encrypted dump has been
+  restored because the Atlas URI, passphrase and `mongodb-database-tools` are not available
+  locally yet. Do this before a pilot deploy.
+- **P1 limits:** the audit chain is serialised in-process, which is correct for one Render
+  instance; a multi-instance deployment needs a transaction or distributed lock. Export and
+  passkey limits are in-memory. First passkey enrollment is trust-on-first-use, so a stolen
+  super-admin session could enroll one attacker passkey before the owner notices. There is no
+  self-service passkey recovery: losing every passkey locks destructive actions until stale
+  `adminpasskeys` rows are removed by an operator with database access. Register a second
+  passkey on another device.
+- **Document ingestion is partially built:** A1 roster PDF text extraction with an editable
+  preview is implemented and tested against generated PDFs. It reads only an embedded text
+  layer, rejects scanned pages and never saves automatically. Timetable PDF import, local OCR
+  and consent-gated Gemini extraction are still not built. No real sample PDFs have been
+  supplied yet, so college-layout accuracy remains unvalidated.
+- **Gemini consent gate:** raw rosters may go to the free tier only after a student notice and
+  a written risk acceptance in `plan.md`; that text must exist before the AI path is coded.
 
 ## Recent session history
 
 | Date | What changed | Result |
 | --- | --- | --- |
+| 2026-11-05 | Document phase A1: owner-scoped roster PDF upload, PDF.js text-layer extraction with visual line reconstruction, editable preview in Classes, stable PDF error codes, 10 MB/20-page/200k-character caps and a 20-per-10-minute limiter. No roster is saved by extraction. | Backend **245/245** in both modes, frontend **90/90**, production build green; generated-PDF fixtures validate extraction, multipart, auth, scanned-PDF rejection and error mapping. Real college PDFs and OCR remain unvalidated. |
+| 2026-11-05 | P1 admin hardening: WebAuthn/passkey step-up for destructive super-admin actions, audit hash chain and `/admin/audit/verify`, `req.ip` audit fix, export auditing and 30/10-minute limits, `/health/ready`, verification-only `JWT_SECRET_PREVIOUS` rotation, Security tab and step-up retry client. Browser E2E exposed and fixed the Mongo `$set`/`$setOnInsert` settings conflict. | Backend **227/227** in both modes, frontend **84/84**, production build green, WebAuthn E2E passed with a 3-entry chain and zero console errors. |
+| 2026-11-05 | Security P0: strict CSP with external theme bootstrap, first-party `SameSite=Lax` cookies, per-account `tokenVersion` revocation, impersonation hardening, teacher-approved first device binding, JWK sanitisation, encrypted backup/restore scripts, Dependabot and a GitHub security workflow. Removed the external Google Fonts import and allowed only the GIS stylesheet. | Backend **189/189**, frontend **84/84**, production build green, CSP browser audit **7/7** page loads with zero violations; backup drill still pending. |
+| 2026-11-04 | Fixed dark-mode contrast across public, teacher, student, check-in, acoustic-lab, TX/RX, super-admin and error pages with semantic status/brand/bar tokens and a shared persisted `ThemeToggle` applied before first paint. Rebuilt the desktop **More** menu as a body portal with fixed positioning, scroll/resize clamping, Escape/click-outside handling and a sticky trigger, so every overflow link is visible at 1101–1920 px. | Frontend **84/84**, production build green, dark/More/mobile browser audit **95/95**, More widths **21/21**. |
 | 2026-11-04 | Production Gmail super-admin grant, 12-hour admin sessions, live env revalidation, HS256 pinning, 200 kB JSON limit, `trust proxy=1`, extra headers, super-admin demotion/disable protection, disabled-account sign-in guard, startup admin warning. Reconciled docs. | Backend **160/160**, frontend **84/84**, production build green, production-mode Gmail-admin **13/13**, mobile/dark **27/27**, PWA/offline **16/16**. |
 | 2026-11-04 | Full attendance product: teacher-confirmed registers, edits and audit, 24-hour queries with optional location, analytics, PDF/Excel exports, session history, notifications, timetable, profile/help, super-admin console, demo seed/reset, dark theme, mobile nav and PWA. | All local suites passed; dev browser smoke **65/65**, API smoke 60 checks. |
 | 2026-10-31 | Wave advancement + bounded key history (2.4c), teacher evidence view (2.5), production caching/HSTS/graceful-shutdown hardening. | Backend suite passed; browser teacher smoke passed; diagrams re-rendered. |

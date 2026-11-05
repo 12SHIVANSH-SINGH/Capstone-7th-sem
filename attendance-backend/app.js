@@ -1,6 +1,7 @@
 const express = require('express');
 const cookieParser = require('cookie-parser');
 const cors = require('cors');
+const { buildCsp } = require('./utils/csp');
 
 const app = express();
 app.disable("x-powered-by");
@@ -11,6 +12,7 @@ const isProduction = String(process.env.NODE_ENV || "").trim().toLowerCase() ===
 // available to this origin: the acoustic lab needs audio, and an attendance
 // query can attach a one-shot location snapshot. Camera stays disabled.
 app.use((req, res, next) => {
+  res.set("Content-Security-Policy", buildCsp());
   res.set("X-Content-Type-Options", "nosniff");
   res.set("X-Frame-Options", "DENY");
   res.set("Referrer-Policy", "strict-origin-when-cross-origin");
@@ -75,8 +77,9 @@ app.use(
 );
 
 app.use(cookieParser());
-// No endpoint accepts a large document. A bounded JSON body keeps an
-// unauthenticated request from buffering arbitrary memory before routing.
+// JSON stays tightly bounded. The one document upload is a roster PDF on an
+// authenticated teacher route; multer caps it at 10 MB and keeps it in memory
+// only for deterministic text extraction.
 app.use(express.json({ limit: "200kb" }));
 
 // Render terminates TLS at exactly one proxy hop. Trusting every hop would let

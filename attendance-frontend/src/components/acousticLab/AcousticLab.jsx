@@ -6,6 +6,7 @@ import Badge from "../../ui/Badge";
 import Button from "../../ui/Button";
 import Card from "../../ui/Card";
 import EmptyState from "../../ui/EmptyState";
+import ThemeToggle from "../../ui/ThemeToggle";
 import {
   BASELINE_DURATION_MS,
   BASELINE_SETTLE_MS,
@@ -742,9 +743,12 @@ const AcousticLab = () => {
       <div className="acoustic-lab__shell">
         <div className="acoustic-lab__topbar">
           <Brand />
-          <Link to="/" className="ui-btn ui-btn--secondary ui-btn--sm">
-            Back to home
-          </Link>
+          <div className="acoustic-lab__topbar-actions">
+            <ThemeToggle />
+            <Link to="/" className="ui-btn ui-btn--secondary ui-btn--sm">
+              Back to home
+            </Link>
+          </div>
         </div>
 
         <header className="acoustic-lab__hero">

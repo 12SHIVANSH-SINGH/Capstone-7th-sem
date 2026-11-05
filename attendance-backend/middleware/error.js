@@ -39,8 +39,15 @@ module.exports = (err, req, resp, next) => {
         err = new ErrorHandler("Json web token is expired, please login again", 401);
     }
 
-    resp.status(err.statuscode).json({
+    const payload = {
         success: false,
         message: err.message
-    })
+    }
+    // A stable string code lets the client distinguish recoverable import
+    // errors without parsing prose. Numeric Mongo codes (11000) stay private.
+    if (typeof err.code === "string") {
+        payload.code = err.code
+    }
+
+    resp.status(err.statuscode).json(payload)
 }

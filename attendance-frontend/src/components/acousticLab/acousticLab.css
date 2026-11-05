@@ -25,6 +25,12 @@
   padding: 18px 0 6px;
 }
 
+.acoustic-lab__topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .acoustic-lab__hero {
   display: flex;
   align-items: flex-end;
@@ -61,7 +67,7 @@
   align-items: flex-start;
   gap: 14px;
   border-left: 4px solid var(--indigo-400);
-  background: linear-gradient(180deg, #fff 0%, var(--indigo-50) 100%);
+  background: linear-gradient(180deg, var(--surface) 0%, var(--indigo-50) 100%);
 }
 
 .acoustic-lab__notice-icon {
@@ -111,13 +117,13 @@
 .acoustic-lab__alert--error {
   border-color: var(--danger-border);
   background: var(--danger-soft);
-  color: #991b1b;
+  color: var(--danger-ink);
 }
 
 .acoustic-lab__alert--warning {
   border-color: var(--warning-border);
   background: var(--warning-soft);
-  color: #92400e;
+  color: var(--warning-ink);
 }
 
 .acoustic-lab__actions {
@@ -135,7 +141,7 @@
 
 .acoustic-lab__inline-warning {
   margin-top: 8px;
-  color: #b45309;
+  color: var(--warning-ink);
   font-size: 13px;
   line-height: 1.5;
 }
@@ -180,7 +186,7 @@
   min-width: 0;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: linear-gradient(180deg, #fff 0%, var(--slate-50) 100%);
+  background: linear-gradient(180deg, var(--surface) 0%, var(--slate-50) 100%);
   padding: 12px;
 }
 
@@ -213,7 +219,7 @@
 
 .acoustic-lab__band--codec-edge {
   background: var(--info-soft);
-  color: #0369a1;
+  color: var(--info-ink);
 }
 
 .acoustic-lab__track {
@@ -243,12 +249,12 @@
 
 .acoustic-lab__tick--baseline {
   background: var(--warning);
-  box-shadow: 0 0 0 1px #fff;
+  box-shadow: 0 0 0 1px var(--surface);
 }
 
 .acoustic-lab__tick--peak {
   background: var(--slate-800);
-  box-shadow: 0 0 0 1px #fff;
+  box-shadow: 0 0 0 1px var(--surface);
 }
 
 .acoustic-lab__bar-values {
@@ -360,7 +366,7 @@
 
 .acoustic-lab__recommendation p {
   margin-top: 8px;
-  color: var(--slate-700);
+  color: var(--text-soft);
   font-size: 13.5px;
   line-height: 1.55;
 }

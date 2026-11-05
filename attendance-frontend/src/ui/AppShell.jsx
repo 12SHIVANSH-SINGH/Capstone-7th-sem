@@ -1,9 +1,11 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link, useLocation } from "react-router-dom";
 import axios from "axios";
-import { FiBell, FiCheck, FiChevronDown, FiCloudOff, FiDownload, FiMenu, FiMoon, FiSun, FiX } from "react-icons/fi";
+import { FiBell, FiCheck, FiChevronDown, FiCloudOff, FiDownload, FiMenu, FiX } from "react-icons/fi";
 import Badge from "./Badge";
 import Brand from "./Brand";
+import ThemeToggle from "./ThemeToggle";
 import { dashboardPath, roleLabel } from "../utils/auth";
 import { isLinkActive, mergeLinks } from "./navigation";
 import SERVER_URL from "../config/api";
@@ -24,14 +26,11 @@ const AppShell = ({ role, name, email, onLogout, links = [], children }) => {
   const hasNotificationsLink = resolvedLinks.some((link) => link.to === "/notifications");
 
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [theme, setTheme] = useState(() => {
-    if (typeof window === "undefined") return "light";
-    return window.localStorage.getItem("bioattend.theme") || "light";
-  });
   const [notifications, setNotifications] = useState([]);
   const [unread, setUnread] = useState(0);
   const [bellOpen, setBellOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [morePosition, setMorePosition] = useState(null);
   const [impersonator, setImpersonator] = useState(null);
   const [stopping, setStopping] = useState(false);
   const [online, setOnline] = useState(() =>
@@ -44,6 +43,8 @@ const AppShell = ({ role, name, email, onLogout, links = [], children }) => {
   });
   const bellRef = useRef(null);
   const moreRef = useRef(null);
+  const moreButtonRef = useRef(null);
+  const moreMenuRef = useRef(null);
 
   useEffect(() => {
     const handleOnline = () => setOnline(true);
@@ -85,13 +86,6 @@ const AppShell = ({ role, name, email, onLogout, links = [], children }) => {
       setInstallPrompt(null);
     }
   };
-
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    window.localStorage.setItem("bioattend.theme", theme);
-    const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute("content", theme === "dark" ? "#0b1120" : "#4F46E5");
-  }, [theme]);
 
   useEffect(() => {
     setMobileOpen(false);
@@ -138,11 +132,63 @@ const AppShell = ({ role, name, email, onLogout, links = [], children }) => {
   useEffect(() => {
     const handleClick = (event) => {
       if (bellRef.current && !bellRef.current.contains(event.target)) setBellOpen(false);
-      if (moreRef.current && !moreRef.current.contains(event.target)) setMoreOpen(false);
+      const insideMore =
+        moreRef.current?.contains(event.target) || moreMenuRef.current?.contains(event.target);
+      if (!insideMore) setMoreOpen(false);
     };
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
+
+  // The More menu is portalled to <body> so the horizontally scrollable nav
+  // cannot clip it. Keep it anchored to the button as the page moves.
+  useLayoutEffect(() => {
+    if (!moreOpen) return undefined;
+    const place = () => {
+      const button = moreButtonRef.current;
+      const menu = moreMenuRef.current;
+      if (!button || !menu) return;
+      if (window.matchMedia("(max-width: 1100px)").matches) {
+        setMoreOpen(false);
+        return;
+      }
+      const rect = button.getBoundingClientRect();
+      const margin = 12;
+      const width = menu.offsetWidth || 190;
+      const left = Math.min(
+        Math.max(margin, rect.left),
+        Math.max(margin, window.innerWidth - width - margin)
+      );
+      setMorePosition({ top: rect.bottom + 8, left });
+    };
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [moreOpen]);
+
+  useEffect(() => {
+    if (!moreOpen) return undefined;
+    const handleKey = (event) => {
+      if (event.key === "Escape") {
+        setMoreOpen(false);
+        moreButtonRef.current?.focus();
+      }
+    };
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [moreOpen]);
+
+  const toggleMore = () => {
+    if (!moreOpen) {
+      const rect = moreButtonRef.current?.getBoundingClientRect();
+      if (rect) setMorePosition({ top: rect.bottom + 8, left: rect.left });
+    }
+    setMoreOpen((current) => !current);
+  };
 
   const stopImpersonation = async () => {
     setStopping(true);
@@ -187,31 +233,48 @@ const AppShell = ({ role, name, email, onLogout, links = [], children }) => {
             {overflowLinks.length > 0 && (
               <div className="ui-more" ref={moreRef}>
                 <button
+                  ref={moreButtonRef}
                   type="button"
                   className={`ui-shell__link ui-more__button ${moreActive ? "is-active" : ""}`}
-                  onClick={() => setMoreOpen((current) => !current)}
+                  onClick={toggleMore}
                   aria-expanded={moreOpen}
                   aria-haspopup="menu"
+                  aria-controls="app-more-menu"
                 >
                   More <FiChevronDown aria-hidden="true" />
                 </button>
-                {moreOpen && (
-                  <div className="ui-more__menu" role="menu">
-                    {overflowLinks.map((link) => (
-                      <Link
-                        key={link.to}
-                        to={link.to}
-                        role="menuitem"
-                        className={`ui-more__item ${isLinkActive(location.pathname, link.to) ? "is-active" : ""}`}
-                      >
-                        {link.label}
-                      </Link>
-                    ))}
-                  </div>
-                )}
               </div>
             )}
           </nav>
+
+          {moreOpen &&
+            overflowLinks.length > 0 &&
+            createPortal(
+              <div
+                id="app-more-menu"
+                ref={moreMenuRef}
+                className="ui-more__menu"
+                role="menu"
+                style={
+                  morePosition
+                    ? { top: morePosition.top, left: morePosition.left }
+                    : { visibility: "hidden" }
+                }
+              >
+                {overflowLinks.map((link) => (
+                  <Link
+                    key={link.to}
+                    to={link.to}
+                    role="menuitem"
+                    className={`ui-more__item ${isLinkActive(location.pathname, link.to) ? "is-active" : ""}`}
+                    onClick={() => setMoreOpen(false)}
+                  >
+                    {link.label}
+                  </Link>
+                ))}
+              </div>,
+              document.body
+            )}
 
           <div className="ui-shell__user">
             <Badge variant={role === "superadmin" ? "warning" : role === "teacher" ? "primary" : "neutral"}>
@@ -264,15 +327,7 @@ const AppShell = ({ role, name, email, onLogout, links = [], children }) => {
               )}
             </div>
 
-            <button
-              type="button"
-              className={iconButton}
-              onClick={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
-              title={theme === "dark" ? "Use light theme" : "Use dark theme"}
-              aria-label={theme === "dark" ? "Use light theme" : "Use dark theme"}
-            >
-              {theme === "dark" ? <FiSun aria-hidden="true" /> : <FiMoon aria-hidden="true" />}
-            </button>
+            <ThemeToggle />
 
             <div className="ui-user-info">
               <span className="ui-user-info__name">{name}</span>

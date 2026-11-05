@@ -2,7 +2,7 @@
   position: sticky;
   top: 0;
   z-index: 100;
-  background: rgba(255, 255, 255, 0.8);
+  background: var(--bar-bg);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border);
@@ -16,6 +16,12 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.navbar__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .navbar__status {

@@ -158,8 +158,9 @@ teacher-confirmed attendance instead.
 
 **Current phase:** the product layer is built, including teacher-confirmed registers,
 queries, analytics, exports, notifications, timetable, PWA and a production-capable
-super-admin console. Roster PDF text extraction with an editable preview is built; timetable
-PDF import, local OCR and Gemini extraction are not. It is still **evidence-only for acoustic
+super-admin console. Roster PDF text extraction with an editable preview is built, and
+timetable PDF text extraction with a read-only preview is built (A2a). Structured timetable
+row parsing, local OCR and Gemini extraction are not. It is still **evidence-only for acoustic
 proof**: the app does not automatically score attendance or run the ID round. The attendance
 decision belongs to the teacher and is audited.
 
@@ -202,9 +203,10 @@ decision belongs to the teacher and is audited.
 
 ## 11. P1 admin hardening (approved 2026-11-05)
 
-**Status (2026-11-05):** implemented and tested locally. The P1 slice passed at backend
-**227/227** in both test modes and frontend **84/84**; after the roster PDF slice the current
-gate is backend **245/245** and frontend **90/90**. The production build is green, and a
+**Status (2026-11-06):** implemented and tested locally. The P1 slice passed at backend
+**227/227** in both test modes and frontend **84/84**; after the roster and timetable PDF
+text-preview slices the current gate is backend **255/255** and frontend **96/96**. The
+production build is green, and a
 Chrome virtual-authenticator run passed the full enrollment → 428 → step-up →
 settings-save → chain-verify path.
 
@@ -233,7 +235,8 @@ runs the existing validation preview and confirms the save.
 | Slice | Status | Design | Limit |
 | --- | --- | --- | --- |
 | A1 Roster PDF text extraction | **Built** | `POST /classes/:classId/roster/pdf/preview` accepts one PDF from the owning teacher. PDF.js reads the embedded text layer, reconstructs visual lines and returns editable text plus page/line/email counts. The frontend fills the roster textarea; the existing preview and explicit save remain unchanged. | Text-layer PDFs only. 10 MB, 20 pages and 200,000 characters; 20 extractions per 10 minutes per account/IP; in-memory, no file persistence. Scanned PDFs return `pdf_no_text_layer`. Real college layouts are unvalidated because no sample PDFs exist. |
-| A2 Timetable PDF import | **Not built** | Extract text, match course code/section to an existing owned class, preview slots and require confirmation. Unmatched rows are flagged for manual class creation. | Must never create a class automatically or overwrite a slot without the teacher seeing the change. Needs representative timetable PDFs before parser work. |
+| A2a Timetable PDF text preview | **Built** | `POST /timetable/pdf/preview` accepts one PDF from a teacher or super-admin and returns the embedded text layer as a read-only preview with page/line counts. The teacher adds each slot through the normal form. | Text-layer PDFs only. Same 10 MB, 20-page, 200,000-character and 20-per-10-minute limits as roster extraction. It never parses rows, matches classes, creates a class or writes a slot. Structured parsing is not built because no representative timetable PDFs exist. |
+| A2b Structured timetable import | **Not built** | Match course code/section to an existing owned class, preview slots and require confirmation. Unmatched rows are flagged for manual class creation. | Must never create a class automatically or overwrite a slot without the teacher seeing the change. Needs representative timetable PDFs before parser work. |
 | A3 Local OCR | **Not built** | Render scanned pages locally and run a free in-process OCR engine. The OCR output still goes through the same editable preview. | No paid service or card. OCR accuracy and runtime must be measured on sample scans before it is offered. |
 | A4 Optional Gemini extraction | **Gated** | A last-resort structured extractor for documents that text extraction and OCR cannot structure. Raw rosters may leave the server only after the consent and risk text below exists. | The Gemini free tier may use content to improve products and may involve human review. No AI path is coded until the owner accepts that risk in this file. |
 

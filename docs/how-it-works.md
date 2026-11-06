@@ -108,6 +108,24 @@ limited to **20 extractions per 10 minutes** per account/IP. A scanned PDF retur
 code. Local OCR is not built yet. No real college PDFs have been supplied, so layout accuracy
 on those documents is unvalidated.
 
+### Timetable PDF text preview
+
+The teacher opens **Timetable → Import PDF text**. The browser sends one PDF to
+`POST /timetable/pdf/preview`; the server runs the same deterministic text-layer extraction
+and returns a read-only preview with page and line counts.
+
+This is deliberately **not** a timetable parser. It does not:
+
+- recognise day or time columns;
+- match course codes or sections to existing classes;
+- create a class, slot or attendance record; or
+- write anything to the database.
+
+The teacher reads the text and adds each slot with **Add slot**, choosing an existing owned
+class. Structured timetable parsing stays gated on representative timetable samples so the
+parser is not invented from guesswork. The same 10 MB, 20-page, 200,000-character and
+20-per-10-minute limits apply. A scanned timetable is rejected until local OCR exists.
+
 ## Check-in sessions and evidence
 
 The teacher opens **Check-in** (`/teacher/check-in`), chooses an owned class and starts a
@@ -212,7 +230,7 @@ that is an assumption, not a measurement.
 | --- | --- |
 | Google sign-in, allowlists, device review | `attendance-backend/controllers/googleAuthController.js`, `utils/signInPolicy.js` |
 | Classes, rooms, rosters | `attendance-backend/controllers/classController.js`, `utils/roster.js` |
-| Roster PDF extraction | `attendance-backend/utils/pdfText.js`, `middleware/pdfUpload.js`, `controllers/classController.js` |
+| Roster and timetable PDF text extraction | `attendance-backend/utils/pdfText.js`, `middleware/pdfUpload.js`, `controllers/classController.js`, `controllers/timetableController.js` |
 | Check-in sessions and wave history | `attendance-backend/controllers/checkInSessionController.js`, `utils/checkInSession.js` |
 | Proof transport | `attendance-backend/controllers/checkInProofController.js`, `utils/checkInProof.js` |
 | Attendance register, analytics and history | `attendance-backend/controllers/attendanceController.js`, `utils/attendance.js` |

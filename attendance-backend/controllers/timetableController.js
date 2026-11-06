@@ -7,6 +7,7 @@ const Enrollment = require("../models/enrollmentModels");
 const { writeAudit } = require("../utils/audit");
 const { getSettings } = require("../utils/settings");
 const { DAYS } = require("../models/timetableModels");
+const { extractPdfText, PdfTextError } = require("../utils/pdfText");
 
 const POPULATE = [
   { path: "courseClass", select: "courseCode title section teacher defaultRoom", populate: { path: "defaultRoom", select: "roomNo" } },
@@ -187,4 +188,48 @@ exports.deleteTimetable = catchAsyncError(async (req, res, next) => {
     isDemo: entry.isDemo,
   });
   res.status(200).json({ success: true });
+});
+
+/**
+ * Extract the text layer from a timetable PDF for teacher review.
+ *
+ * Preview-only: this does not parse rows, match classes or write a timetable.
+ * The teacher reads the extracted text and adds each slot through the normal
+ * form. Structured timetable parsing stays gated on representative samples.
+ */
+exports.previewTimetablePdf = catchAsyncError(async (req, res, next) => {
+  if (!req.file) {
+    const missing = new ErrorHandler("Choose a timetable PDF to extract.", 400);
+    missing.code = "pdf_missing";
+    return next(missing);
+  }
+
+  let extraction;
+  try {
+    extraction = await extractPdfText(req.file.buffer);
+  } catch (error) {
+    if (error instanceof PdfTextError) {
+      const pdfError = new ErrorHandler(error.message, error.statuscode);
+      pdfError.code = error.code;
+      return next(pdfError);
+    }
+    throw error;
+  }
+
+  if (!extraction.hasText) {
+    const noText = new ErrorHandler(
+      "This timetable PDF has no selectable text layer. Add slots manually for now; local OCR is not built yet.",
+      422
+    );
+    noText.code = "pdf_no_text_layer";
+    return next(noText);
+  }
+
+  res.status(200).json({
+    success: true,
+    extraction: {
+      ...extraction,
+      fileName: req.file.originalname,
+    },
+  });
 });

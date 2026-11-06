@@ -22,6 +22,7 @@
     "test:studentcheckin": "node --test src/components/student/studentCheckInView.node-tests.js",
     "test:auth": "node --test src/utils/auth.node-tests.js",
     "test:rosterimport": "node --test src/utils/rosterImport.node-tests.js",
+    "test:timetableimport": "node --test src/utils/timetableImport.node-tests.js",
     "eject": "react-scripts eject"
   },
   "eslintConfig": {

@@ -129,12 +129,15 @@ normal development; CORS allows `localhost:3000` and `127.0.0.1:3000`.
    rows, run **Preview roster** and confirm the save. Scanned PDFs without a text layer are
    rejected until local OCR is built. The roster is the list of students allowed to submit
    evidence.
-3. Open **Check-in** (`/teacher/check-in`): choose the class and start a session. The
+3. Open **Timetable** (`/timetable`) to plan the week. **Import PDF text** extracts only the
+   embedded text layer into a read-only preview; it creates no slot or class. Add each slot
+   with **Add slot** and choose an existing owned class.
+4. Open **Check-in** (`/teacher/check-in`): choose the class and start a session. The
    screen shows wave 0, a two-minute key and a countdown.
-4. Open the transmitter with **Open transmitter**, or inspect live evidence in the
+5. Open the transmitter with **Open transmitter**, or inspect live evidence in the
    **Evidence** card. **Advance wave** is enabled only after the current wave has at least
    one accepted proof.
-5. When the class is done, **confirm close** on the check-in screen. Then open the
+6. When the class is done, **confirm close** on the check-in screen. Then open the
    **Register**, mark students present/absent/excused and **finalise**. Finalising publishes
    the register; the 24-hour query window started when the session closed.
 
@@ -256,11 +259,12 @@ npm run test:checkin                     # 7
 npm run test:studentcheckin              # 9
 npm run test:auth                        # 2
 npm run test:rosterimport                # 6
+npm run test:timetableimport             # 6
 CI=true REACT_APP_API_URL=/api/v1 npm run build
 ```
 
-The current expected counts are **backend 245/245** in both default and
-`--test-isolation=none` modes, and **frontend 90/90** across the six frontend suites. The
+The current expected counts are **backend 255/255** in both default and
+`--test-isolation=none` modes, and **frontend 96/96** across the seven frontend suites. The
 production build writes `attendance-frontend/build/`; the backend serves it automatically
 when that folder exists.
 

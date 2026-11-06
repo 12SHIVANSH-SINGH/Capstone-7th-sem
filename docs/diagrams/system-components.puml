@@ -42,6 +42,7 @@ rectangle "Bio Attend web service\nNode.js · Express · one origin" as SRV {
   rectangle "Check-in sessions\nkeys · current wave · advance\nbounded key history" as SESS
   rectangle "Student discovery\nlive sessions · no key" as DISC
   rectangle "Proof transport\nsignature · evidence · 24 h TTL" as PROOF
+  rectangle "Document import\nPDF text layer · preview only" as DOC
   rectangle "Safety guards\nCSRF origin · rate limit · startup indexes" as GUARD
 }
 
@@ -50,6 +51,7 @@ database "MongoDB Atlas" as DB {
   rectangle "Classes · rooms\nrosters" as C
   rectangle "Check-in sessions\ncurrent key + bounded history" as S
   rectangle "Proof evidence\nTTL ~24 h" as P
+  rectangle "Timetable\nweekly slots" as T
 }
 
 rectangle "Google Identity" as G
@@ -70,6 +72,8 @@ DISC --> C
 DISC --> S
 PROOF --> S
 PROOF --> P
+DOC ..> C : roster text preview\nno auto-save
+DOC ..> T : timetable text preview\nno slot write
 PROOF ..> L3 : evidence feeds scoring\nonly after the owner starts it
 
 note bottom of RX
@@ -78,6 +82,12 @@ note bottom of RX
   A decoded key is evidence, not attendance.
   The device signature proves which bound account
   submitted it; it cannot prove physical presence.
+end note
+
+note bottom of DOC
+  Extract -> preview -> teacher confirms.
+  No class, slot or roster is created by extraction.
+  Scanned pages need local OCR, which is not built.
 end note
 
 @enduml

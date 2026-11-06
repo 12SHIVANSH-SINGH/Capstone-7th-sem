@@ -11,17 +11,12 @@ const {
   getRoster,
 } = require("../controllers/classController");
 const acceptPdfUpload = require("../middleware/pdfUpload");
-const { createRateLimiter } = require("../middleware/rateLimit");
+const { createPdfPreviewLimiter } = require("../middleware/pdfUpload");
 
 const router = express.Router();
 const teacherOnly = isAuthenticated.authorizeRoles("teacher");
 const guards = [isAuthenticated, teacherOnly];
-const pdfImportLimiter = createRateLimiter({
-  windowMs: 10 * 60 * 1000,
-  max: 20,
-  message: "Too many PDF extractions. Wait a few minutes and try again.",
-  keyFor: (req) => `${req.user?._id || "unknown"}:${req.ip || "unknown"}`,
-});
+const pdfImportLimiter = createPdfPreviewLimiter();
 
 // Guards are attached per route on purpose. A blanket router.use() here would
 // also swallow every /api/v1 route mounted after this router (Google sign-in,

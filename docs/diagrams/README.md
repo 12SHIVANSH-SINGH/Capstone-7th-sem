@@ -10,7 +10,7 @@ These diagrams focus on the acoustic/evidence path and do not replace that produ
 
 | File | What it shows | Use it for |
 | --- | --- | --- |
-| `system-components.puml` | Teacher phone, student phone, the Express service, MongoDB, Google Identity, the acoustic channel and the gated Layer 3 block | Orientation and architecture reviews |
+| `system-components.puml` | Teacher phone, student phone, the Express service, MongoDB, Google Identity, the acoustic channel, the PDF text-preview path and the gated Layer 3 block | Orientation and architecture reviews |
 | `check-in-flow.puml` | End-to-end check-in from the teacher starting a wave through student consent, discovery, decoding, evidence submission, the teacher evidence card and the evidence-gated wave advance; the gated future is a separate swimlane | Explaining what is built vs what is still blocked |
 | `proof-transport.puml` | The proof sequence: canonical message, device signature, guards, validation, `201`/`200`, evidence TTL | Security and API reviews of the proof endpoint |
 

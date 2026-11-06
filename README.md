@@ -13,7 +13,7 @@ Capstone project · NIT Jamshedpur
 
 </div>
 
-**Live prototype:** [https://bio-attend.onrender.com](https://bio-attend.onrender.com) — the public deployment is an earlier build (`029d18e`) of the full attendance product. The current tree adds P0/P1 security hardening (strict CSP, revocable sessions, teacher-approved device binding, passkey step-up and an audit hash chain) plus the latest docs. It is **built and tested locally but not committed or deployed**. The owner controls every push and deploy.
+**Live prototype:** [https://bio-attend.onrender.com](https://bio-attend.onrender.com) — the repository's `HEAD` and `origin/main` are **`32a2078`**, which includes the full attendance product plus P0/P1 security hardening (strict CSP, revocable sessions, teacher-approved device binding, passkey step-up and an audit hash chain). The live deployment's exact version was **not verified in this session**. The owner controls every push and deploy.
 
 > **Layer 1 gate status:** the owner has directed that Layer 1 be treated as **passed for build planning only**. This is an assumption, not a measurement. The 2026-10-25 sweep still fails at 5 m (4/10) and 10 m (1/10), and the reverse direction and muted control are unmeasured. Do not read this build as proof that the physical gate passed.
 
@@ -51,8 +51,8 @@ The student cascade (phones retransmitting the next key), automatic scoring and 
 | Super-admin console, audit, settings, impersonation, demo data | ✅ built and locally verified, including a Gmail super-admin in a production-mode check |
 | Passkey step-up, audit hash chain, export limits, readiness, JWT rotation | ✅ built; browser E2E passed with a Chrome virtual authenticator |
 | Roster PDF extraction → editable preview | ✅ text-based PDFs only, verified with generated fixtures; real college PDFs and scanned OCR still unvalidated |
-| Timetable PDF import | ⛔ not built; needs sample timetable PDFs |
-| Production deployment of this tree | ⏳ not done — Render still runs `029d18e`; the owner must configure and deploy |
+| Timetable PDF text extraction → read-only preview | ✅ text-based PDFs only; no row parsing, class matching or slot creation; needs sample timetable PDFs for structured import |
+| Production deployment of this tree | ⏳ exact live version not verified in this session; the owner controls deploy |
 | Real Google/phone multi-wave rehearsal | ⏳ pending |
 | Student cascade, automatic scoring, ID round, mobile app | ⛔ not built / gated |
 
@@ -111,7 +111,7 @@ available in production. Resetting demo data preserves the signed-in admin accou
 ## Tests
 
 ```bash
-cd attendance-backend && npm test                     # 245 tests
+cd attendance-backend && npm test                     # 255 tests
 cd attendance-backend && npm test -- --test-isolation=none
 cd attendance-frontend && npm run test:proof          # 15 tests
 cd attendance-frontend && npm run test:acoustic       # 51 tests
@@ -119,14 +119,16 @@ cd attendance-frontend && npm run test:checkin        # 7 tests
 cd attendance-frontend && npm run test:studentcheckin # 9 tests
 cd attendance-frontend && npm run test:auth           # 2 tests
 cd attendance-frontend && npm run test:rosterimport   # 6 tests
+cd attendance-frontend && npm run test:timetableimport # 6 tests
 cd attendance-frontend && CI=true REACT_APP_API_URL=/api/v1 npm run build
 ```
 
-The working tree also passed a 65-check browser smoke across the super-admin, teacher,
+Earlier sessions passed a 65-check browser smoke across the super-admin, teacher,
 student and query flows, a 13-check production-mode Gmail-admin check, mobile/dark checks,
 production PWA/offline checks, and a WebAuthn end-to-end flow using Chrome's virtual
 authenticator (428 before enrollment, passkey registration, settings retry and a verified
-audit chain). Those temporary harnesses are not part of the repo's npm test commands.
+audit chain). Those temporary harnesses are not part of the repo's npm test commands. The A2a
+timetable preview modal has helper tests and a production build, but no browser smoke yet.
 
 ## Documentation
 
@@ -146,4 +148,4 @@ audit chain). Those temporary harnesses are not part of the repo's npm test comm
 - Attendance queries expire 24 hours after a session closes. Expired queries stay reviewable and can be reopened with an audit entry; approving a query marks the student present.
 - Demo data is available only outside production and is clearly marked `@demo.invalid`; it never replaces the signed-in admin account.
 - The production layout is one service so cookies stay first-party. The older split Vercel/Render option is documented only as an alternative.
-- Roster PDF import reads only an embedded text layer and fills an editable box; it never saves automatically. Scanned PDFs are rejected until local OCR is built. No real college PDFs have been supplied, so layout accuracy on those documents is unvalidated. Timetable PDF import and any Gemini extraction remain gated.
+- Roster PDF import reads only an embedded text layer and fills an editable box; it never saves automatically. Timetable PDF import also reads only the text layer and shows a read-only preview; it never creates a slot or class. Scanned PDFs are rejected until local OCR is built. No real college PDFs have been supplied, so layout accuracy and structured timetable parsing remain unvalidated. Gemini extraction remains gated.

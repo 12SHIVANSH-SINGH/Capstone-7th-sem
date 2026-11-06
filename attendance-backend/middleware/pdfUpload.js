@@ -1,5 +1,6 @@
 const multer = require("multer");
 const ErrorHandler = require("../utils/errorhandler");
+const { createRateLimiter } = require("./rateLimit");
 const { MAX_PDF_BYTES } = require("../utils/pdfText");
 
 // Keep a teacher-supplied PDF in memory only. It is parsed for preview and
@@ -31,6 +32,17 @@ const acceptPdfUpload = (req, res, next) =>
     return next(error);
   });
 
+// Both PDF preview routes share the same preview limits. Each router creates
+// its own in-memory bucket, so the cap is per route, account and IP.
+const createPdfPreviewLimiter = () =>
+  createRateLimiter({
+    windowMs: 10 * 60 * 1000,
+    max: 20,
+    message: "Too many PDF extractions. Wait a few minutes and try again.",
+    keyFor: (req) => `${req.user?._id || "unknown"}:${req.ip || "unknown"}`,
+  });
+
 module.exports = acceptPdfUpload;
 module.exports.acceptPdfUpload = acceptPdfUpload;
+module.exports.createPdfPreviewLimiter = createPdfPreviewLimiter;
 module.exports.MAX_PDF_BYTES = MAX_PDF_BYTES;

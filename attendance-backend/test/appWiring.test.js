@@ -96,6 +96,18 @@ test("the roster PDF preview route is mounted behind authentication", async (t) 
   assert.match((await response.json()).message, /login/i);
 });
 
+test("the timetable PDF preview route is mounted behind authentication", async (t) => {
+  const { server, baseUrl } = await start();
+  t.after(() => stop(server));
+
+  const response = await fetch(`${baseUrl}/api/v1/timetable/pdf/preview`, {
+    method: "POST",
+  });
+
+  assert.equal(response.status, 401);
+  assert.match((await response.json()).message, /login/i);
+});
+
 test("the real app still serves the health route", async (t) => {
   const { server, baseUrl } = await start();
   t.after(() => stop(server));

@@ -98,9 +98,20 @@ check the validation errors before **Save roster**. A saved roster still needs t
 confirmation step; extraction itself never writes enrollments. Real college PDF layouts are
 unvalidated until sample documents are supplied.
 
-**PDF upload returns 401 or 404**
-The session expired, the caller is not a teacher, or the class is not owned by that teacher.
-Sign in again and open the class from **Classes**.
+**Timetable PDF upload returns `pdf_no_text_layer`**
+The timetable is a scan or has no embedded text layer. Add slots manually for now; local OCR
+is not built. The timetable import is a text preview only and never creates a slot.
+
+**Timetable PDF extraction worked but no slots appeared**
+That is expected. A2a reads the PDF text and shows a read-only preview; structured row
+parsing and class matching are not built. Add each slot with **Add slot** and choose an
+existing owned class. Extraction never creates a class, slot or attendance record. Real
+timetable layouts are unvalidated until sample documents are supplied.
+
+**PDF upload returns 401, 403 or 404**
+The session expired, the role is wrong, or a roster route was called for a class the teacher
+does not own. Timetable extraction requires a teacher or super-admin; token/class roster
+extraction requires the owning teacher. Sign in again and open the right page.
 
 **`/health/ready` returns 503**
 The process is alive but MongoDB is not connected. Check `DB_URI`, Atlas network access and

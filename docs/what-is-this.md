@@ -41,15 +41,16 @@ the signed proof is submitted.
 | Teacher-confirmed attendance register | ✅ mark present/absent/excused, finalise, edit with an audit note, inspect evidence and query history |
 | Attendance queries | ✅ 24-hour window after session close, location/time evidence, approve/reject/reopen with audit; approved queries count as present |
 | Analytics, exports and supporting pages | ✅ per-class/per-student analytics, trends, session history, PDF/Excel exports, notifications, timetable, profile and help |
+| Roster and timetable PDF text previews | ✅ text-based PDFs only; roster text remains editable and requires preview + confirmation, timetable text is read-only and creates no slot; real college layouts and OCR remain unvalidated |
 | Super-admin console | ✅ users/classes/sessions, settings, audit with hash-chain verification, overrides/deletion, impersonation; `SUPER_ADMIN_EMAILS` is an environment grant and works in production; demo seed/reset is development-only |
 | Admin security | ✅ passkey step-up for destructive actions (five-minute approval cookie), teacher-approved first/replacement devices, revocable sessions, strict CSP and SHA-256 audit chain |
 | Live phone-to-phone tone test | ⚠️ 1 m 10/10, 2 m 9/10, 3 m 9/10, **5 m 4/10**, **10 m 1/10** (2026-10-25 sweep); reverse direction and muted control unmeasured; gate not measured as met |
 | Full flow on real phones | ⏳ attendance is teacher-confirmed and the local browser flow works end to end; a real-phone/Google multi-wave rehearsal, measured acoustic range, the student cascade, automatic scoring and the ID round are still pending |
 
-This is a demo-ready capstone prototype — not yet used for real attendance. The live
-deployment at <https://bio-attend.onrender.com> runs `029d18e`, which includes the
-attendance/query/admin layer but not the P0/P1 security hardening; the owner has not deployed
-the current tree.
+This is a demo-ready capstone prototype — not yet used for real attendance. The repository's
+`HEAD` and `origin/main` are `32a2078`, which includes the attendance/query/admin layer and
+the P0/P1 security hardening. The live deployment's exact version was not verified in this
+session; the owner controls every push and deploy.
 
 ## Learn more
 

@@ -22,7 +22,7 @@ Before doing anything:
 4. Tell me in a few lines: the current layer, the single slice you will work on, and its
    pass/fail test.
 
-Current state (2026-11-05, session 24; details in `progress.md`):
+Current state (2026-11-06, session 26; details in `progress.md`):
 
 - **Layer 1 is assumed passed by owner direction (2026-10-29) for build planning only. This
   is not a measurement.** The 2026-10-25 sweep recorded **1 m 10/10, 2 m 9/10, 3 m 9/10,
@@ -56,26 +56,36 @@ Current state (2026-11-05, session 24; details in `progress.md`):
 - **Super-admin:** exact-match `SUPER_ADMIN_EMAILS` environment grant. For this project:
   `12shivanshsingha@gmail.com`; admin sessions default to 12 hours. It must not overlap
   `TEACHER_EMAILS` or a `TEST_*` list. Demo routes return 404 in production.
-- **Local gates:** backend **227/227** under `npm test` and `--test-isolation=none`;
-  frontend **84/84** (proof 15, acoustic 51, check-in 7, student check-in 9, auth 2); the
-  clean `CI=true REACT_APP_API_URL=/api/v1 npm run build` compiles successfully. The WebAuthn
+- **Document ingestion has started:** **A1 roster PDF text extraction → editable preview**
+  and **A2a timetable PDF text extraction → read-only preview** are built and tested with
+  generated PDF fixtures. Both read only an embedded text layer, reject scanned pages and
+  never save automatically. A1 fills the roster textarea for the existing preview/save; A2a
+  never parses rows, matches classes, creates a class or writes a slot. A2b structured
+  timetable import, local OCR (A3) and consent-gated Gemini extraction (A4) are not built.
+- **Local gates:** backend **255/255** under `npm test` and `--test-isolation=none`;
+  frontend **96/96** (proof 15, acoustic 51, check-in 7, student check-in 9, auth 2, roster
+  import 6, timetable import 6); the clean
+  `CI=true REACT_APP_API_URL=/api/v1 npm run build` compiles successfully. The WebAuthn
   browser E2E passed with a Chrome virtual authenticator: 428 before enrollment, passkey
   registration, five-minute cookie, settings retry and a 3-entry verified audit chain with
   zero console errors.
 - **Other recorded smokes:** dev **65/65**, production-mode Gmail-admin **13/13**, mobile/dark
   **27/27**, production PWA/offline **16/16**, CSP production-build audit **7/7** page loads.
   These use temporary browser harnesses, not repo npm commands.
-- **Production:** Render runs **`029d18e`** at https://bio-attend.onrender.com and does **not**
-  include the P0/P1 security work. Local `HEAD` and `origin/main` are also **`029d18e`**; the
-  current P0/P1, PWA and dark-mode work is **uncommitted** in the working tree. No push, tag,
-  merge or deploy has been performed. The owner reviews, commits, pushes and deploys manually.
-- **Next slice:** **PDF/timetable/roster ingestion**, in this order: deterministic text
-  extraction → preview → local OCR → optional LLM extraction → teacher confirmation. **No
-  sample PDFs have been supplied yet**, so do not invent parser behaviour or claim accuracy;
-  ask for representative timetable and roster PDFs first. Timetable import must schedule
-  **existing classes only** and flag unmatched rows for manual class creation. Roster import
-  must preview and require teacher confirmation; never auto-save a roster or auto-mark
-  attendance. Use free options only and never require a payment card.
+- **Repository:** local `HEAD`, `origin/main` and `origin/HEAD` are **`32a2078`**; the A1
+  roster PDF slice, P0/P1 security, PWA and dark-mode work are committed and pushed. The A2a
+  timetable-preview changes are **uncommitted** in the working tree pending owner review. The
+  live Render deployment version was not verified; do not assume it matches `32a2078`. No
+  push, tag, merge or deploy has been performed. The owner reviews, commits, pushes and
+  deploys manually.
+- **Next slice:** **A2b structured timetable import**, but only after representative
+  timetable PDFs are supplied. Match course code/section to an existing owned class, show a
+  slot preview and require teacher confirmation; flag unmatched rows for manual class
+  creation. Do not invent parser behaviour or claim accuracy without samples. Timetable
+  import must never create a class automatically or overwrite a slot without the teacher
+  seeing the change. Local OCR (A3) follows. Roster import must preview and require teacher
+  confirmation; never auto-save a roster or auto-mark attendance. Use free options only and
+  never require a payment card.
 - **Gemini gate:** raw rosters may go to the free tier only after an explicit student notice
   and a documented risk acceptance are written into `plan.md`. That text does not exist yet;
   do not write the AI path before it does.
@@ -124,8 +134,9 @@ Short version if the files are unavailable:
 > small slice, test it, record the real result, and move on only if it passed. The product
 > includes teacher-confirmed attendance, queries, analytics, exports, a production
 > super-admin console, passkey step-up and an audit hash chain. Acoustic proof is evidence-only.
-> Backend **227/227**, frontend **84/84**. The next slice is PDF/timetable/roster ingestion,
-> but sample PDFs and the Gemini consent/risk text are still missing, so ask before building.
+> Backend **255/255**, frontend **96/96**. A1 roster PDF extraction and A2a timetable PDF
+> text preview are built; A2b structured timetable import is next but needs representative
+> timetable PDFs, and the Gemini consent/risk text is still missing, so ask before building.
 > Physical 5 m/10 m range work, reverse/muted control and a real Google/phone rehearsal remain
 > open. Layer 1 is an owner assumption for build planning only, not a measured pass. Never
 > push, tag, merge or deploy.

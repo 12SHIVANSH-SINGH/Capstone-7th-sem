@@ -48,7 +48,7 @@ then checks `/islogin`; the access column describes where the page sends you.
 | `/admin` | Super-admin | Production console: overview, users, classes, sessions, attendance overrides/deletion, queries, audit, passkey security, settings and impersonation. Demo controls appear only outside production. Destructive actions ask for a passkey. |
 | `/notifications` | Signed in | Personal notification centre; mark one/all read or clear read items. |
 | `/profile` | Signed in | Account identity, role badge, phone label and display-name settings. The role cannot be changed here. |
-| `/timetable` | Signed in | Weekly timetable. Students read; teachers and super-admins can add, edit and delete slots. A slot never starts attendance by itself. |
+| `/timetable` | Signed in | Weekly timetable. Students read; teachers and super-admins can add, edit and delete slots or extract a text-based PDF into a read-only text preview. A slot never starts attendance by itself. |
 | `/help` | Signed in | Role-specific onboarding, workflow and FAQ. |
 | `/acoustic-lab` | Public | Phone audio lab: sample-rate gate, mic settings, seven probe tones and margins. No sign-in needed. |
 | `/acoustic-tx` | Public | Two-phone transmitter. Accepts `?key=<decimal>&from=checkin` to prefill a session key and show a back link to the teacher screen. |
@@ -146,12 +146,15 @@ then checks `/islogin`; the access column describes where the page sends you.
 | POST | `/notifications/:notificationId/read` | Signed in | Mark one notification read. |
 | DELETE | `/notifications/read` | Signed in | Clear already-read notifications. |
 | GET | `/timetable` | Signed in | Read timetable entries visible to the caller. |
+| POST | `/timetable/pdf/preview` | Staff, rate limited | Multipart upload of one text-based PDF (field `file`). Extract the embedded text layer and return a read-only text preview. It never parses rows, matches classes, creates a slot or creates a class. 10 MB, 20 pages, 200,000 characters, 20 requests per 10 minutes per account/IP. |
 | POST | `/timetable` | Staff | Create a weekly slot for an owned class. |
 | PATCH | `/timetable/:entryId` | Staff | Edit a slot. |
 | DELETE | `/timetable/:entryId` | Staff | Delete a slot. |
 
-Timetable PDF import is **not built**. The future route must schedule existing owned classes
-only, preview every slot and flag unmatched rows for manual class creation.
+Timetable PDF text extraction (A2a) is **built**; it only fills a read-only preview. Structured
+row parsing, class matching and automatic slot creation are **not built**. The next step must
+schedule existing owned classes only, preview every slot and flag unmatched rows for manual
+class creation. The route never creates a class or marks attendance.
 
 ### Exports
 

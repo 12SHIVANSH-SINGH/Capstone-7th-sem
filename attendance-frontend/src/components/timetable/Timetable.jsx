@@ -1,17 +1,25 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import {
   FiAlertTriangle,
   FiCalendar,
   FiClock,
   FiEdit3,
+  FiFileText,
   FiPlus,
   FiRefreshCw,
   FiTrash2,
+  FiUpload,
 } from "react-icons/fi";
 import SERVER_URL from "../../config/api";
 import useRoleSession from "../../hooks/useRoleSession";
 import { classLabel, formatDate } from "../../utils/format";
+import {
+  extractionSummary,
+  importErrorMessage,
+  isPdfFile,
+} from "../../utils/timetableImport";
 import AppShell from "../../ui/AppShell";
 import Badge from "../../ui/Badge";
 import Button from "../../ui/Button";
@@ -21,6 +29,7 @@ import Field from "../../ui/Field";
 import Modal from "../../ui/Modal";
 import { PageLoader } from "../../ui/Spinner";
 import { useToast } from "../../ui/Toast";
+import "./timetable.css";
 
 const requestConfig = { withCredentials: true };
 const messageFor = (error, fallback) =>
@@ -30,6 +39,7 @@ const weekdayOrder = [1, 2, 3, 4, 5, 6, 0];
 
 const Timetable = () => {
   const { user, loading, logout } = useRoleSession(["student", "teacher", "superadmin"]);
+  const navigate = useNavigate();
   const toast = useToast();
   const role = user?.role || "student";
   const canEdit = role === "teacher" || role === "superadmin";
@@ -45,6 +55,12 @@ const Timetable = () => {
   const [editor, setEditor] = useState(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState("");
+  const [importingPdf, setImportingPdf] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importText, setImportText] = useState("");
+  const [importNotice, setImportNotice] = useState("");
+  const [importFileName, setImportFileName] = useState("");
+  const pdfInputRef = useRef(null);
   const [form, setForm] = useState({
     classId: "",
     dayOfWeek: 1,
@@ -185,6 +201,41 @@ const Timetable = () => {
     }
   };
 
+  const importPdf = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || importingPdf) return;
+
+    if (!isPdfFile(file)) {
+      toast("Choose a PDF file to preview its text.", "error");
+      return;
+    }
+
+    setImportingPdf(true);
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      const response = await axios.post(
+        `${SERVER_URL}/timetable/pdf/preview`,
+        body,
+        requestConfig
+      );
+      const extraction = response.data?.extraction || {};
+      setImportText(String(extraction.text || ""));
+      setImportFileName(String(extraction.fileName || file.name || ""));
+      setImportNotice(extractionSummary(extraction));
+      setImportOpen(true);
+    } catch (requestError) {
+      if (requestError?.response?.status === 401) {
+        navigate("/login");
+        return;
+      }
+      toast(importErrorMessage(requestError), "error");
+    } finally {
+      setImportingPdf(false);
+    }
+  };
+
   if (loading || pageLoading) return <PageLoader label="Loading timetable…" />;
   if (!user) return <PageLoader label="Opening sign in…" />;
 
@@ -207,9 +258,27 @@ const Timetable = () => {
             <FiRefreshCw aria-hidden="true" /> Refresh
           </Button>
           {canEdit && (
-            <Button size="sm" onClick={openCreate} disabled={classes.length === 0}>
-              <FiPlus aria-hidden="true" /> Add slot
-            </Button>
+            <>
+              <input
+                ref={pdfInputRef}
+                type="file"
+                accept=".pdf,application/pdf"
+                hidden
+                onChange={importPdf}
+              />
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => pdfInputRef.current?.click()}
+                loading={importingPdf}
+                disabled={importingPdf}
+              >
+                <FiUpload aria-hidden="true" /> Import PDF text
+              </Button>
+              <Button size="sm" onClick={openCreate} disabled={classes.length === 0}>
+                <FiPlus aria-hidden="true" /> Add slot
+              </Button>
+            </>
           )}
         </div>
       </div>
@@ -284,6 +353,20 @@ const Timetable = () => {
           </div>
         )}
       </Card>
+
+      {canEdit && (
+        <div className="notice notice--info">
+          <FiFileText className="notice__icon" aria-hidden="true" />
+          <div>
+            <strong>Timetable PDF import is text-only</strong>
+            <p>
+              Uploading extracts the selectable text for review. No slot or class is created:
+              add each slot with <strong>Add slot</strong>. Scanned PDFs need local OCR, which
+              is not built yet.
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="notice notice--info">
         <FiClock className="notice__icon" aria-hidden="true" />
@@ -405,6 +488,47 @@ const Timetable = () => {
             </div>
           )}
         </form>
+      </Modal>
+
+      <Modal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        title="Timetable PDF text preview"
+        subtitle={
+          importFileName
+            ? `${importFileName} · ${importNotice}`
+            : importNotice
+        }
+        wide
+        footer={<Button variant="secondary" onClick={() => setImportOpen(false)}>Close preview</Button>}
+      >
+        <div className="page-stack">
+          <div className="notice notice--warning">
+            <FiAlertTriangle className="notice__icon" aria-hidden="true" />
+            <div>
+              <strong>Nothing has been scheduled</strong>
+              <p>
+                This is the PDF's embedded text, not a parsed timetable. No class was matched,
+                no slot was created and no attendance was changed. Use <strong>Add slot</strong>{" "}
+                for each row you want to keep.
+              </p>
+            </div>
+          </div>
+          <Field
+            label="Extracted text"
+            htmlFor="timetable-import-text"
+            hint="Read-only preview. Structured row parsing is not built until representative timetable samples are supplied."
+          >
+            <textarea
+              id="timetable-import-text"
+              className="ui-textarea timetable-import__text"
+              value={importText}
+              readOnly
+              rows={16}
+              spellCheck={false}
+            />
+          </Field>
+        </div>
       </Modal>
     </AppShell>
   );

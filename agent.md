@@ -13,7 +13,7 @@ The server mints keys, records signed proof evidence and keeps an audited attend
 register. A **teacher confirms attendance**; a decoded tone is not an automatic verdict.
 Full detail is in `plan.md`; do not restate or redesign it here.
 
-## Current phase (2026-11-05, session 24)
+## Current phase (2026-11-06, session 26)
 
 - **Layer 1 is assumed passed by owner direction (2026-10-29) for build planning only.** This
   is **not** a measured pass. The 2026-10-25 sweep decoded 10/10 at 1 m, 9/10 at 2 m, 9/10 at
@@ -36,10 +36,11 @@ Full detail is in `plan.md`; do not restate or redesign it here.
   score. The teacher opens the register, sees evidence/optional location and marks
   present/absent/excused; finalisation and every correction are audited. Scoring, the ID
   round and the student cascade remain unbuilt.
-- **Production is `029d18e`** at <https://bio-attend.onrender.com> and does **not** include the
-  P0/P1 hardening. Local `HEAD` and `origin/main` are `029d18e`; the P0/P1 security, PWA and
-  dark-mode work is **uncommitted** in the working tree. No push, tag, merge or deploy was
-  performed.
+- **Repository state (2026-11-06):** local `HEAD` and `origin/main` are **`32a2078`**, which
+  includes the A1 roster PDF slice, P0/P1 security, PWA and dark-mode work. The A2a
+  timetable-preview changes are uncommitted in the working tree pending owner review. The
+  exact live Render version was **not verified in this session**; do not claim the deployment
+  matches the repository without checking.
 - **The owner controls every push and deploy.** Never push, tag, merge, or deploy unless the
   owner explicitly asks in that session. A green local suite is not permission to publish.
 - **Roster PDF extraction is built (A1):** an authenticated teacher uploads a text-based
@@ -48,11 +49,16 @@ Full detail is in `plan.md`; do not restate or redesign it here.
   confirms the save. Scanned PDFs are rejected; nothing is auto-saved. The path is tested with
   generated PDF fixtures, **not real college PDFs**; do not claim layout accuracy without
   samples.
-- **Next slice (A2):** timetable PDF import, then local OCR, then optional Gemini extraction.
-  **No sample timetable or roster PDFs have been supplied yet**, so do not invent parser
-  behaviour or claim extraction accuracy. Timetable import must schedule existing classes
-  only; unmatched rows are flagged for manual class creation. Local OCR comes after
-  text-layer extraction, and optional Gemini extraction comes last.
+- **Timetable PDF text preview is built (A2a):** a teacher or super-admin uploads a text-based
+  PDF to `POST /timetable/pdf/preview`; the server returns a **read-only** text preview with
+  page/line counts. It never parses rows, matches classes, creates a class or writes a slot.
+  The teacher adds slots through the existing form. Tested with generated PDF fixtures, not
+  real timetable PDFs.
+- **Next slice (A2b):** structured timetable row parsing, then local OCR, then optional
+  Gemini extraction. **No sample timetable or roster PDFs have been supplied yet**, so do not
+  invent parser behaviour or claim extraction accuracy. Structured timetable import must
+  schedule existing classes only; unmatched rows are flagged for manual class creation. Local
+  OCR comes after text-layer extraction, and optional Gemini extraction comes last.
 - **Gemini gate:** raw rosters may go to the free tier only after an explicit student notice
   and a documented risk acceptance are written into `plan.md`. That text does not exist yet;
   do not write the AI path before it does.
@@ -114,14 +120,15 @@ Full detail is in `plan.md`; do not restate or redesign it here.
 Current local gate (all must pass before asking the owner to deploy):
 
 ```bash
-cd attendance-backend && npm test                              # 245/245
-cd attendance-backend && npm test -- --test-isolation=none     # 245/245
+cd attendance-backend && npm test                              # 255/255
+cd attendance-backend && npm test -- --test-isolation=none     # 255/255
 cd attendance-frontend && npm run test:proof                    # 15/15
 cd attendance-frontend && npm run test:acoustic                 # 51/51
 cd attendance-frontend && npm run test:checkin                  # 7/7
 cd attendance-frontend && npm run test:studentcheckin           # 9/9
 cd attendance-frontend && npm run test:auth                     # 2/2
 cd attendance-frontend && npm run test:rosterimport             # 6/6
+cd attendance-frontend && npm run test:timetableimport          # 6/6
 ```
 
 Production build (same API path and empty hosted-domain hint as the deployed site):
@@ -145,9 +152,9 @@ checks. A pure unit test is not enough for those routes.
   attendance, queries, exports, sessions, admin, notifications, timetable, profile, help,
   sound lab, TX/RX and the student shell.
 - `attendance-backend/` — Express API: Google sign-in, classes/rosters, text-layer PDF roster
-  extraction, teacher-approved device binding, check-in sessions, proof transport, attendance
-  register, queries, exports, notifications, timetable, admin, passkey step-up, audit hash
-  chain, startup/index readiness and CSRF origin guard.
+  and timetable previews, teacher-approved device binding, check-in sessions, proof transport,
+  attendance register, queries, exports, notifications, timetable, admin, passkey step-up,
+  audit hash chain, startup/index readiness and CSRF origin guard.
 - `docs/routes.md` — every page/API path and its access rule.
 - `docs/diagrams/` — `system-components.puml`, `check-in-flow.puml`,
   `proof-transport.puml`.
@@ -193,9 +200,11 @@ checks. A pure unit test is not enough for those routes.
   and rate-limited.
 - **PDF/timetable ingestion is extract → preview → teacher confirms.** Never auto-save an
   imported roster, never create classes from a timetable, and never mark attendance from an
-  import. An unmatched timetable row is flagged for manual class creation. The current
-  extractor reads only an embedded text layer; never present OCR output as implemented until
-  local OCR is actually built and tested.
+  import. The timetable route currently returns a read-only text preview only: it does not
+  parse rows, match classes or write slots. An unmatched timetable row is flagged for manual
+  class creation once structured parsing is built. The current extractor reads only an
+  embedded text layer; never present OCR output as implemented until local OCR is actually
+  built and tested.
 - **No room hardware.** The teacher's ordinary phone starts the process and is never passed
   around.
 - **Mic/audio need a user tap and HTTPS.** Disable echoCancellation, noiseSuppression and

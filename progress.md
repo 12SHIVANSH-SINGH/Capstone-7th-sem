@@ -3,8 +3,8 @@
 Update this at the end of every session. If it disagrees with the real code, the code wins:
 fix this file and tell the owner.
 
-Last updated: **2026-11-05** (session 25: roster PDF extraction A1; backend **245/245**,
-frontend **90/90**, production build green, CSP browser audit **7/7** page loads,
+Last updated: **2026-11-06** (session 26: timetable PDF text preview A2a; backend **255/255**,
+frontend **96/96**, production build green, CSP browser audit **7/7** page loads,
 WebAuthn browser E2E passed).
 
 ## Status
@@ -17,10 +17,12 @@ WebAuthn browser E2E passed).
   binding, encrypted backup scripts and supply-chain scanning. P1 adds WebAuthn/passkey
   step-up for destructive admin actions, an audit hash chain with verification, export auditing
   and rate limits, `/health/ready`, JWT rotation and the settings-patch fix. The document
-  phase has started: **A1 roster PDF text extraction → editable preview** is built and tested
-  with generated fixtures. Timetable PDF import (A2), local OCR (A3) and consent-gated Gemini
-  extraction (A4) are not built. Scoring, automatic attendance decisions and the ID round are
-  not built.
+  phase has started: **A1 roster PDF text extraction → editable preview** and **A2a timetable
+  PDF text extraction → read-only preview** are built and tested with generated fixtures.
+  Neither slice writes data: A1 fills the roster textarea for the existing preview/save, and
+  A2a never parses rows, matches classes, creates a class or writes a slot. Structured
+  timetable import (A2b), local OCR (A3) and consent-gated Gemini extraction (A4) are not
+  built. Scoring, automatic attendance decisions and the ID round are not built.
 - **Production super-admin access is built:** `SUPER_ADMIN_EMAILS` grants the exact owner
   address the `superadmin` role in production as well as development. A verified Gmail
   identity is accepted for this grant; the Google button no longer forces the college hosted
@@ -49,14 +51,17 @@ WebAuthn browser E2E passed).
 - **Device binding:** a student's first browser and every changed browser now enter the
   teacher device-review queue; only dev/test personas auto-approve. Replacing an approved
   device bumps `tokenVersion`, so the old session cannot submit proofs.
-- **Production state:** Render runs **`029d18e`** at
-  <https://bio-attend.onrender.com> and does not include the P0/P1 security work. Local
-  `HEAD` is also **`029d18e`**; the P0/P1 security, PWA and dark-mode work is **uncommitted**
-  in the working tree. No push, tag, merge or deploy was performed.
-- **Next action:** obtain representative timetable and roster PDFs, then build A2 timetable
-  import (existing classes only, unmatched rows flagged) and A3 local OCR. In parallel, the
-  owner can configure Render and deploy, then run a real Google/phone multi-wave rehearsal.
-  Production needs
+- **Repository state:** local `HEAD`, `origin/main` and `origin/HEAD` are all **`32a2078`**.
+  The A1 roster PDF slice, P0/P1 security, PWA and dark-mode work are committed and pushed.
+  The A2a timetable-preview changes are **uncommitted** in the working tree pending owner
+  review. The live Render deployment version was not verified; do not assume it matches
+  `32a2078`. No push, tag, merge or deploy was performed in this session.
+- **Next action:** obtain representative timetable (and ideally roster) PDFs. Then build
+  **A2b structured timetable parsing** only when samples exist: match rows to existing owned
+  classes, show a slot preview, require teacher confirmation and flag unmatched rows for
+  manual class creation. Do not invent timetable layouts. Local OCR (A3) follows. In
+  parallel, the owner can review and publish A2a, configure Render and deploy, then run a
+  real Google/phone multi-wave rehearsal. Production needs
   `SUPER_ADMIN_EMAILS=12shivanshsingha@gmail.com`,
   `SUPER_ADMIN_SESSION_HOURS=12`, an HTTPS `WEBAUTHN_ORIGINS` (or `RENDER_EXTERNAL_URL`), and
   an empty/unset `REACT_APP_GOOGLE_HOSTED_DOMAIN`. The address must not appear in
@@ -70,7 +75,8 @@ WebAuthn browser E2E passed).
 | Google sign-in, allowlists, device binding and review | ✅ built and tested |
 | Rooms, classes, CSV/paste rosters and enrollment | ✅ built and tested |
 | Roster PDF text extraction → editable preview | ✅ built and tested with generated PDF fixtures; no auto-save; scanned OCR and real-college layouts unvalidated |
-| Timetable PDF import, local OCR, Gemini extraction | ⛔ not built / gated |
+| Timetable PDF text extraction → read-only preview | ✅ built and tested with generated PDF fixtures; never parses rows, creates classes or writes slots; real timetable layouts unvalidated |
+| Structured timetable import, local OCR, Gemini extraction | ⛔ not built / gated |
 | Check-in sessions, wave keys, teacher check-in screen | ✅ built and tested |
 | Signed proof transport, student discovery, student check-in shell | ✅ built and tested; evidence only |
 | Evidence-gated wave advancement and bounded key history | ✅ built and tested |
@@ -91,15 +97,16 @@ WebAuthn browser E2E passed).
 
 | Gate | Result |
 | --- | --- |
-| Backend (`npm test`) | **245/245** |
-| Backend (`npm test -- --test-isolation=none`) | **245/245** |
+| Backend (`npm test`) | **255/255** |
+| Backend (`npm test -- --test-isolation=none`) | **255/255** |
 | Proof transport | **15/15** |
 | Acoustic (codec, lab, worklets, TX/RX link) | **51/51** |
 | Teacher check-in view | **7/7** |
 | Student check-in view | **9/9** |
 | Auth routing | **2/2** |
 | Roster PDF import helpers | **6/6** |
-| Frontend total | **90/90** |
+| Timetable PDF import helpers | **6/6** |
+| Frontend total | **96/96** |
 | Production build | ✅ compiles successfully (`CI=true REACT_APP_API_URL=/api/v1 npm run build`) |
 | Browser smoke (dev) | **65/65** |
 | CSP production-build audit | **7/7 page loads**, zero CSP violations, Google button rendered, service worker active, dark theme applied |
@@ -115,9 +122,9 @@ WebAuthn browser E2E passed).
 
 The browser smokes used temporary browser harnesses outside the repo's npm test commands.
 The backend suite covers auth policy, controllers, middleware, startup, env guards, origin
-guard, cookies, rate limits, rosters, PDF text reconstruction and upload preview, device
-binding, session core, wave advancement, proof transport, teacher evidence, student
-discovery, rehearsal enrollment, super-admin access, WebAuthn step-up, audit-chain
+guard, cookies, rate limits, rosters, roster/timetable PDF text reconstruction and upload
+previews, device binding, session core, wave advancement, proof transport, teacher evidence,
+student discovery, rehearsal enrollment, super-admin access, WebAuthn step-up, audit-chain
 integrity, export auditing, readiness and JWT rotation.
 
 ## Layer 1 measurements
@@ -196,10 +203,12 @@ build planning only; never call the physical gate measured-passed.
   `adminpasskeys` rows are removed by an operator with database access. Register a second
   passkey on another device.
 - **Document ingestion is partially built:** A1 roster PDF text extraction with an editable
-  preview is implemented and tested against generated PDFs. It reads only an embedded text
-  layer, rejects scanned pages and never saves automatically. Timetable PDF import, local OCR
-  and consent-gated Gemini extraction are still not built. No real sample PDFs have been
-  supplied yet, so college-layout accuracy remains unvalidated.
+  preview and A2a timetable PDF text extraction with a read-only preview are implemented and
+  tested against generated PDFs. Both read only an embedded text layer, reject scanned pages
+  and never save automatically. A2a never parses rows or creates slots/classes. A2b
+  structured timetable import, local OCR and consent-gated Gemini extraction are still not
+  built. No real sample PDFs have been supplied yet, so college-layout accuracy and
+  structured timetable parsing remain blocked/unvalidated.
 - **Gemini consent gate:** raw rosters may go to the free tier only after a student notice and
   a written risk acceptance in `plan.md`; that text must exist before the AI path is coded.
 
@@ -207,6 +216,7 @@ build planning only; never call the physical gate measured-passed.
 
 | Date | What changed | Result |
 | --- | --- | --- |
+| 2026-11-06 | Document phase A2a: staff-only `POST /timetable/pdf/preview`, shared PDF preview limiter, deterministic text-layer extraction and read-only modal preview in Timetable. Generated-PDF fixtures cover extraction, multipart/auth, scanned-PDF rejection and error mapping. No row parsing, class matching, class creation or slot writes. | Backend **255/255** in both modes, frontend **96/96**, production build green. Real timetable PDFs and the browser modal were not validated; A2b is blocked on samples. |
 | 2026-11-05 | Document phase A1: owner-scoped roster PDF upload, PDF.js text-layer extraction with visual line reconstruction, editable preview in Classes, stable PDF error codes, 10 MB/20-page/200k-character caps and a 20-per-10-minute limiter. No roster is saved by extraction. | Backend **245/245** in both modes, frontend **90/90**, production build green; generated-PDF fixtures validate extraction, multipart, auth, scanned-PDF rejection and error mapping. Real college PDFs and OCR remain unvalidated. |
 | 2026-11-05 | P1 admin hardening: WebAuthn/passkey step-up for destructive super-admin actions, audit hash chain and `/admin/audit/verify`, `req.ip` audit fix, export auditing and 30/10-minute limits, `/health/ready`, verification-only `JWT_SECRET_PREVIOUS` rotation, Security tab and step-up retry client. Browser E2E exposed and fixed the Mongo `$set`/`$setOnInsert` settings conflict. | Backend **227/227** in both modes, frontend **84/84**, production build green, WebAuthn E2E passed with a 3-entry chain and zero console errors. |
 | 2026-11-05 | Security P0: strict CSP with external theme bootstrap, first-party `SameSite=Lax` cookies, per-account `tokenVersion` revocation, impersonation hardening, teacher-approved first device binding, JWK sanitisation, encrypted backup/restore scripts, Dependabot and a GitHub security workflow. Removed the external Google Fonts import and allowed only the GIS stylesheet. | Backend **189/189**, frontend **84/84**, production build green, CSP browser audit **7/7** page loads with zero violations; backup drill still pending. |
@@ -247,5 +257,7 @@ cd attendance-frontend && npm run test:acoustic
 cd attendance-frontend && npm run test:checkin
 cd attendance-frontend && npm run test:studentcheckin
 cd attendance-frontend && npm run test:auth
+cd attendance-frontend && npm run test:rosterimport
+cd attendance-frontend && npm run test:timetableimport
 cd attendance-frontend && CI=true REACT_APP_API_URL=/api/v1 npm run build
 ```

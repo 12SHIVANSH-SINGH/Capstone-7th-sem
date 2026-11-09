@@ -13,7 +13,7 @@ Capstone project · NIT Jamshedpur
 
 </div>
 
-**Live prototype:** [https://bio-attend.onrender.com](https://bio-attend.onrender.com) — the repository's `HEAD` and `origin/main` are **`32a2078`**, which includes the full attendance product plus P0/P1 security hardening (strict CSP, revocable sessions, teacher-approved device binding, passkey step-up and an audit hash chain). The live deployment's exact version was **not verified in this session**. The owner controls every push and deploy.
+**Live prototype:** [https://bio-attend.onrender.com](https://bio-attend.onrender.com) — the repository's `HEAD`, `origin/main` and `origin/HEAD` are **`003f900`**, which includes the full attendance product, P0/P1 security hardening and the committed A2a timetable PDF text preview. The live service is reachable and serves A2a UI strings, but its exact deployed commit was **not verified against the Render dashboard**; the owner must confirm that before signed testing. The owner controls every push and deploy.
 
 > **Layer 1 gate status:** the owner has directed that Layer 1 be treated as **passed for build planning only**. This is an assumption, not a measurement. The 2026-10-25 sweep still fails at 5 m (4/10) and 10 m (1/10), and the reverse direction and muted control are unmeasured. Do not read this build as proof that the physical gate passed.
 
@@ -52,8 +52,9 @@ The student cascade (phones retransmitting the next key), automatic scoring and 
 | Passkey step-up, audit hash chain, export limits, readiness, JWT rotation | ✅ built; browser E2E passed with a Chrome virtual authenticator |
 | Roster PDF extraction → editable preview | ✅ text-based PDFs only, verified with generated fixtures; real college PDFs and scanned OCR still unvalidated |
 | Timetable PDF text extraction → read-only preview | ✅ text-based PDFs only; no row parsing, class matching or slot creation; needs sample timetable PDFs for structured import |
-| Production deployment of this tree | ⏳ exact live version not verified in this session; the owner controls deploy |
-| Real Google/phone multi-wave rehearsal | ⏳ pending |
+| Production deployment of this tree | ⏳ live service reachable and serves A2a UI strings; exact commit must be checked in the Render dashboard before signed testing |
+| Deployed manual test plan | 📋 [docs/testing-plan.md](docs/testing-plan.md) — 4 phones + 3–4 laptops, acoustic range, signed flow, admin security, PDF previews and conditional restore drill |
+| Real Google/phone multi-wave rehearsal | ⏳ pending; the deployed test plan is the execution script |
 | Student cascade, automatic scoring, ID round, mobile app | ⛔ not built / gated |
 
 This is a demo-ready capstone prototype — not yet used for real attendance.
@@ -121,6 +122,9 @@ cd attendance-frontend && npm run test:auth           # 2 tests
 cd attendance-frontend && npm run test:rosterimport   # 6 tests
 cd attendance-frontend && npm run test:timetableimport # 6 tests
 cd attendance-frontend && CI=true REACT_APP_API_URL=/api/v1 npm run build
+
+# synthetic, text-layer PDFs for the manual preview tests
+cd attendance-backend && node scripts/generate-test-pdfs.js
 ```
 
 Earlier sessions passed a 65-check browser smoke across the super-admin, teacher,
@@ -136,6 +140,7 @@ timetable preview modal has helper tests and a production build, but no browser 
 - 🗺️ **[Route reference](docs/routes.md)** — every page and API endpoint, with access rules and purpose.
 - 🧠 **[How it works](docs/how-it-works.md)** — the architecture and flows in plain words.
 - 🚢 **[Deployment](docs/deployment.md)** — one Render service + Atlas + Google OAuth.
+- 🧪 **[Deployed test plan](docs/testing-plan.md)** — click-level phone/laptop test run, evidence templates and go/no-go gates.
 - 🛠️ **[Troubleshooting](docs/troubleshooting.md)** — setup, auth, microphone and deploy fixes.
 - 📐 **[Architecture diagrams](docs/diagrams/)** — PlantUML component map, check-in flow and proof sequence.
 - 🧭 [`plan.md`](plan.md) — signal design and staged engineering plan.

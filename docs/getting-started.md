@@ -1,8 +1,9 @@
 # Getting started
 
 Run the whole stack on one laptop: MongoDB, the Express API and the React app. This is
-the canonical local guide; production setup is in [deployment.md](deployment.md), and
-every page/API path is in [routes.md](routes.md).
+the canonical local guide; production setup is in [deployment.md](deployment.md), every
+page/API path is in [routes.md](routes.md), and the deployed multi-device run is in
+[testing-plan.md](testing-plan.md).
 
 ## 1. Prerequisites
 
@@ -268,10 +269,22 @@ The current expected counts are **backend 255/255** in both default and
 production build writes `attendance-frontend/build/`; the backend serves it automatically
 when that folder exists.
 
+Generate the synthetic PDFs used by the roster and timetable preview checks:
+
+```bash
+cd attendance-backend
+node scripts/generate-test-pdfs.js
+```
+
+It writes `roster-text-layer.pdf`, `timetable-text-layer.pdf` and `no-text-layer.pdf` to the
+gitignored `test-artifacts/` directory. The files contain fake data and verify extraction
+mechanics only, not real college layout accuracy.
+
 ## 11. Next steps
 
 - Every page and API path: [routes.md](routes.md).
 - Architecture and flows: [how-it-works.md](how-it-works.md).
 - Production deployment: [deployment.md](deployment.md).
+- Deployed phone/laptop test run: [testing-plan.md](testing-plan.md).
 - Common failures: [troubleshooting.md](troubleshooting.md).
 - Current status and physical measurements: [`progress.md`](../progress.md).

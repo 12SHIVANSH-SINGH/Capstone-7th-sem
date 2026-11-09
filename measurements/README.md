@@ -9,9 +9,9 @@ One folder per test day:
 
 ```text
 measurements/YYYY-MM-DD/
-  README.md          summary: pair, key, distance, sent/decoded, settings
-  tx-<runId>.json    transmitter report
-  rx-<runId>.json    receiver report
+  README.md                    summary: pair, key, distance, sent/decoded, settings
+  tx-<runId>-<distance>.json   transmitter report
+  rx-<runId>-<distance>.json   receiver report
 ```
 
 Keep the receiver and transmitter JSON files together. Two phones count as one run when

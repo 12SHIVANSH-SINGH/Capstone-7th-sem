@@ -159,10 +159,12 @@ teacher-confirmed attendance instead.
 **Current phase:** the product layer is built, including teacher-confirmed registers,
 queries, analytics, exports, notifications, timetable, PWA and a production-capable
 super-admin console. Roster PDF text extraction with an editable preview is built, and
-timetable PDF text extraction with a read-only preview is built (A2a). Structured timetable
-row parsing, local OCR and Gemini extraction are not. It is still **evidence-only for acoustic
-proof**: the app does not automatically score attendance or run the ID round. The attendance
-decision belongs to the teacher and is audited.
+timetable PDF text extraction with a read-only preview is built (A2a). Both are committed in
+`003f900`. Structured timetable row parsing, local OCR and Gemini extraction are not. It is
+still **evidence-only for acoustic proof**: the app does not automatically score attendance
+or run the ID round. The attendance decision belongs to the teacher and is audited. The
+click-level execution script for the deployed 4-phone/3–4-laptop run is
+[`docs/testing-plan.md`](docs/testing-plan.md).
 
 **Next work, in order:**
 
@@ -170,8 +172,9 @@ decision belongs to the teacher and is audited.
 | --- | --- | --- | --- |
 | 1 (physical) | 1.10 range diagnosis | Lower the band and/or tune TX settings; rerun 1 m, 5 m, 10 m, then reverse and muted control | ≥95% decoded at 1 m/5 m/10 m both directions; 0 decodes in the muted control |
 | 2 (rehearsal) | 2.6 multi-wave rehearsal | 10–20 phones for 5–6 minutes; measure waves, timing and range | Every phone reaches a wave; timing measured; no false-accept claim without scoring |
-| 3 (owner) | Deploy and verify | Configure Render, deploy the current tree, verify real Google sign-in and `/admin` | Health, teacher/student flow, Gmail super-admin, no demo endpoints in production |
-| 4 (gated) | 3.x scoring, ID round, review queue | Only after the physical gate is genuinely measured | Layer 3 gate |
+| 3 (owner) | Deploy and verify | Configure Render, deploy the current tree, compare the Render dashboard commit with the reviewed `HEAD`, verify real Google sign-in and `/admin` | Health/readiness, test-plan G2 commit match, Google sign-in, no demo or dev routes in production |
+| 4 (test) | Deployed manual test run | Execute [`docs/testing-plan.md`](docs/testing-plan.md): AC → FL → AD → PDF → DP/RS with 4 phones and 3–4 laptops | Preflight gates G0–G7 pass; every suite records PASS/FAIL/BLOCKED with evidence; no open P0/P1 defect |
+| 5 (gated) | 3.x scoring, ID round, review queue | Only after the physical gate is genuinely measured | Layer 3 gate |
 
 ## 9. Risks and honest limits
 
@@ -190,11 +193,13 @@ decision belongs to the teacher and is audited.
 
 ## 10. Open items
 
-- Confirm a real student Google sign-in on production; teacher sign-in is verified.
+- Confirm the live Render commit against the Render dashboard (test-plan gate G2); a
+  reachable service is not proof that the deployed commit is current.
+- Run the signed real-student Google flow on Render (`docs/testing-plan.md`, suite FL); the
+  local smokes used a JWT cookie and, for the student shell, fake audio.
 - Confirm Render free-plan behaviour during a live 5–6 minute check-in.
-- Diagnose the 5 m/10 m range failure, then run reverse direction and muted control.
-- Run the real Google/phone multi-wave rehearsal; the local smokes used a JWT cookie and,
-  for the student shell, fake audio.
+- Diagnose the 5 m/10 m range failure, then run reverse direction and muted control through
+  test-plan suite AC.
 - Decide whether device bindings follow the same 1-day retention as proof evidence.
 - Document the device-recovery boundary: a teacher approves every first or replacement
   device, and a stolen session cookie cannot bind without that decision.

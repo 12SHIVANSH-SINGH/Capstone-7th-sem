@@ -16,6 +16,10 @@ backups/
 *.archive.gz.enc
 *.archive.gz.enc.sha256
 
+# Generated synthetic PDFs and other disposable manual-test artefacts.
+test-artifacts/
+test-evidence/
+
 # Virtual Environment
 .venv/
 env/

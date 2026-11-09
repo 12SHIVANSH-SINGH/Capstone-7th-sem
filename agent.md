@@ -13,7 +13,7 @@ The server mints keys, records signed proof evidence and keeps an audited attend
 register. A **teacher confirms attendance**; a decoded tone is not an automatic verdict.
 Full detail is in `plan.md`; do not restate or redesign it here.
 
-## Current phase (2026-11-06, session 26)
+## Current phase (2026-11-09, session 27)
 
 - **Layer 1 is assumed passed by owner direction (2026-10-29) for build planning only.** This
   is **not** a measured pass. The 2026-10-25 sweep decoded 10/10 at 1 m, 9/10 at 2 m, 9/10 at
@@ -36,11 +36,19 @@ Full detail is in `plan.md`; do not restate or redesign it here.
   score. The teacher opens the register, sees evidence/optional location and marks
   present/absent/excused; finalisation and every correction are audited. Scoring, the ID
   round and the student cascade remain unbuilt.
-- **Repository state (2026-11-06):** local `HEAD` and `origin/main` are **`32a2078`**, which
-  includes the A1 roster PDF slice, P0/P1 security, PWA and dark-mode work. The A2a
-  timetable-preview changes are uncommitted in the working tree pending owner review. The
-  exact live Render version was **not verified in this session**; do not claim the deployment
-  matches the repository without checking.
+- **Repository state (2026-11-09):** local `HEAD`, `origin/main` and `origin/HEAD` are all
+  **`003f900`**, which includes the A1 roster PDF slice, A2a timetable text preview, P0/P1
+  security, PWA and dark-mode work. The earlier `32a2078` claims in the status docs are stale
+  and were corrected in session 27. The live service is reachable and its bundle contains A2a
+  strings, but the exact deployed commit was **not verified against the Render dashboard**;
+  do not claim the deployment matches the repository without checking.
+- **Deployed test plan:** [`docs/testing-plan.md`](docs/testing-plan.md) is the execution
+  script for the 4-phone/3–4-laptop run. It covers acoustic range and controls, the signed
+  attendance/query flow on Render with real college accounts, device/passkey/admin security,
+  PDF previews, deployment verification and the conditional encrypted restore drill.
+- **Test PDF fixtures:** `attendance-backend/scripts/generate-test-pdfs.js` writes synthetic
+  text-layer roster/timetable PDFs and a no-text-layer PDF to the gitignored `test-artifacts/`
+  directory. It verifies each file through `extractPdfText` before exiting.
 - **The owner controls every push and deploy.** Never push, tag, merge, or deploy unless the
   owner explicitly asks in that session. A green local suite is not permission to publish.
 - **Roster PDF extraction is built (A1):** an authenticated teacher uploads a text-based
@@ -54,17 +62,20 @@ Full detail is in `plan.md`; do not restate or redesign it here.
   page/line counts. It never parses rows, matches classes, creates a class or writes a slot.
   The teacher adds slots through the existing form. Tested with generated PDF fixtures, not
   real timetable PDFs.
-- **Next slice (A2b):** structured timetable row parsing, then local OCR, then optional
-  Gemini extraction. **No sample timetable or roster PDFs have been supplied yet**, so do not
-  invent parser behaviour or claim extraction accuracy. Structured timetable import must
-  schedule existing classes only; unmatched rows are flagged for manual class creation. Local
-  OCR comes after text-layer extraction, and optional Gemini extraction comes last.
+- **Next build slice (A2b), after the deployed test run:** structured timetable row parsing,
+  then local OCR, then optional Gemini extraction. **No sample timetable or roster PDFs have
+  been supplied yet**, so do not invent parser behaviour or claim extraction accuracy.
+  Structured timetable import must schedule existing classes only; unmatched rows are flagged
+  for manual class creation. Local OCR comes after text-layer extraction, and optional Gemini
+  extraction comes last.
 - **Gemini gate:** raw rosters may go to the free tier only after an explicit student notice
   and a documented risk acceptance are written into `plan.md`. That text does not exist yet;
   do not write the AI path before it does.
 - **Still blocked:** automatic scoring, the ID round, the student cascade, the "lowest wave
-  heard" join rule, the mobile app, a real Google/phone rehearsal, physical 5 m/10 m range
-  diagnosis and the encrypted Atlas restore drill.
+  heard" join rule, the mobile app, a verified live Render commit, the real Google/phone
+  multi-wave rehearsal in the deployed plan, physical 5 m/10 m range diagnosis with
+  reverse/muted control, and the encrypted Atlas restore drill (URI, passphrase,
+  `mongodb-database-tools` and scratch-database permission are unconfirmed).
 
 ## Core working rule: small slices, one session at a time
 
@@ -80,6 +91,7 @@ Full detail is in `plan.md`; do not restate or redesign it here.
 ## Session start checklist
 
 - [ ] Read `agent.md`, `plan.md`, `progress.md`.
+- [ ] Before a deployed test run, read `docs/testing-plan.md` and execute its preflight gates.
 - [ ] Open the relevant route/diagram before changing architecture or flow.
 - [ ] Inspect the actual files. If `progress.md` and the code disagree, trust the code, then
       correct `progress.md` and tell the owner.

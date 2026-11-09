@@ -5,8 +5,10 @@ purpose. This is a map, not a second API specification: request bodies and respo
 shapes live in the controllers under `attendance-backend/controllers/`.
 
 The API is mounted at **`/api/v1`**. Paths in the API table are relative to that prefix.
-All API responses are JSON except the PDF/Excel downloads. API responses send
-`Cache-Control: no-store`.
+Every matched API endpoint returns JSON except the PDF/Excel downloads. An unmatched
+`/api/*` path falls through to Express's built-in 404, which returns `text/html` rather
+than the JSON error envelope or the React shell. API responses, including that default
+404, send `Cache-Control: no-store`.
 
 ## Access labels
 
@@ -211,4 +213,5 @@ workbooks require **Super-admin**.
 - [Getting started](getting-started.md) — run the stack.
 - [How it works](how-it-works.md) — the flows behind these routes.
 - [Deployment](deployment.md) — production configuration and verification.
+- [Deployed test plan](testing-plan.md) — click-level signed flow, security and restore gates.
 - [Troubleshooting](troubleshooting.md) — 401/403, Google, microphone and session fixes.

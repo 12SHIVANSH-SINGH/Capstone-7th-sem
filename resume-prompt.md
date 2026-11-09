@@ -22,7 +22,7 @@ Before doing anything:
 4. Tell me in a few lines: the current layer, the single slice you will work on, and its
    pass/fail test.
 
-Current state (2026-11-06, session 26; details in `progress.md`):
+Current state (2026-11-09, session 27; details in `progress.md`):
 
 - **Layer 1 is assumed passed by owner direction (2026-10-29) for build planning only. This
   is not a measurement.** The 2026-10-25 sweep recorded **1 m 10/10, 2 m 9/10, 3 m 9/10,
@@ -62,6 +62,12 @@ Current state (2026-11-06, session 26; details in `progress.md`):
   never save automatically. A1 fills the roster textarea for the existing preview/save; A2a
   never parses rows, matches classes, creates a class or writes a slot. A2b structured
   timetable import, local OCR (A3) and consent-gated Gemini extraction (A4) are not built.
+- **Deployed test plan:** `docs/testing-plan.md` is the click-level run for 4 phones and 3–4
+  laptops: acoustic range/controls, signed Render attendance/query flow with real college
+  accounts, device/passkey/admin security, PDF previews, deployment verification and the
+  conditional encrypted restore drill. Its G2 (live commit) and G5 (restore prerequisites)
+  gates are hard stops. `attendance-backend/scripts/generate-test-pdfs.js` creates the
+  synthetic text-layer and no-text-layer PDFs used by the preview tests.
 - **Local gates:** backend **255/255** under `npm test` and `--test-isolation=none`;
   frontend **96/96** (proof 15, acoustic 51, check-in 7, student check-in 9, auth 2, roster
   import 6, timetable import 6); the clean
@@ -72,26 +78,33 @@ Current state (2026-11-06, session 26; details in `progress.md`):
 - **Other recorded smokes:** dev **65/65**, production-mode Gmail-admin **13/13**, mobile/dark
   **27/27**, production PWA/offline **16/16**, CSP production-build audit **7/7** page loads.
   These use temporary browser harnesses, not repo npm commands.
-- **Repository:** local `HEAD`, `origin/main` and `origin/HEAD` are **`32a2078`**; the A1
-  roster PDF slice, P0/P1 security, PWA and dark-mode work are committed and pushed. The A2a
-  timetable-preview changes are **uncommitted** in the working tree pending owner review. The
-  live Render deployment version was not verified; do not assume it matches `32a2078`. No
-  push, tag, merge or deploy has been performed. The owner reviews, commits, pushes and
-  deploys manually.
-- **Next slice:** **A2b structured timetable import**, but only after representative
-  timetable PDFs are supplied. Match course code/section to an existing owned class, show a
-  slot preview and require teacher confirmation; flag unmatched rows for manual class
-  creation. Do not invent parser behaviour or claim accuracy without samples. Timetable
-  import must never create a class automatically or overwrite a slot without the teacher
-  seeing the change. Local OCR (A3) follows. Roster import must preview and require teacher
-  confirmation; never auto-save a roster or auto-mark attendance. Use free options only and
-  never require a payment card.
+- **Repository:** local `HEAD`, `origin/main` and `origin/HEAD` are all **`003f900`**; the
+  A1 roster PDF slice, A2a timetable text preview, P0/P1 security, PWA and dark-mode work are
+  committed and pushed. The earlier `32a2078`/“A2a uncommitted” claims were stale and were
+  corrected on 2026-11-09. The live service is reachable and its bundle contains A2a UI
+  strings, but the exact Render commit was not checked against the dashboard; do not assume
+  it matches `003f900`. No push, tag, merge or deploy has been performed. The owner reviews,
+  commits, pushes and deploys manually.
+- **Next action:** execute `docs/testing-plan.md` in order. Pass G0–G7 first; G2 requires the
+  owner to compare the Render dashboard commit with the recorded `HEAD`, and G5 checks the
+  Atlas URI, passphrase, `mongodump`/`mongorestore` and scratch-database permission. Stop
+  signed testing if G2 fails; mark the restore suite **BLOCKED** if G5 fails. Then run
+  **AC → FL → AD → PDF → DP/RS** and record real results. **A2b structured timetable import**
+  comes only after representative timetable PDFs are supplied. Match course code/section to
+  an existing owned class, show a slot preview and require teacher confirmation; flag
+  unmatched rows for manual class creation. Do not invent parser behaviour or claim accuracy
+  without samples. Timetable import must never create a class automatically or overwrite a
+  slot without the teacher seeing the change. Local OCR (A3) follows. Roster import must
+  preview and require teacher confirmation; never auto-save a roster or auto-mark attendance.
+  Use free options only and never require a payment card.
 - **Gemini gate:** raw rosters may go to the free tier only after an explicit student notice
   and a documented risk acceptance are written into `plan.md`. That text does not exist yet;
   do not write the AI path before it does.
-- **Remaining blockers:** sample PDFs, the Gemini consent/risk text, the encrypted Atlas
-  restore drill (needs URI, passphrase and `mongodb-database-tools`), a real Google/phone
-  multi-wave rehearsal, and physical 5 m/10 m range diagnosis with reverse/muted control.
+- **Remaining blockers:** a verified live Render commit (G2), sample PDFs, the Gemini
+  consent/risk text, the encrypted Atlas restore drill (needs URI, passphrase,
+  `mongodb-database-tools` and scratch-database permission), a real Google/phone multi-wave
+  rehearsal through the deployed plan, and physical 5 m/10 m range diagnosis with
+  reverse/muted control.
 - **Production environment additions:** `SUPER_ADMIN_EMAILS=12shivanshsingha@gmail.com`,
   `SUPER_ADMIN_SESSION_HOURS=12`, an HTTPS `WEBAUTHN_ORIGINS` (or Render's
   `RENDER_EXTERNAL_URL`), optional `WEBAUTHN_RP_ID`/`WEBAUTHN_RP_NAME`, and an empty/unset

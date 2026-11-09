@@ -2,8 +2,10 @@
 
 This is the production guide for Bio Attend. All account-level setup (GitHub, Render,
 MongoDB Atlas, Google Cloud) is done by the project owner. The repository is built and tested
-locally. Local `HEAD` and `origin/main` are `32a2078`; the live Render deployment state was
-not verified in this session. The owner controls every push and deploy.
+locally. Local `HEAD`, `origin/main` and `origin/HEAD` are `003f900`, which includes the
+committed A2a timetable PDF text preview. The live service is reachable and its bundle
+contains the A2a UI strings, but the exact deployed commit must be compared in the Render
+dashboard before signed testing. The owner controls every push and deploy.
 
 Recommended shape:
 
@@ -284,6 +286,12 @@ promotions are logged after the user row is saved.
 
 ## 6. Verify the deployment
 
+This section is the command-line smoke check. The click-level signed run — real Google
+accounts, attendance, queries, admin security, PDF previews and the conditional restore
+drill — is [`testing-plan.md`](testing-plan.md). Its **G2** gate requires the Render
+dashboard to show the reviewed commit; the health endpoints alone do not prove which commit
+is live.
+
 Replace `BASE` with the Render URL (no trailing slash):
 
 ```bash
@@ -438,6 +446,7 @@ third-party, which Safari and some Chrome modes block.
 - [ ] CSP browser audit shows zero violations on `/`, `/login`, a teacher page, analytics,
       help and `/admin`; Google button renders; service worker is active
 - [ ] Code pushed to GitHub `main`
+- [ ] Render dashboard live deploy commit matches the reviewed `HEAD` (`testing-plan.md` G2)
 - [ ] Atlas cluster, user and network access created; `DB_URI` includes `/attendance`
 - [ ] Render service created with the build/start commands and health path
 - [ ] All environment variables set; `DEV_AUTH_ENABLED` and `ALLOW_TEST_ROSTER_EMAILS` absent
@@ -455,7 +464,7 @@ third-party, which Safari and some Chrome modes block.
 - [ ] Teacher sign-in, room/class/roster save survive a refresh
 - [ ] A text-based timetable PDF shows a read-only preview and creates no slot; a scanned PDF returns `pdf_no_text_layer`
 - [ ] First student device and a changed device both wait for teacher review
-- [ ] Encrypted backup taken and one restore drill completed in a scratch database
+- [ ] Encrypted backup taken and one restore drill completed in a scratch database (`testing-plan.md` suite RS; gate G5 must pass first)
 - [ ] Gmail super-admin signs in, `/islogin` reports `superadmin`, `/admin` shows the
       production badge, and demo endpoints return 404
 - [ ] Super-admin registers a passkey; a protected action returns 428 before approval and

@@ -4,6 +4,11 @@ Atlas M0 has **no automated backups**. The encrypted dump is the recovery path f
 migration, an accidental delete or a compromised database account. It is not optional before a
 pilot.
 
+The restore drill is suite **RS** in [`testing-plan.md`](testing-plan.md). It is conditional
+on gate **G5**: the Atlas URI, backup passphrase, `mongodump`/`mongorestore` and
+scratch-database permission must all be available. If any prerequisite is missing, record the
+suite **BLOCKED**; do not describe the restore as tested.
+
 ## What you need
 
 - `mongodump` and `mongorestore` from MongoDB Database Tools:
@@ -96,5 +101,6 @@ check, the restore arguments map `attendance.*` to a scratch database, and a wro
 rejected. That proves the script plumbing, not MongoDB restore correctness.
 
 The first real backup and restore drill still needs the Atlas URI, the passphrase and MongoDB
-Database Tools installed on the operator machine. Record the result in `progress.md` after the
-drill.
+Database Tools installed on the operator machine. The deployed test plan
+([`testing-plan.md`](testing-plan.md), suite RS) is the execution script; it marks the suite
+**BLOCKED** when gate G5 fails. Record the result in `progress.md` after the drill.

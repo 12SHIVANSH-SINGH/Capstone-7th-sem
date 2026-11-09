@@ -3,9 +3,9 @@
 Update this at the end of every session. If it disagrees with the real code, the code wins:
 fix this file and tell the owner.
 
-Last updated: **2026-11-06** (session 26: timetable PDF text preview A2a; backend **255/255**,
-frontend **96/96**, production build green, CSP browser audit **7/7** page loads,
-WebAuthn browser E2E passed).
+Last updated: **2026-11-09** (session 27: deployed manual test plan, synthetic PDF fixture
+generator, stale-doc reconciliation; backend **255/255** and frontend **96/96** remain the
+last recorded gate before this documentation/tooling session).
 
 ## Status
 
@@ -23,6 +23,11 @@ WebAuthn browser E2E passed).
   A2a never parses rows, matches classes, creates a class or writes a slot. Structured
   timetable import (A2b), local OCR (A3) and consent-gated Gemini extraction (A4) are not
   built. Scoring, automatic attendance decisions and the ID round are not built.
+- **Deployed test plan:** [`docs/testing-plan.md`](docs/testing-plan.md) is the click-level
+  execution script for the 4-phone/3–4-laptop run. It covers acoustic range and controls, the
+  signed attendance/query flow on Render with real college accounts, device/passkey/admin
+  security, PDF previews, deployment verification and the conditional encrypted restore
+  drill. Its G2 (live commit) and G5 (restore prerequisites) gates are hard stops.
 - **Production super-admin access is built:** `SUPER_ADMIN_EMAILS` grants the exact owner
   address the `superadmin` role in production as well as development. A verified Gmail
   identity is accepted for this grant; the Google button no longer forces the college hosted
@@ -51,17 +56,23 @@ WebAuthn browser E2E passed).
 - **Device binding:** a student's first browser and every changed browser now enter the
   teacher device-review queue; only dev/test personas auto-approve. Replacing an approved
   device bumps `tokenVersion`, so the old session cannot submit proofs.
-- **Repository state:** local `HEAD`, `origin/main` and `origin/HEAD` are all **`32a2078`**.
-  The A1 roster PDF slice, P0/P1 security, PWA and dark-mode work are committed and pushed.
-  The A2a timetable-preview changes are **uncommitted** in the working tree pending owner
-  review. The live Render deployment version was not verified; do not assume it matches
-  `32a2078`. No push, tag, merge or deploy was performed in this session.
-- **Next action:** obtain representative timetable (and ideally roster) PDFs. Then build
-  **A2b structured timetable parsing** only when samples exist: match rows to existing owned
-  classes, show a slot preview, require teacher confirmation and flag unmatched rows for
-  manual class creation. Do not invent timetable layouts. Local OCR (A3) follows. In
-  parallel, the owner can review and publish A2a, configure Render and deploy, then run a
-  real Google/phone multi-wave rehearsal. Production needs
+- **Repository state:** local `HEAD`, `origin/main` and `origin/HEAD` are all **`003f900`**.
+  The A1 roster PDF slice, A2a timetable text preview, P0/P1 security, PWA and dark-mode work
+  are committed and pushed. The earlier `32a2078`/“A2a uncommitted” claims were stale and were
+  corrected in session 27. The live service is reachable: `/api/v1/health/ready` returned
+  ready with the database connected, and `main.14c6a1a8.js` contained A2a UI strings
+  (“Timetable PDF text preview”, “Import PDF text”). The exact deployed commit was **not
+  compared with the Render dashboard**, so G2 of the test plan remains open. No push, tag,
+  merge or deploy was performed in this session.
+- **Next action:** execute [`docs/testing-plan.md`](docs/testing-plan.md) in order. First pass
+  G0–G7, especially G2 (owner compares the Render dashboard commit with `003f900`) and G5
+  (Atlas URI, passphrase, `mongodump`/`mongorestore` and scratch-database permission). If G2
+  fails, stop signed testing. If G5 fails, mark the restore suite **BLOCKED** and do not claim
+  restore coverage. Then run AC → FL → AD → PDF → DP/RS. Only after that, and only when
+  representative timetable PDFs exist, build **A2b structured timetable parsing**: match rows
+  to existing owned classes, show a slot preview, require teacher confirmation and flag
+  unmatched rows for manual class creation. Do not invent timetable layouts. Local OCR (A3)
+  follows. Production needs
   `SUPER_ADMIN_EMAILS=12shivanshsingha@gmail.com`,
   `SUPER_ADMIN_SESSION_HOURS=12`, an HTTPS `WEBAUTHN_ORIGINS` (or `RENDER_EXTERNAL_URL`), and
   an empty/unset `REACT_APP_GOOGLE_HOSTED_DOMAIN`. The address must not appear in
@@ -91,7 +102,8 @@ WebAuthn browser E2E passed).
 | Demo seed/reset (`@demo.invalid`) | ✅ development only; 404 in production |
 | PWA manifest, service worker, offline shell, dark theme and overflow-aware navigation | ✅ production build verified |
 | Student cascade, automatic scoring, ID round, mobile app | ⛔ not built / gated |
-| Real Google + physical-phone multi-wave rehearsal | ⏳ pending |
+| Deployed manual test plan + synthetic PDF fixtures | ✅ plan written; generator verified (`roster`/`timetable` text layers true, `no-text-layer` false); execution pending |
+| Real Google + physical-phone multi-wave rehearsal | ⏳ pending; the deployed test plan is the execution script |
 
 ## Tests
 
@@ -107,6 +119,7 @@ WebAuthn browser E2E passed).
 | Roster PDF import helpers | **6/6** |
 | Timetable PDF import helpers | **6/6** |
 | Frontend total | **96/96** |
+| Synthetic PDF fixture generator | ✅ `roster-text-layer.pdf` and `timetable-text-layer.pdf` extract text; `no-text-layer.pdf` reports no text layer |
 | Production build | ✅ compiles successfully (`CI=true REACT_APP_API_URL=/api/v1 npm run build`) |
 | Browser smoke (dev) | **65/65** |
 | CSP production-build audit | **7/7 page loads**, zero CSP violations, Google button rendered, service worker active, dark theme applied |
@@ -216,6 +229,7 @@ build planning only; never call the physical gate measured-passed.
 
 | Date | What changed | Result |
 | --- | --- | --- |
+| 2026-11-09 | Wrote `docs/testing-plan.md` for the deployed 4-phone/3–4-laptop run, added a synthetic text-layer/no-text PDF fixture generator, and reconciled stale `32a2078`/“A2a uncommitted” claims across the status docs. The live service answered health/readiness and its bundle contained A2a strings; the exact Render commit was not compared with the dashboard. | Documentation/tooling only; generator verified both text-layer PDFs and the no-text rejection. No product tests were changed. G2 (live commit) and G5 (restore prerequisites) remain hard gates before signed testing. |
 | 2026-11-06 | Document phase A2a: staff-only `POST /timetable/pdf/preview`, shared PDF preview limiter, deterministic text-layer extraction and read-only modal preview in Timetable. Generated-PDF fixtures cover extraction, multipart/auth, scanned-PDF rejection and error mapping. No row parsing, class matching, class creation or slot writes. | Backend **255/255** in both modes, frontend **96/96**, production build green. Real timetable PDFs and the browser modal were not validated; A2b is blocked on samples. |
 | 2026-11-05 | Document phase A1: owner-scoped roster PDF upload, PDF.js text-layer extraction with visual line reconstruction, editable preview in Classes, stable PDF error codes, 10 MB/20-page/200k-character caps and a 20-per-10-minute limiter. No roster is saved by extraction. | Backend **245/245** in both modes, frontend **90/90**, production build green; generated-PDF fixtures validate extraction, multipart, auth, scanned-PDF rejection and error mapping. Real college PDFs and OCR remain unvalidated. |
 | 2026-11-05 | P1 admin hardening: WebAuthn/passkey step-up for destructive super-admin actions, audit hash chain and `/admin/audit/verify`, `req.ip` audit fix, export auditing and 30/10-minute limits, `/health/ready`, verification-only `JWT_SECRET_PREVIOUS` rotation, Security tab and step-up retry client. Browser E2E exposed and fixed the Mongo `$set`/`$setOnInsert` settings conflict. | Backend **227/227** in both modes, frontend **84/84**, production build green, WebAuthn E2E passed with a 3-entry chain and zero console errors. |

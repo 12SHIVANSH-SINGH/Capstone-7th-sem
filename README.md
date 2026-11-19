@@ -13,9 +13,11 @@ Capstone project · NIT Jamshedpur
 
 </div>
 
-**Live prototype:** [https://bio-attend.onrender.com](https://bio-attend.onrender.com) — the repository's `HEAD`, `origin/main` and `origin/HEAD` are **`003f900`**, which includes the full attendance product, P0/P1 security hardening and the committed A2a timetable PDF text preview. The live service is reachable and serves A2a UI strings, but its exact deployed commit was **not verified against the Render dashboard**; the owner must confirm that before signed testing. The owner controls every push and deploy.
+**Live prototype:** [https://bio-attend.onrender.com](https://bio-attend.onrender.com) — the repository's `HEAD`, `origin/main` and `origin/HEAD` are **`433d522`** (a `.gitleaksignore`-only commit over `8d2e873`), which includes the full attendance product, P0/P1 security hardening and the committed A2a timetable PDF text preview. The live service is reachable and serves A2a UI strings, but its exact deployed commit was **not verified against the Render dashboard**; the owner must confirm that before signed testing. The owner controls every push and deploy.
 
 > **Layer 1 gate status:** the owner has directed that Layer 1 be treated as **passed for build planning only**. This is an assumption, not a measurement. The 2026-10-25 sweep still fails at 5 m (4/10) and 10 m (1/10), and the reverse direction and muted control are unmeasured. Do not read this build as proof that the physical gate passed.
+
+**New here?** Read [`docs/reading-order.md`](docs/reading-order.md) for the order to read the docs, run the stack locally, test it and then read the codebase.
 
 ## Why
 

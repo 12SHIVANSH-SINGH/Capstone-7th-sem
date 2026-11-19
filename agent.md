@@ -13,7 +13,7 @@ The server mints keys, records signed proof evidence and keeps an audited attend
 register. A **teacher confirms attendance**; a decoded tone is not an automatic verdict.
 Full detail is in `plan.md`; do not restate or redesign it here.
 
-## Current phase (2026-11-09, session 27)
+## Current phase (2026-11-11, session 29)
 
 - **Layer 1 is assumed passed by owner direction (2026-10-29) for build planning only.** This
   is **not** a measured pass. The 2026-10-25 sweep decoded 10/10 at 1 m, 9/10 at 2 m, 9/10 at
@@ -36,12 +36,14 @@ Full detail is in `plan.md`; do not restate or redesign it here.
   score. The teacher opens the register, sees evidence/optional location and marks
   present/absent/excused; finalisation and every correction are audited. Scoring, the ID
   round and the student cascade remain unbuilt.
-- **Repository state (2026-11-09):** local `HEAD`, `origin/main` and `origin/HEAD` are all
-  **`003f900`**, which includes the A1 roster PDF slice, A2a timetable text preview, P0/P1
-  security, PWA and dark-mode work. The earlier `32a2078` claims in the status docs are stale
-  and were corrected in session 27. The live service is reachable and its bundle contains A2a
-  strings, but the exact deployed commit was **not verified against the Render dashboard**;
-  do not claim the deployment matches the repository without checking.
+- **Repository state (2026-11-10):** local `HEAD`, `origin/main` and `origin/HEAD` are all
+  **`433d522`**, a `.gitleaksignore`-only commit over `8d2e873` (which contains the test plan
+  and guide). The tree includes the A1 roster PDF slice, A2a timetable text preview, P0/P1
+  security, PWA and dark-mode work. `003f900` was the earlier product commit; the `32a2078`
+  claims in older status docs are stale and were corrected in session 27. The live service is
+  reachable and its bundle contains A2a strings, but the exact deployed commit was **not
+  verified against the Render dashboard**; do not claim the deployment matches the repository
+  without checking.
 - **Deployed test plan:** [`docs/testing-plan.md`](docs/testing-plan.md) is the execution
   script for the 4-phone/3–4-laptop run. It covers acoustic range and controls, the signed
   attendance/query flow on Render with real college accounts, device/passkey/admin security,

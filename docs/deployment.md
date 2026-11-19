@@ -2,8 +2,9 @@
 
 This is the production guide for Bio Attend. All account-level setup (GitHub, Render,
 MongoDB Atlas, Google Cloud) is done by the project owner. The repository is built and tested
-locally. Local `HEAD`, `origin/main` and `origin/HEAD` are `003f900`, which includes the
-committed A2a timetable PDF text preview. The live service is reachable and its bundle
+locally. Local `HEAD`, `origin/main` and `origin/HEAD` are `433d522`, a `.gitleaksignore`-only
+commit over `8d2e873`; the tree includes the committed A2a timetable PDF text preview. The live
+service is reachable and its bundle
 contains the A2a UI strings, but the exact deployed commit must be compared in the Render
 dashboard before signed testing. The owner controls every push and deploy.
 

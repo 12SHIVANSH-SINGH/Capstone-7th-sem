@@ -3,9 +3,10 @@
 Update this at the end of every session. If it disagrees with the real code, the code wins:
 fix this file and tell the owner.
 
-Last updated: **2026-11-09** (session 27: deployed manual test plan, synthetic PDF fixture
-generator, stale-doc reconciliation; backend **255/255** and frontend **96/96** remain the
-last recorded gate before this documentation/tooling session).
+Last updated: **2026-11-11** (session 29: newcomer reading-order and testing-setup guide;
+session 28 reconciled current-state commits and completed the deployed-test-plan accuracy
+pass; backend **255/255** and frontend **96/96** remain the last recorded gate before these
+documentation/tooling sessions).
 
 ## Status
 
@@ -56,16 +57,18 @@ last recorded gate before this documentation/tooling session).
 - **Device binding:** a student's first browser and every changed browser now enter the
   teacher device-review queue; only dev/test personas auto-approve. Replacing an approved
   device bumps `tokenVersion`, so the old session cannot submit proofs.
-- **Repository state:** local `HEAD`, `origin/main` and `origin/HEAD` are all **`003f900`**.
-  The A1 roster PDF slice, A2a timetable text preview, P0/P1 security, PWA and dark-mode work
-  are committed and pushed. The earlier `32a2078`/“A2a uncommitted” claims were stale and were
-  corrected in session 27. The live service is reachable: `/api/v1/health/ready` returned
-  ready with the database connected, and `main.14c6a1a8.js` contained A2a UI strings
+- **Repository state:** local `HEAD`, `origin/main` and `origin/HEAD` are all **`433d522`**,
+  a `.gitleaksignore`-only commit over `8d2e873` (the docs/test-plan commit). The A1 roster PDF
+  slice, A2a timetable text preview, P0/P1 security, PWA and dark-mode work are committed and
+  pushed; `003f900` was the earlier product commit. The earlier `32a2078`/“A2a uncommitted”
+  claims were stale and were corrected in session 27. The live service is reachable:
+  `/api/v1/health/ready` returned ready with the database connected, and `main.14c6a1a8.js`
+  contained A2a UI strings
   (“Timetable PDF text preview”, “Import PDF text”). The exact deployed commit was **not
   compared with the Render dashboard**, so G2 of the test plan remains open. No push, tag,
   merge or deploy was performed in this session.
 - **Next action:** execute [`docs/testing-plan.md`](docs/testing-plan.md) in order. First pass
-  G0–G7, especially G2 (owner compares the Render dashboard commit with `003f900`) and G5
+  G0–G7, especially G2 (owner compares the Render dashboard commit with `433d522`) and G5
   (Atlas URI, passphrase, `mongodump`/`mongorestore` and scratch-database permission). If G2
   fails, stop signed testing. If G5 fails, mark the restore suite **BLOCKED** and do not claim
   restore coverage. Then run AC → FL → AD → PDF → DP/RS. Only after that, and only when
@@ -229,6 +232,8 @@ build planning only; never call the physical gate measured-passed.
 
 | Date | What changed | Result |
 | --- | --- | --- |
+| 2026-11-11 | Added `docs/reading-order.md`: a plain-language path from the idea and honest limits, through local setup and the deployed test sequence, to a file-by-file code-reading order. Linked it from the root README and docs index. | Documentation only; no product code changed. Structural checks passed (diff whitespace, fenced blocks, table columns, relative links). |
+| 2026-11-10 | Reconciled every current-state commit reference to `433d522`, the `.gitleaksignore`-only commit over docs commit `8d2e873`; completed the click-level accuracy pass on FL wave sequencing, AD step-up paths, PDF preview controls, AC receiver transfer and the zero-proof key-expiry recovery. | Documentation only; no product code changed. Structural checks passed (diff whitespace, fenced blocks, table columns, relative links). G2 (live commit) and G5 (restore prerequisites) remain hard gates. |
 | 2026-11-09 | Wrote `docs/testing-plan.md` for the deployed 4-phone/3–4-laptop run, added a synthetic text-layer/no-text PDF fixture generator, and reconciled stale `32a2078`/“A2a uncommitted” claims across the status docs. The live service answered health/readiness and its bundle contained A2a strings; the exact Render commit was not compared with the dashboard. | Documentation/tooling only; generator verified both text-layer PDFs and the no-text rejection. No product tests were changed. G2 (live commit) and G5 (restore prerequisites) remain hard gates before signed testing. |
 | 2026-11-06 | Document phase A2a: staff-only `POST /timetable/pdf/preview`, shared PDF preview limiter, deterministic text-layer extraction and read-only modal preview in Timetable. Generated-PDF fixtures cover extraction, multipart/auth, scanned-PDF rejection and error mapping. No row parsing, class matching, class creation or slot writes. | Backend **255/255** in both modes, frontend **96/96**, production build green. Real timetable PDFs and the browser modal were not validated; A2b is blocked on samples. |
 | 2026-11-05 | Document phase A1: owner-scoped roster PDF upload, PDF.js text-layer extraction with visual line reconstruction, editable preview in Classes, stable PDF error codes, 10 MB/20-page/200k-character caps and a 20-per-10-minute limiter. No roster is saved by extraction. | Backend **245/245** in both modes, frontend **90/90**, production build green; generated-PDF fixtures validate extraction, multipart, auth, scanned-PDF rejection and error mapping. Real college PDFs and OCR remain unvalidated. |

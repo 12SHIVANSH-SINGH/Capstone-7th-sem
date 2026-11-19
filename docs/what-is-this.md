@@ -48,8 +48,9 @@ the signed proof is submitted.
 | Full flow on real phones | ⏳ attendance is teacher-confirmed and the local browser flow works end to end; a real-phone/Google multi-wave rehearsal, measured acoustic range, the student cascade, automatic scoring and the ID round are still pending |
 
 This is a demo-ready capstone prototype — not yet used for real attendance. The repository's
-`HEAD`, `origin/main` and `origin/HEAD` are `003f900`, which includes the attendance/query/admin
-layer, the P0/P1 security hardening and the committed A2a timetable PDF text preview. The live
+`HEAD`, `origin/main` and `origin/HEAD` are `433d522` (a `.gitleaksignore`-only commit over
+`8d2e873`), which includes the attendance/query/admin layer, the P0/P1 security hardening and
+the committed A2a timetable PDF text preview. The live
 service is reachable and serves A2a UI strings, but its exact deployed commit has not been
 checked in the Render dashboard. The click-level deployed test run is
 [`testing-plan.md`](testing-plan.md).

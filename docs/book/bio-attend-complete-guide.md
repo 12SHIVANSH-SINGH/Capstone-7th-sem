@@ -2,7 +2,7 @@
 
 **A layman's tour of every formula, route, design decision, physics idea and code path in the Bio Attend acoustic attendance system.**
 
-Written for the working tree inspected on **6 November 2026** (`HEAD` reported by `git log -1 --oneline` as `003f900`, "deepseek flash 4.1 max"). The repository's older status documents may name a different commit; when this book and the code disagree, the code wins. No commit, push, tag, merge or deploy was performed while writing it.
+Written for the working tree inspected on **6 November 2026** (`HEAD` reported by `git log -1 --oneline` as `003f900`, "deepseek flash 4.1 max"). A reconciliation on **10 November 2026** found `HEAD`, `origin/main` and `origin/HEAD` at `433d522`, a `.gitleaksignore`-only commit over `8d2e873`; the product code described here is unchanged. The repository's older status documents may name a different commit; when this book and the code disagree, the code wins. No commit, push, tag, merge or deploy was performed while writing it.
 
 ---
 
@@ -28,7 +28,7 @@ It is written in plain language first, with the formula or code condition immedi
 
 - It is **not** a claim that the physical layer has passed. The owner has treated Layer 1 as passed **for build planning only**. The last recorded distance sweep decoded 10/10 at 1 m, 9/10 at 2 m, 9/10 at 3 m, **4/10 at 5 m** and **1/10 at 10 m**. Reverse direction and the muted control were not measured. Do not describe the acoustic gate as measured-passed.
 - It is **not** a claim that real college PDFs parse accurately. Roster PDF extraction and timetable PDF extraction are tested with generated fixtures. No representative college timetable or roster PDFs have been supplied, and scanned OCR is not built.
-- It is **not** a claim that the live Render deployment matches this working tree (`003f900`). The exact deployed version was not verified while writing; gate **G2** in [`docs/testing-plan.md`](../testing-plan.md) checks it before signed testing.
+- It is **not** a claim that the live Render deployment matches this working tree (`433d522`). The exact deployed version was not verified while writing; gate **G2** in [`docs/testing-plan.md`](../testing-plan.md) checks it before signed testing.
 - It is **not** a promise that automatic attendance, scoring, the ID round or the multi-hop student cascade exist. They do not.
 
 ## The one-sentence version
@@ -1477,7 +1477,7 @@ It rejects hex, exponent, signs and whitespace. It checks the key range 0–170,
 | Goertzel recurrence | $s[n] = x[n] + k s[n-1] - s[n-2]$ | `fsk.singleTonePowerDb` |
 | Goertzel coefficient | $k = 2\cos(2\pi f/f_s)$ | `fsk.singleTonePowerDb` |
 | Magnitude squared | $s_1^2 + s_2^2 - k s_1 s_2$ | `fsk.singleTonePowerDb` |
-| Normalised power | $\max(|X|^2/N^2, 10^{-12})$ | `fsk.singleTonePowerDb` |
+| Normalised power | $\max(\lvert X\rvert^2/N^2, 10^{-12})$ | `fsk.singleTonePowerDb` |
 | Level dB | $10\log_{10}(P)$ | `fsk.singleTonePowerDb` |
 | Margin | $L_{\max} - \operatorname{median}(L)$ | `fsk.measureTones` |
 | Decision window | $\max(512, \operatorname{round}(0.35N))$ | `fsk.decodeAtStart` |
@@ -1485,7 +1485,7 @@ It rejects hex, exponent, signs and whitespace. It checks the key range 0–170,
 | Marker minimum span | $1.5N$ | `fsk.decodeFrame` |
 | Frame start estimate | $\operatorname{round}((\text{first}+\text{last}+W)/2 - N)$ | `fsk.decodeFrame` |
 | Nyquist | $f_s/2$ | lab / physics |
-| Alias fold | $\left|f - f_s \cdot \operatorname{round}(f/f_s)\right|$ | `labConfig.aliasedFrequency` |
+| Alias fold | $\left\lvert f - f_s \cdot \operatorname{round}(f/f_s)\right\rvert$ | `labConfig.aliasedFrequency` |
 | Lab baseline | median of windows | `labConfig.computeBaseline` |
 | Lab peak | median after 20% trim | `labConfig.computeTonePeak` |
 | Lab margin | $P_f - B_f$ | lab UI |
@@ -2280,7 +2280,7 @@ Types: session started/closed, attendance finalized, query created/approved/reje
 | `teacher` | ObjectId → User | required, indexed |
 | `room` | ObjectId → Room | default null |
 | `dayOfWeek` | Number | required, 0–6, indexed |
-| `startTime` | String | required, matches `^([01]\d|2[0-3]):[0-5]\d$` |
+| `startTime` | String | required, matches `^([01]\d\|2[0-3]):[0-5]\d$` |
 | `endTime` | String | same pattern |
 | `term` | String | max 80, default "" |
 | `active` | Boolean | default true, indexed |
@@ -3641,7 +3641,7 @@ The `message` is for people. The `code` is for code. Only a small number of erro
 | **Staff** | Teacher or super-admin |
 | **Super-admin** | `role: "superadmin"` only |
 | **Super-admin + step-up** | Super-admin and a fresh WebAuthn assertion; otherwise **428** |
-| **Dev-only** | Mounted only when `NODE_ENV=development|test` and `DEV_AUTH_ENABLED=true` |
+| **Dev-only** | Mounted only when `NODE_ENV=development\|test` and `DEV_AUTH_ENABLED=true` |
 
 A missing or expired session returns **401**. A valid session with the wrong role or class ownership returns **403**. A valid super-admin session without a recent passkey approval returns **428** on step-up routes.
 
@@ -6489,7 +6489,7 @@ The frame contains data digits. `digitsToValue` converts them to the integer key
 
 4. Parses the response with `evidenceFromResponse`, which keeps `wave`, `recordedAt`, `duplicate` and `attendanceDecided`.
 
-The page never displays the key. It shows the wave and the time. If the key expires before submission, the server returns 409 and the page asks the student to wait for the next wave. If the teacher advances the wave while the phone is listening, an effect compares `selectedSession.wave` with the wave the capture started on and stops the capture, so the phone cannot submit a frame from the old key.
+The page never displays the key. It shows the wave and the time. If the key expires before submission, the server returns 409 and the page asks the student to wait for the next wave. If no one submitted evidence for that wave, the teacher cannot advance it and must close and restart the session. If the teacher advances the wave while the phone is listening, an effect compares `selectedSession.wave` with the wave the capture started on and stops the capture, so the phone cannot submit a frame from the old key.
 
 ### Optional location
 
@@ -6515,7 +6515,7 @@ It does not show "Present", a score, a confidence, or an attendance status. That
 - **Insecure context** → the page refuses to start and explains HTTPS/localhost.
 - **Wrong sample rate** → the gate blocks before decoding, with a message about the device/browser. A silently aliased decode would be worse than a clear refusal.
 - **Tone too quiet** → the decoder finds no frame; the listen timer ends and the student retries. The 9 dB margin is the guard against a false decode.
-- **Key expired** → the server rejects; the page tells the student to wait for the next wave.
+- **Key expired** → the server rejects; the page tells the student to wait for the next wave. If the wave has zero proofs, the teacher must close and restart the session.
 - **Wave advanced** → the page stops the old capture and asks the student to listen again.
 - **Device not approved** → the page blocks submission and explains the teacher review. The acoustic lab remains usable.
 - **Two tabs listening** → both could decode and submit; the unique `(session, student, wave)` index makes the second a duplicate. The UI may show two evidence cards, but only one proof exists.
@@ -6619,7 +6619,7 @@ The key is displayed as a large number. It is the teacher's secret to transmit, 
 - **Advance wave**, with a confirmation modal;
 - **Close session**, with a confirmation modal.
 
-The countdown is computed from `keyExpiresAt` on every render tick. `keyIsUsable` also checks the session is active and the key is a valid integer. When it expires, the transmitter button is disabled and the panel tells the teacher to wait for evidence, then advance or close.
+The countdown is computed from `keyExpiresAt` on every render tick. `keyIsUsable` also checks the session is active and the key is a valid integer. When it expires, the transmitter button is disabled and the panel tells the teacher to wait for evidence, then advance or close. If the wave expired with **zero** proofs, the teacher cannot advance it; close the session and start a new one.
 
 ### Advancing
 
@@ -8775,14 +8775,14 @@ The audit rows are restored with their `seq`, `hash` and `prevHash`. If the back
 | Microphone will not start | Insecure origin, denied permission, another app holds the mic | Use HTTPS/localhost, allow the mic, close other apps |
 | Sample-rate gate blocks | Browser/device cannot represent the band | Use a supported Chrome/device; do not bypass the gate |
 | No frame decoded | Phone cannot hear the tone, volume low, distance too far, expired key | Move closer, raise media volume, replay/advance, retry |
-| "Key expired" | More than two minutes passed | Teacher advances/replays; student listens again |
+| "Key expired" | More than two minutes passed | If the wave has a proof, advance/replay; if zero proofs, close and restart; student listens again |
 | "Wave is no longer current" | Teacher advanced while the phone was decoding | Listen again for the new wave |
 | "Proof signature is invalid" | Device key changed, wrong stored public key, corrupted signature | Re-bind the device; check the browser key |
 | "Device not approved" | First binding or a pending change | Teacher approves the device |
 | "A device change is awaiting review" | A pending request freezes the old device | Teacher decides the request |
 | "Not on this class roster" | Student removed after the session started | Add them back if appropriate; the historical row remains |
 | Evidence list empty | No proofs yet, wrong session, or proofs older than 24 h TTL | Check the session and time; the register counter may remain |
-| Advance returns 409 | No proof for the current wave, session closed, or a concurrent advance | Wait for evidence; refresh; do not blind-increment |
+| Advance returns 409 | No proof for the current wave, session closed, or a concurrent advance | Wait for evidence; refresh; do not blind-increment. If the key expired with zero proofs, close and restart |
 | Start returns 409 | An active session already exists, or the class has no room | Resume the active session; set a default room |
 | Register missing a student | They were not on the active roster when the session started | Check enrollments; the snapshot is historical |
 | Finalise returns 409 | The session is still active | Close it first |
@@ -10185,7 +10185,7 @@ The scripts are tested with stubs, not a real Atlas restore. Until a drill is re
 
 ### Deployment verification
 
-The repository's `HEAD`, `origin/main` and `origin/HEAD` are `003f900`, which includes the committed A2a timetable text preview. The live Render service answered `/api/v1/health` and `/api/v1/health/ready`, and its `main.14c6a1a8.js` bundle contained the A2a UI strings. The exact deployed commit was not compared with the Render dashboard while writing, so that comparison is a hard gate (**G2** in [`docs/testing-plan.md`](../testing-plan.md)) before signed testing:
+The repository's `HEAD`, `origin/main` and `origin/HEAD` are `433d522`, a `.gitleaksignore`-only commit over `8d2e873`, which added this book and the test plan; the tree includes the committed A2a timetable text preview. The live Render service answered `/api/v1/health` and `/api/v1/health/ready`, and its `main.14c6a1a8.js` bundle contained the A2a UI strings. The exact deployed commit was not compared with the Render dashboard while writing, so that comparison is a hard gate (**G2** in [`docs/testing-plan.md`](../testing-plan.md)) before signed testing:
 
 - a deploy may be from a different commit than the book describes;
 - a fix may be in the working tree but not deployed;
@@ -10931,7 +10931,7 @@ $$
 | Session statuses | `active`, `closed` | `checkInSession.js` | Two-state lifecycle |
 | Distinct-key retries | 5 | `checkInSession.js` | Avoid repeating the previous key |
 | Proof protocol | `bioattend-proof:v1` | `checkInProof.js` | Versioned signed message |
-| Signature length | 64 bytes | `checkInProof.js` | Raw P-256 `r || s` |
+| Signature length | 64 bytes | `checkInProof.js` | Raw P-256 `r \|\| s` |
 | Signature encoding | Base64, 88 characters including `==` padding | `checkInProof.js` | Exact payload shape |
 | Safe id length | 1–128 | `checkInProof.js` | Session/student identifiers |
 | Proof TTL | 86,400 s | `checkInProofModels.js` | One day |
@@ -11954,7 +11954,7 @@ Do not add a second acoustic run at 5 m just to show failure. If you want to dis
 | Microphone permission denied | Re-enable in the browser site settings, reload, retry | "Audio capture needs explicit permission." |
 | Sample-rate gate refuses | Use another phone or the fallback | "This device's audio pipeline cannot represent the band; the gate is protecting the result." |
 | Student device pending | Open the teacher review queue and approve, or use a pre-approved device | "A new browser must be approved by a teacher; that is the device-binding control." |
-| Proof says key expired | Teacher advances or replays; student listens again | "The key lifetime is two minutes." |
+| Proof says key expired | If the wave has a proof, the teacher advances or replays; if zero proofs, close and restart. The student listens again | "The key lifetime is two minutes." |
 | Start returns 409 | There is already an active session or no room | "The state conflict is deliberate; close the old session or set a room." |
 | 401 on a page | Sign in again; confirm the cookie and origin | "The session expired; this is not an acoustic failure." |
 | 429 | Wait for the window; check `Retry-After` | "A rate limit is protecting the route." |

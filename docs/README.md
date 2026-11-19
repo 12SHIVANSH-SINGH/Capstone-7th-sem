@@ -1,6 +1,10 @@
 # Bio Attend — Docs
 
-Plain-English documentation. Start at the top; the whole set takes about fifteen minutes.
+New here? Read **[Start here — the reading order](reading-order.md)** first. It gives a
+15-minute overview path, a local setup path, the deployed test sequence and a code-reading
+order.
+
+Then use this index as reference:
 
 1. **[What is Bio Attend?](what-is-this.md)** — the problem, the idea and where the project stands.
 2. **[Getting started](getting-started.md)** — run MongoDB, the backend and the frontend on one laptop.

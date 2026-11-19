@@ -1,10 +1,10 @@
 # Bio Attend — deployed manual test plan
 
-**Plan version:** 1.0  
-**Written:** 2026-11-09  
-**Application:** [https://bio-attend.onrender.com](https://bio-attend.onrender.com)  
-**Repository state at writing:** `003f900` on `main` (A2a committed)  
-**Owner:** project owner (deploy, environment, accounts)  
+**Plan version:** 1.0\
+**Written:** 2026-11-09 (reconciled 2026-11-10)\
+**Application:** [https://bio-attend.onrender.com](https://bio-attend.onrender.com)\
+**Repository state at writing:** `433d522` on `main` (a `.gitleaksignore`-only commit over `8d2e873`; product code, including A2a, is unchanged from `003f900`)\
+**Owner:** project owner (deploy, environment, accounts)\
 **Status:** ready to execute after the preflight gates in §3 pass
 
 This plan tells one small test team exactly what to open, tap, type, observe and record. It
@@ -215,9 +215,9 @@ git rev-parse --short origin/main
 git status --short
 ```
 
-Expected at writing: both hashes print `003f900`, and `git status --short` shows only the
+Expected at writing: both hashes print `433d522`, and `git status --short` shows only the
 documentation/test-tool changes the owner already knows about. Record the actual hashes; do not
-assume they are still `003f900`.
+assume they are still `433d522`.
 
 Run the local gate:
 
@@ -298,7 +298,7 @@ At plan-writing time the live site returned:
   text”**, which are A2a UI strings.
 
 That is supporting evidence that A2a is deployed. It is **not proof** that the live commit is
-exactly `003f900`. Only the Render dashboard commit comparison is proof.
+exactly `433d522`. Only the Render dashboard commit comparison is proof.
 
 **PASS:** the Render dashboard commit equals the recorded `HEAD`.  
 **FAIL:** any mismatch, or the dashboard cannot be checked. Stop signed testing; ask the owner
@@ -444,7 +444,8 @@ summary recommendation. A phone that fails the 44.1 kHz gate is **BLOCKED** for 
 
 1. Put P1 (teacher TX) and P2/P3 (student RX) 1 m apart, facing each other.
 2. On P1, open `/acoustic-tx`; set Run ID `FSTM`, distance `1 m`, room and notes.
-3. Tap **Copy receiver link**.
+3. Tap **Copy receiver link**; send it to P2 and P3 (for example through the team chat), or
+   plan to type the same Run ID on both phones.
 4. On P2, open the copied link; verify the same run ID, distance and room.
 5. On P3, open the same copied link (or type the same run ID and conditions).
 6. On both receivers, tap **Start listening** and allow the microphone.
@@ -484,7 +485,7 @@ Swap roles at the same physical positions:
 
 1. P2 becomes the transmitter; P1 becomes the receiver.
 2. P2 opens `/acoustic-tx`; set Run ID `RSTM`, distance `1 m`, room and notes.
-3. P1 opens the receiver link from P2; start listening.
+3. P1 opens the receiver link from P2 (or types the same `RSTM` run ID); start listening.
 4. P2 taps **Start transmitting**; 10 frames.
 5. Stop and save both reports.
 
@@ -946,8 +947,8 @@ signing the student out.
    - On P3 and L4/L3, open `/student/check-in`, tick consent and tap **Join check-in** for
      wave 0. If the rejected browser blocks joining, record that block and continue with P3.
    - On P1, tap **Start transmitting**.
-   - On L4/L3, verify it does **not** show **Evidence recorded**. If it joined, the server must
-     reject the submission with **403** (invalid device signature).
+   - On L4/L3, verify it does **not** show **Evidence recorded**. If it joined, open DevTools
+     → Network, confirm the proof request returns **403**, and capture the visible error.
    - On P3, verify **Evidence recorded** and **Attendance: Not decided**.
    - On L1, verify the evidence card shows one proof for S2 on wave 0.
    - Close the disposable check-in without finalising it.
@@ -971,7 +972,9 @@ no evidence.
    `/login` (401). If L3 stays signed in, that is a **FAIL**.
 5. Sign in again on L3; verify the dashboard now reports the device approved.
 6. On P2, refresh or navigate; verify it is sent to `/login` (401).
-7. Sign in again on P2; DP-05 needs S1 signed in on that phone.
+7. Sign in again on P2. Because the approved binding now belongs to L3, this is another
+   pending device change; leave it in review and do **not** approve it. DP-05 only needs the
+   `/student/check-in` page to load on P2.
 
 **PASS:** replacing an approved device invalidates both the old session and the session that
 requested the change; a fresh sign-in reaches the approved new binding.  
@@ -1090,9 +1093,12 @@ times.
 
 The limit is **30 downloads per 10 minutes** per account/IP. Do this last in the AD suite.
 
+Use **A1's** token, not T1's: FL-17 already consumed six of T1's downloads, and the limiter is
+keyed by user id. Do not restart the Render service to reset the limiter.
+
 Preferred API check (keeps the UI free):
 
-1. Copy the teacher or super-admin `token` cookie as in AD-06.
+1. Copy the super-admin `token` cookie as in AD-06.
 2. Run 31 sequential requests to a cheap export route, for example:
 
 ```bash
@@ -1132,15 +1138,18 @@ Use a disposable third session so the main flow is not disturbed. If **Security*
 step-up window **Open** from an earlier action, wait until it shows **Locked** first, so the
 assertion is genuinely tested rather than reusing the window.
 
-1. On L1, start a session for `TST101`; close it immediately; finalise it.
-2. On L2, open `/admin` → **Sessions**; find that session; click **Register**.
-3. Select a row; change the status; add a decision note; save.
-4. Complete the passkey prompt.
-5. Verify the row changes and the audit log records the override.
-6. Delete the same row: click **Delete attendance row** → **Confirm delete**; complete the
+1. On L1, open `/teacher/check-in`; select `TST101 · T`; click **Start check-in**; then
+   **Close check-in** → **Confirm close**.
+2. Open `/teacher/sessions`; find the new session; click **Register**; click **Finalise
+   attendance** → **Confirm finalise**. All pending rows become Absent.
+3. On L2, open `/admin` → **Sessions**; find that session; click **Register**.
+4. Select a row; change the status; add a decision note; save.
+5. Complete the passkey prompt.
+6. Verify the row changes and the audit log records the override.
+7. Delete the same row: click **Delete attendance row** → **Confirm delete**; complete the
    passkey prompt.
-7. Verify the row is gone and the audit log keeps the previous status and actor.
-8. Do not delete audit entries.
+8. Verify the row is gone and the audit log keeps the previous status and actor.
+9. Do not delete audit entries.
 
 **PASS:** override/delete work only with step-up and are audited.  
 **FAIL:** either action succeeds without a passkey.
@@ -1242,8 +1251,8 @@ upload changes the roster or creates a slot before the teacher clicks save/add, 
 #### PDF-03 — Roster no-text-layer rejection
 
 1. Click **Upload CSV or PDF**; choose `test-artifacts/no-text-layer.pdf`.
-2. Verify the error: “This PDF has no selectable text layer. Use CSV or paste the list instead;
-   local OCR is not built yet.”
+2. Verify the error: “This PDF has no selectable text layer. Use CSV/paste for now; local OCR
+   is not built yet.”
 3. Verify the textarea and saved roster are unchanged.
 
 **PASS:** a scanned/image-only PDF is rejected; nothing is guessed or saved.
@@ -1289,7 +1298,7 @@ Do not save synthetic emails into the attendance class.
 1. Import `timetable-text-layer.pdf` again; read the text.
 2. Click **Close preview**.
 3. Click **Add slot**; choose `TST101`, a day, start/end time and room.
-4. Save; verify the slot appears.
+4. Click **Add slot** again in the form footer; verify the slot appears.
 5. Verify `/teacher/check-in` still shows no live session for the class.
 
 **PASS:** the teacher manually schedules a slot; the timetable remains a plan.
@@ -1384,7 +1393,8 @@ attendance data.
 1. On L1 (teacher), open `/teacher-dashboard`, `/queries`, `/exports`, `/timetable` and
    `/acoustic-lab`.
 2. On L2 (A1), open `/admin`.
-3. On P2 (S1), open `/student/check-in`.
+3. On P2 (S1), open `/student/check-in`. The device may show **review** because AD-03 left
+   S1's approved binding on L3; that is expected. This step only checks the console and CSP.
 4. Open `/login` in a signed-out tab.
 5. For each page, check the console for errors and CSP violations.
 6. Verify the Google button renders on `/login`.
@@ -1626,11 +1636,16 @@ If it takes more than a few seconds, wait for the cold start before starting a t
 
 ### 7.1 GO for a limited pilot (test class only)
 
+This tier does not claim Layer 1 is measured-passed. It allows a test-class-only pilot with
+manual attendance and a recorded 5 m/10 m result; §7.2 requires the full range gate for
+real student data.
+
 All of these must be true:
 
 - [ ] G0–G4, G6, G7 PASS.
 - [ ] G2 live commit matches the reviewed commit.
-- [ ] AC: 1 m forward and reverse ≥95%; 5 m and 10 m measured and recorded; muted control 0/10.
+- [ ] AC: AC-01 sample-rate gate PASS; 1 m forward and reverse ≥95%; 5 m and 10 m measured
+      and recorded; muted and transmitter-off controls 0.
 - [ ] FL: full session A and B flow PASS; evidence-only boundary holds at FL-09.
 - [ ] AD: device review, 428/step-up, audit chain, export limit and production config PASS.
 - [ ] PDF: no auto-save; no auto-created slot; no-text rejection PASS.
@@ -1640,7 +1655,8 @@ All of these must be true:
 
 Everything in §7.1 **plus**:
 
-- [ ] AC: 1 m, 5 m and 10 m meet ≥95% in **both directions**, with 0 muted decodes.
+- [ ] AC: 1 m, 5 m and 10 m meet ≥95% in **both directions**, with 0 muted and 0
+      transmitter-off decodes.
 - [ ] RS: encrypted backup and restore drill PASS, or the owner records a written risk
       acceptance with a date and a remediation plan.
 - [ ] The owner accepts the remaining P2/P3 defects.
@@ -1657,7 +1673,8 @@ Any of these is an automatic NO-GO:
 - dev/demo/test-account access in production;
 - restore drill BLOCKED for a real-data pilot (unless the owner signs a written risk
   acceptance);
-- 1 m acoustic link below 95%.
+- 1 m acoustic link below 95% (blocks every pilot); 5 m or 10 m below 95% blocks a real-data
+  pilot.
 
 ### 7.4 Decision
 

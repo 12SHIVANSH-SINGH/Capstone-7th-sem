@@ -22,7 +22,7 @@ Before doing anything:
 4. Tell me in a few lines: the current layer, the single slice you will work on, and its
    pass/fail test.
 
-Current state (2026-11-09, session 27; details in `progress.md`):
+Current state (2026-11-11, session 29; details in `progress.md`):
 
 - **Layer 1 is assumed passed by owner direction (2026-10-29) for build planning only. This
   is not a measurement.** The 2026-10-25 sweep recorded **1 m 10/10, 2 m 9/10, 3 m 9/10,
@@ -78,13 +78,14 @@ Current state (2026-11-09, session 27; details in `progress.md`):
 - **Other recorded smokes:** dev **65/65**, production-mode Gmail-admin **13/13**, mobile/dark
   **27/27**, production PWA/offline **16/16**, CSP production-build audit **7/7** page loads.
   These use temporary browser harnesses, not repo npm commands.
-- **Repository:** local `HEAD`, `origin/main` and `origin/HEAD` are all **`003f900`**; the
-  A1 roster PDF slice, A2a timetable text preview, P0/P1 security, PWA and dark-mode work are
-  committed and pushed. The earlier `32a2078`/“A2a uncommitted” claims were stale and were
-  corrected on 2026-11-09. The live service is reachable and its bundle contains A2a UI
-  strings, but the exact Render commit was not checked against the dashboard; do not assume
-  it matches `003f900`. No push, tag, merge or deploy has been performed. The owner reviews,
-  commits, pushes and deploys manually.
+- **Repository:** local `HEAD`, `origin/main` and `origin/HEAD` are all **`433d522`**, a
+  `.gitleaksignore`-only commit over `8d2e873` (the docs/test-plan commit); the A1 roster PDF
+  slice, A2a timetable text preview, P0/P1 security, PWA and dark-mode work are committed and
+  pushed. `003f900` was the earlier product commit. The earlier `32a2078`/“A2a uncommitted”
+  claims were stale and were corrected on 2026-11-09. The live service is reachable and its
+  bundle contains A2a UI strings, but the exact Render commit was not checked against the
+  dashboard; do not assume it matches `433d522`. No push, tag, merge or deploy has been performed.
+  The owner reviews, commits, pushes and deploys manually.
 - **Next action:** execute `docs/testing-plan.md` in order. Pass G0–G7 first; G2 requires the
   owner to compare the Render dashboard commit with the recorded `HEAD`, and G5 checks the
   Atlas URI, passphrase, `mongodump`/`mongorestore` and scratch-database permission. Stop

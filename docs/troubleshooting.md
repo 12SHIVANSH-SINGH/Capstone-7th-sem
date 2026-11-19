@@ -166,8 +166,10 @@ their account is on the class roster with an approved device. Exact retries do n
 second row. A phone still listening for an old key is refused.
 
 **The student page says the key expired or the wave changed**
-A wave key lives two minutes. Ask the teacher to advance/replay the current wave, then tap
-**Join** again. The old frame is deliberately rejected.
+A wave key lives two minutes. If at least one phone already submitted evidence for that wave,
+ask the teacher to advance to a new wave, then tap **Join** again. If the wave has no evidence
+at all, the teacher cannot advance it because advance is gated on a proof: close the session
+and start a new one. The old frame is deliberately rejected.
 
 **The register is missing a student**
 Only active roster rows become attendance rows. Check the roster and enrollment status,

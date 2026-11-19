@@ -159,8 +159,8 @@ teacher-confirmed attendance instead.
 **Current phase:** the product layer is built, including teacher-confirmed registers,
 queries, analytics, exports, notifications, timetable, PWA and a production-capable
 super-admin console. Roster PDF text extraction with an editable preview is built, and
-timetable PDF text extraction with a read-only preview is built (A2a). Both are committed in
-`003f900`. Structured timetable row parsing, local OCR and Gemini extraction are not. It is
+timetable PDF text extraction with a read-only preview is built (A2a). Both are in the committed
+tree at `433d522`. Structured timetable row parsing, local OCR and Gemini extraction are not. It is
 still **evidence-only for acoustic proof**: the app does not automatically score attendance
 or run the ID round. The attendance decision belongs to the teacher and is audited. The
 click-level execution script for the deployed 4-phone/3–4-laptop run is

@@ -3,7 +3,7 @@
 **Plan version:** 1.0\
 **Written:** 2026-11-09 (reconciled 2026-11-10)\
 **Application:** [https://bio-attend.onrender.com](https://bio-attend.onrender.com)\
-**Repository state at writing:** `433d522` on `main` (a `.gitleaksignore`-only commit over `8d2e873`; product code, including A2a, is unchanged from `003f900`)\
+**Repository state at writing:** `80dc2e1` on `main`; the phone-to-phone cascade is uncommitted in the working tree and must be reviewed, committed and published before FL can pass\
 **Owner:** project owner (deploy, environment, accounts)\
 **Status:** ready to execute after the preflight gates in §3 pass
 
@@ -215,9 +215,10 @@ git rev-parse --short origin/main
 git status --short
 ```
 
-Expected at writing: both hashes print `433d522`, and `git status --short` shows only the
-documentation/test-tool changes the owner already knows about. Record the actual hashes; do not
-assume they are still `433d522`.
+Expected at writing: both hashes print `80dc2e1`, and `git status --short` shows the
+uncommitted cascade slice. Record the actual hashes; do not assume they are still `80dc2e1`.
+For FL, the published commit must include the cascade changes; if it does not, stop and ask
+the owner to publish them.
 
 Run the local gate:
 
@@ -239,7 +240,7 @@ CI=true REACT_APP_API_URL=/api/v1 \
   npm run build
 ```
 
-Expected at writing: backend **255/255** in both modes, frontend **96/96**, production build
+Expected at writing: backend **262/262** in both modes, frontend **102/102**, production build
 compiles. Record the actual counts.
 
 Generate the synthetic PDFs (see §4.4):
@@ -298,11 +299,14 @@ At plan-writing time the live site returned:
   text”**, which are A2a UI strings.
 
 That is supporting evidence that A2a is deployed. It is **not proof** that the live commit is
-exactly `433d522`. Only the Render dashboard commit comparison is proof.
+the reviewed one. Only the Render dashboard commit comparison is proof.
 
-**PASS:** the Render dashboard commit equals the recorded `HEAD`.  
-**FAIL:** any mismatch, or the dashboard cannot be checked. Stop signed testing; ask the owner
-to deploy the reviewed commit. Do not test an older deployment and call it current.
+**PASS:** the Render dashboard commit equals the reviewed commit the owner published, and that
+commit includes the cascade slice FL exercises.
+
+**FAIL:** any mismatch, a missing cascade slice, or the dashboard cannot be checked. Stop signed
+testing; ask the owner to deploy the reviewed commit. Do not test an older deployment and call it
+current.
 
 ### G3 — Google OAuth and account access
 
@@ -560,12 +564,16 @@ This is the false-positive control. It must produce **zero** decoded frames.
 test class `TST101` has the real S1–S3 roster. The first-device approvals happen in FL-03, not
 in AD-01.
 
-Each wave key lives about **two minutes**. Have the student phones on the Join screen before
-the teacher transmits. If a key expires before every phone submits, the teacher may advance
-only after at least one proof on the current wave; the remaining students join the new wave.
-If a key expires with **zero** proofs, the wave cannot be advanced: close the session and
-start a new one. Do not fake, replay or hand-enter evidence to unblock a wave. Record the
-actual wave counts; do not force the planned example counts.
+Each round key lives about **two minutes**. The teacher starts the session once; round 0 plays
+from P1 automatically, and every phone whose proof is accepted relays the server-minted next
+signal. Have the student phones on `/student/check-in` as the session starts, or tap **Play
+this round** to replay while the key is fresh. Do not fake, replay or hand-enter evidence to
+unblock a round. Record the actual round counts; do not force the planned example counts.
+
+If at least one proof was accepted, the server has already minted a pending next signal: use
+**Nudge the class** to resend it, or **Advanced controls → Advance round** as a fallback. If a
+round expires with **zero** proofs, there is no pending signal to promote: close the session
+and start a new one.
 
 Use two sessions:
 
@@ -608,103 +616,88 @@ Do this once per student phone before the first session:
 
 **PASS:** each student has one approved device and no “waiting for teacher review” alert.
 
-#### FL-04 — Start Session A
+#### FL-04 — Start Session A and round 0
 
 1. On L1, open `/teacher/check-in`.
 2. Select `TST101 · T`.
 3. Verify the class has a default room; if not, set one in `/teacher/classes`.
-4. Click **Start check-in**.
-5. Verify the card **“2. Check-in is live”** appears.
-6. Record the wave number (`0`), the key, the countdown (about 2:00) and the start time.
-7. Do not share the key with students.
+4. Set P1 media volume to the same level used in AC.
+5. Tap **Start and play round 0** once.
+6. Verify the **Round 0 is live** card appears and P1 starts playing automatically. There is
+   no separate transmitter page and no location prompt.
+7. Record the round number (`0`), the countdown (about 2:00) and the start time.
+8. Do not share the key with students.
 
-**PASS:** one active session exists; wave 0; key visible only on the teacher screen.
+**PASS:** one active session exists; round 0; audio starts from the teacher screen; the key is
+visible only on the teacher screen.
 
-#### FL-05 — Prepare the wave 0 transmitter (do not transmit yet)
-
-1. On P1, sign in as T1 and open `/teacher/check-in`; select `TST101 · T` if needed. Confirm
-   the live session shows wave 0 and its key.
-2. Tap **Open transmitter** on P1. Verify `/acoustic-tx` opens with the key prefilled and the
-   notice “Session key loaded from the check-in screen. Start the transmitter when students
-   are ready.”
-3. Verify the **Back to check-in** link is present.
-4. Set Distance `in class`, Room `B-204`, and Notes with the phone model and media volume.
-5. Set media volume to the same level used in AC.
-6. **Do not tap Start transmitting yet.** The students must be listening first (FL-06).
-7. Work quickly: the key lives about two minutes. If it expires before any student submits,
-   use the zero-proof recovery rule in the §4.2 introduction.
-
-**PASS:** the transmitter is open on P1 with the correct key and settings, but no frames have
-played.
-
-#### FL-06 — Students join, then teacher transmits wave 0
+#### FL-05 — Students join while round 0 is live
 
 1. On P2, open `/student/check-in`.
-2. Read the **Before you listen** notice.
-3. Tick the consent checkbox: “I understand this phone will use the microphone and that
-   hearing a key records evidence, not attendance.”
-4. Tap **Join check-in**; allow the microphone. Verify the page says **Listening for the wave**
-   and shows the countdown.
-5. On P3, repeat steps 1–4 for S2. Both students must be listening before the transmitter
-   starts.
-6. On P4, do **not** open `/student/check-in` yet; S3 joins in FL-08 for the wave-change test.
-7. On P1, tap **Start transmitting**; wait for the planned frames to finish.
-8. Verify the transmitter report shows the planned/played count.
-9. On P2 and P3, verify:
-   - The progress step **Wave heard** completes.
+2. Read the **Before you join** notice.
+3. Tick the consent checkbox. Verify it says the choice lasts for this check-in.
+4. Tap **Join check-in**; allow the microphone. Verify the page says **Listening for the next
+   round** and shows the countdown.
+5. On P3, repeat steps 1–4 for S2.
+6. On P4, do **not** open `/student/check-in` yet; S3 joins in FL-08 to test relay across
+   rounds.
+7. If P2 or P3 missed the automatic round-0 playback, tap **Play this round** on P1 while the
+   key is still fresh.
+8. Work quickly: the key lives about two minutes. If it expires before any student submits,
+   use the zero-proof recovery rule in the §4.2 introduction.
+
+**PASS:** both students joined with one consent and one tap; no reload or second screen was
+needed; both are listening and their countdowns match the teacher's round.
+
+#### FL-06 — Evidence and automatic relay
+
+1. On P2 and P3, verify:
    - The evidence card says **Evidence recorded**.
    - **Attendance** says **Not decided**.
-   - The wave number and time are shown.
-10. On L1, verify the **Evidence received** card shows 2 proofs for wave 0.
+   - The phone reports that it passed the next signal on and is listening again.
+2. On L1, verify the **Evidence received** card shows 2 proofs for round 0 and names S1 and
+   S2. Verify the teacher console shows a fresh **Next signal** with its own countdown.
+3. Verify the teacher did not tap Advance or open a transmitter. If a phone proved the pending
+   round, verify the live round advanced automatically and the old round's evidence remains.
+4. On P1, verify old round audio stopped when the server advanced; later rounds are carried by
+   student phones, not auto-played by P1.
 
-**PASS:** both students were listening before the transmission; each sees evidence recorded
-and “Attendance: Not decided”; nothing marks them present automatically.
+**PASS:** each accepted phone relays without teacher action; the server mints the next signal;
+the teacher sees evidence, not attendance; the live round can advance automatically.
 
-#### FL-07 — Teacher sees evidence and advances
+#### FL-07 — Teacher fallback controls
 
-1. Verify the **Evidence received** card still lists both S1 and S2 for wave 0.
-2. Verify the rows name S1 and S2 and show the wave/time.
-3. Click **Advance wave**.
-4. Read the confirmation: “Advance to wave 1?”
-5. Click **Confirm advance**.
-6. Verify the key changes, the countdown resets, and wave 1 is displayed.
+1. On L1, verify the **Evidence received** card lists every round that has proofs, with the
+   correct student names and times.
+2. In **Advanced controls**, verify **Advance round** is enabled only while the current round
+   has accepted evidence.
+3. Tap **Nudge the class**. Verify it sends the fresh pending signal if one is shown;
+   otherwise it replays the current round.
+4. Tap **Advance round** → read the confirmation → **Confirm advance**.
+5. Verify the round increments by one and the countdown never exceeds two minutes. A fresh
+   pending key keeps its original expiry; otherwise the server mints a new two-minute key.
+6. Verify P1 does not auto-play the newly advanced round. Use **Play this round** only if the
+   class needs the teacher to replay it.
 
-**PASS:** the old key is no longer displayed; wave 1 has a fresh two-minute key.
+**PASS:** manual advance is evidence-gated, moves exactly one round, and preserves the pending
+key's lifetime when one is fresh.
 
-#### FL-08 — Student handles the wave change
+#### FL-08 — Students keep relaying across rounds
 
-FL-07 left the session on **wave 1**, but the wave 1 key has not been transmitted yet. A wave
-can only be advanced after at least one proof, so first put one proof on wave 1, then test the
-listener's reaction to the next advance.
+1. On P4, open `/student/check-in` now. Read the notice, tick consent and tap **Join check-in**.
+   Verify it discovers the current round (greater than 0) without a reload or special link.
+2. On P2 and P3, verify they are still listening after the round changes. No second Join or
+   page reload should be required. If a phone was mid-playback, verify it returns to listening
+   when playback finishes.
+3. On P1, tap **Play this round** (or **Nudge the class** if a fresh pending signal is shown)
+   so P4 can hear a signal. Wait for playback to finish.
+4. On P4, verify **Evidence recorded** for the current round and that it passes the next
+   signal on. Verify **Attendance: Not decided**.
+5. On L1, verify per-round counts include P4's round and that no student has two rows for the
+   same round. Verify a retry or a repeated relay does not add a second row.
 
-1. On P1, tap **Back to check-in**; confirm the screen shows wave 1 and its new key. Tap
-   **Open transmitter** and verify the transmitter key matches wave 1.
-2. On P3, reload `/student/check-in` to clear the previous **Evidence recorded** card, tick
-   consent again, and tap **Join check-in**. The page does not offer a second Join on a new
-   wave without a reload; record this as a **P2 UI finding**. Verify it is listening for wave 1.
-3. On P1, tap **Start transmitting**; wait for the planned frames to finish.
-4. On P3, verify **Evidence recorded** for wave 1.
-5. On P4, open `/student/check-in`, tick consent and tap **Join check-in**; verify it is
-   listening for wave 1. P4 has missed the wave 1 transmission, so it should not record
-   evidence. Do not advance until P4 is listening.
-6. On L1, verify wave 1 has at least one proof (S2), then click **Advance wave** →
-   **Confirm advance** to wave 2.
-7. On P4, verify listening stops and the message says the teacher advanced to a new wave and
-   asks the student to tap Join for the new key.
-8. On P1, tap **Back to check-in**; confirm wave 2. Tap **Open transmitter**, then **Start
-   transmitting**; wait for the planned frames to finish.
-9. On P4, tap **Join check-in**; verify it listens for wave 2, then records **Evidence
-   recorded**.
-10. On L1, verify the evidence card shows per-wave counts, for example `Wave 0 · 2`,
-    `Wave 1 · 1` and `Wave 2 · 1`.
-
-Complete steps 7–9 promptly: the wave 2 key is minted at step 6. If it expires with zero
-proofs, the wave cannot be advanced; close the session, record the restart as an execution
-issue, and repeat Session A.
-
-**PASS:** the student's listener stops on the change; a new Join is required; no old-wave proof
-is submitted after the change; each transmitted wave has evidence and the teacher sees per-wave
-counts.
+**PASS:** students relay across rounds without a per-round reload; the late joiner records
+evidence; duplicate or stale frames add no rows; the teacher sees per-round counts.
 
 #### FL-09 — Register shows evidence, not attendance
 
@@ -723,7 +716,7 @@ counts.
 #### FL-10 — Teacher marks Session A
 
 1. In the **Register** tab, set S1 to **Present**, S2 to **Present**, S3 to **Present**.
-2. Add a short decision note for S1, for example “Present in room; wave 0/1 evidence.”
+2. Add a short decision note for S1, for example “Present in room; round 0/1 evidence.”
 3. Click **Save 3 changes**.
 4. Verify the statuses persist and the register summary updates to 3 present, 0 pending.
 5. Verify **Finalise attendance** is **not** offered while the session is still live. The
@@ -753,17 +746,16 @@ audited; Session A is 100% because all three rows were marked before finalisatio
 
 #### FL-12 — Start Session B
 
-1. On L1, open `/teacher/check-in`; select `TST101 · T`; click **Start check-in**.
-2. On P1, open `/teacher/check-in` (or tap **Back to check-in**); confirm Session B is live on
-   wave 0. Tap **Open transmitter**; do not transmit yet.
-3. On P2 and P3, open `/student/check-in`; tick consent and tap **Join check-in**; allow the
-   microphone. Verify both phones are listening for wave 0. If a stale **Evidence recorded**
-   card from Session A blocks Join, reload the page and record the stale-state issue.
-4. On P1, tap **Start transmitting**; wait for the planned frames.
-5. On P2 and P3, verify **Evidence recorded** for wave 0. Do **not** have S3 submit; S3 may
+1. On L1, open `/teacher/check-in`; select `TST101 · T`; click **Start and play round 0**.
+2. On P2 and P3, open `/student/check-in`. Consent is bound to a session, so Session B must
+   ask again: tick it, tap **Join check-in** and allow the microphone. Verify both phones are
+   listening for round 0.
+3. If either phone missed the automatic playback, tap **Play this round** on P1 while the key
+   is fresh.
+4. On P2 and P3, verify **Evidence recorded** for round 0. Do **not** have S3 submit; S3 may
    keep the page open or close it.
-6. On L1, verify 2 proofs for wave 0.
-7. Click **Close check-in** → **Confirm close**. Do not advance the wave.
+5. On L1, verify 2 proofs for round 0.
+6. Click **Close check-in** → **Confirm close**. Do not advance the round.
 8. On L1, open `/teacher/sessions`; find Session B and click **Register**. Verify S1/S2 are
    **Pending** with evidence and S3 is **Pending** with no evidence.
 9. Mark S1 and S2 **Present**; leave S3 **Pending**.
@@ -882,11 +874,11 @@ or redact other classes' student data before keeping or sharing the query files.
 
 | Test | Session | Student(s) | Expected | Observed | Result | Evidence |
 | --- | --- | --- | --- | --- | --- | --- |
-| FL-04 Start Session A | A | — | Wave 0 live |  |  |  |
-| FL-05 Transmitter prepared | A | — | Open; no frames played |  |  |  |
-| FL-06 Join then transmit | A | S1, S2 | Listening first; evidence, not attendance |  |  |  |
-| FL-07 Advance wave | A | — | Wave 1 fresh key |  |  |  |
-| FL-08 Wave-change handling | A | S2, S3 | Listening stops; new Join |  |  |  |
+| FL-04 Start Session A | A | — | Round 0 live; audio starts automatically |  |  |  |
+| FL-05 Students join round 0 | A | S1, S2 | One consent; both listening |  |  |  |
+| FL-06 Automatic relay | A | S1, S2 | Evidence, not attendance; next signal relayed |  |  |  |
+| FL-07 Teacher fallback | A | — | Nudge/Advance gated and one round only |  |  |  |
+| FL-08 Relay across rounds | A | S2, S3 | Late joiner; no reload; no duplicate rows |  |  |  |
 | FL-09 Register pending | A | S1–S3 | All Pending with evidence |  |  |  |
 | FL-10 Mark present (live) | A | S1–S3 | Present; no finalise while live |  |  |  |
 | FL-11 Close + finalise | A | — | Closed first; 100%; audited |  |  |  |
@@ -942,15 +934,15 @@ signing the student out.
      **P2 UI defect**: the status check is account-level, not browser-level. It is not a
      device-approval bypass if the proof signature is still rejected.
 6. Prove the rejection with a disposable live session:
-   - On L1, start a check-in for `TST101`. On P1 (sign in as T1 if needed), click
-     **Open transmitter** but do not transmit yet.
+   - On L1, start a check-in for `TST101` with **Start and play round 0**. On P1, confirm
+     round 0 is playing.
    - On P3 and L4/L3, open `/student/check-in`, tick consent and tap **Join check-in** for
-     wave 0. If the rejected browser blocks joining, record that block and continue with P3.
-   - On P1, tap **Start transmitting**.
+     round 0. If the rejected browser blocks joining, record that block and continue with P3.
+   - If the automatic playback has ended, tap **Play this round** on P1 while the key is fresh.
    - On L4/L3, verify it does **not** show **Evidence recorded**. If it joined, open DevTools
      → Network, confirm the proof request returns **403**, and capture the visible error.
    - On P3, verify **Evidence recorded** and **Attendance: Not decided**.
-   - On L1, verify the evidence card shows one proof for S2 on wave 0.
+   - On L1, verify the evidence card shows one proof for S2 on round 0.
    - Close the disposable check-in without finalising it.
 7. On P3, refresh; verify the previously approved device still reports approved and its
    session was not revoked.
@@ -1138,8 +1130,8 @@ Use a disposable third session so the main flow is not disturbed. If **Security*
 step-up window **Open** from an earlier action, wait until it shows **Locked** first, so the
 assertion is genuinely tested rather than reusing the window.
 
-1. On L1, open `/teacher/check-in`; select `TST101 · T`; click **Start check-in**; then
-   **Close check-in** → **Confirm close**.
+1. On L1, open `/teacher/check-in`; select `TST101 · T`; click **Start and play round 0**;
+   then **Close check-in** → **Confirm close**.
 2. Open `/teacher/sessions`; find the new session; click **Register**; click **Finalise
    attendance** → **Confirm finalise**. All pending rows become Absent.
 3. On L2, open `/admin` → **Sessions**; find that session; click **Register**.
@@ -1734,9 +1726,9 @@ These are not failures of this test plan; they are boundaries of the current bui
 | Create room/class | `/teacher/classes` → **Add room** → **Room number** → **Add room**; fill **Course code**, **Section**, **Class title**, **Default room** → **Create class** |
 | Roster | Select class → **Upload CSV or PDF** or paste → **Preview roster** → **Save roster** → **Confirm save** |
 | Approve device | `/teacher/classes` → **Device approval queue** → **Approve** / **Reject** |
-| Start check-in | `/teacher/check-in` → select class → **Start check-in** |
-| Transmit | **Open transmitter** → **Start transmitting** |
-| Advance | **Advance wave** → **Confirm advance** |
+| Start round 0 | `/teacher/check-in` → select class → **Start and play round 0** |
+| Transmit | **Play this round** or **Nudge the class** |
+| Advance | **Advanced controls** → **Advance round** → **Confirm advance** |
 | Register | **Attendance register** → status dropdown → note → **Save N changes**; after **Close check-in**, **Finalise attendance** → **Confirm finalise** |
 | Close | **Close check-in** → **Confirm close** |
 
@@ -1745,7 +1737,7 @@ These are not failures of this test plan; they are boundaries of the current bui
 | Task | Path and clicks |
 | --- | --- |
 | Sign in | `/login` → Google button → choose student |
-| Check in | `/student/check-in` → tick consent → **Join check-in** → allow microphone → wait for **Evidence recorded** |
+| Check in | `/student/check-in` → tick consent → **Join check-in** once → allow microphone → wait for **Evidence recorded** and automatic relay |
 | Query | `/queries` → **Raise a query** → select session → reason ≥10 characters → **Send query** |
 | Analytics | `/attendance` |
 | Sign out | `/profile` → **Sign out** |
@@ -1838,7 +1830,7 @@ Redact before sharing outside the test team:
 | **Query** | A student's 24-hour correction request after a session closes |
 | **Step-up** | A fresh passkey assertion required for destructive admin actions |
 | **Device review** | Teacher approval of a first or changed student browser |
-| **Wave** | A two-minute key period; the teacher advances only after evidence |
+| **Round (wave)** | A two-minute key period. Normally advanced by an accepted proof for the pending round; the teacher has an evidence-gated manual fallback. |
 | **A2a** | Timetable PDF text extraction into a read-only preview (built) |
 | **A2b** | Structured timetable row parsing (not built) |
 | **A3** | Local OCR (not built) |

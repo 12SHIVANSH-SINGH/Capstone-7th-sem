@@ -4,6 +4,20 @@
 
 Written for the working tree inspected on **6 November 2026** (`HEAD` reported by `git log -1 --oneline` as `003f900`, "deepseek flash 4.1 max"). A reconciliation on **10 November 2026** found `HEAD`, `origin/main` and `origin/HEAD` at `433d522`, a `.gitleaksignore`-only commit over `8d2e873`; the product code described here is unchanged. The repository's older status documents may name a different commit; when this book and the code disagree, the code wins. No commit, push, tag, merge or deploy was performed while writing it.
 
+> **Update — 20 November 2026 (after this snapshot).** The working tree now contains an
+> **uncommitted phone-to-phone relay cascade**. A valid proof for the current round mints a
+> server-side pending next key and returns it only to the proving phone; a valid proof for the
+> pending round atomically promotes it and mints the following key. Accepted or duplicate
+> proving phones play the returned signal, then listen again; the teacher starts and plays
+> round 0 in one tap and keeps an evidence-gated manual advance plus a fresh-pending nudge as
+> fallbacks. Closed sessions expose neither key nor pending state. This book's cascade
+> sections below describe the earlier teacher-driven build. Treat `agent.md`, `plan.md`,
+> `progress.md`, `docs/how-it-works.md` and the code as current; where this book disagrees,
+> those win. The evidence-only rule, the unmeasured physical gate and the deployment caveat
+> still apply, and the cascade has **not** been measured in a physical classroom. Test counts
+> in this book are the 6 November snapshot; the current local gate is backend **262/262** in
+> both modes and frontend **102/102**.
+
 ---
 
 ## What this book is
@@ -28,8 +42,8 @@ It is written in plain language first, with the formula or code condition immedi
 
 - It is **not** a claim that the physical layer has passed. The owner has treated Layer 1 as passed **for build planning only**. The last recorded distance sweep decoded 10/10 at 1 m, 9/10 at 2 m, 9/10 at 3 m, **4/10 at 5 m** and **1/10 at 10 m**. Reverse direction and the muted control were not measured. Do not describe the acoustic gate as measured-passed.
 - It is **not** a claim that real college PDFs parse accurately. Roster PDF extraction and timetable PDF extraction are tested with generated fixtures. No representative college timetable or roster PDFs have been supplied, and scanned OCR is not built.
-- It is **not** a claim that the live Render deployment matches this working tree (`433d522`). The exact deployed version was not verified while writing; gate **G2** in [`docs/testing-plan.md`](../testing-plan.md) checks it before signed testing.
-- It is **not** a promise that automatic attendance, scoring, the ID round or the multi-hop student cascade exist. They do not.
+- It is **not** a claim that the live Render deployment matches the working tree. At this snapshot the repository was `433d522`; the current working tree is `80dc2e1` plus the uncommitted cascade. The exact deployed version was not verified; gate **G2** in [`docs/testing-plan.md`](../testing-plan.md) checks it before signed testing.
+- It is **not** a promise that automatic attendance, scoring or the ID round exist. They do not. The multi-hop relay cascade is built locally but uncommitted and unmeasured; see the 20 November update above.
 
 ## The one-sentence version
 
@@ -63,12 +77,12 @@ Each technical chapter follows the same pattern:
 
 > **A note on line numbers.** Code line numbers move whenever a file changes. This book names files, functions, constants and exact conditions instead of quoting line numbers. That makes it stable and still precise enough to find the code.
 
-## Status snapshot at the time of writing
+## Status snapshot (updated 20 November 2026)
 
 | Item | State |
 | --- | --- |
-| Backend test suite | **255/255** under `npm test` and under `npm test -- --test-isolation=none` |
-| Frontend helper tests | **96/96** total across proof, acoustic, check-in view, auth, roster import and timetable import suites |
+| Backend test suite | **262/262** under `npm test` and under `npm test -- --test-isolation=none` |
+| Frontend helper tests | **102/102** total across proof, acoustic, check-in view, auth, roster import and timetable import suites |
 | Production build | Green with `CI=true REACT_APP_API_URL=/api/v1 npm run build` |
 | Acoustic lab, FSK codec, TX/RX pages | Built and tested; link works at 1 m but degrades at 5–10 m |
 | Signed proof transport | Built and tested; stores evidence only |
@@ -297,19 +311,19 @@ Those numbers matter because they create the central engineering tension:
 - 100 phones cannot all transmit at once without collisions.
 - The system must still work through a normal web browser, with no app install.
 
-The long-term answer in the plan is a **cascade**: the teacher's phone plays key K0; phones that hear K0 prove it and retransmit K1; more phones hear K1; and so on. The current build implements teacher-driven waves and signed evidence, but **not** the student retransmission cascade. That gap is stated repeatedly in the plan and must not be hidden.
+The answer in the plan is a **cascade**: the teacher's phone plays key K0; phones that hear K0 prove it and retransmit K1; more phones hear K1; and so on. The current working tree implements this relay locally with server-minted pending keys, but it is uncommitted and has **not** been measured in a physical classroom. Owner-reported runs are planning evidence, not measurements.
 
 ## 2. The four actors and what each one sees
 
 ### The student
 
-The student signs in with a college Google account, is on a class roster, and has a browser-bound device key approved by a teacher. On the student dashboard they see live sessions for classes they are enrolled in. They open the check-in page, read a short retention/consent notice, tick the consent box, and press Join. The browser asks for microphone permission. The phone listens for a valid FSK frame, decodes it **locally**, signs a message containing the session id, wave and key with the device key, and posts the signed proof. The page shows a "recorded evidence" card. It does **not** say "present". It does **not** show the key. It does **not** decide attendance.
+The student signs in with a college Google account, is on a class roster, and has a browser-bound device key approved by a teacher. On the student dashboard they see live sessions for classes they are enrolled in. They open the check-in page, read a short retention/consent notice, tick the consent box once, and press Join. The browser asks for microphone permission. The phone listens for a valid FSK frame, decodes it **locally**, signs a message containing the session id, wave and key with the device key, and posts the signed proof. If the server accepts it, the response carries the server-minted next relay signal; the phone plays that signal and returns to listening. The page shows a "recorded evidence" card. It does **not** say "present". It does **not** show the key. It does **not** decide attendance.
 
 Later, the student can see their attendance history and raise a query for a closed session if they were present but unmarked. They see the status of that query and any decision note.
 
 ### The teacher
 
-The teacher owns classes, rosters and sessions. On the class page they create a class, add a room, and import or paste a roster. Before a check-in they open the live session page, start a session, and show or play the current key. The key is displayed only on the teacher's page. The teacher can open the transmitter page to play the tone. They can see live evidence: which enrolled student submitted which wave. They can advance to the next wave only after the current wave has at least one accepted proof. They can close the session.
+The teacher owns classes, rosters and sessions. On the class page they create a class, add a room, and import or paste a roster. Before a check-in they open the live session page and tap **Start and play round 0** once; the phone plays the first signal without a separate transmitter page. The key is displayed only on the teacher's page. They can see live evidence: which enrolled student submitted which round, and the server-minted pending signal. The cascade normally advances when a phone proves the pending round; the teacher keeps a **Nudge** and an evidence-gated **Advance round** fallback. They can close the session.
 
 After the session closes, the teacher opens the register, one row per active roster student, sees evidence and optional location, and marks each row present, absent or excused. When they finalise, remaining pending rows become absent. The query window opens at **close** and lasts the configured number of hours, default 24. The teacher reviews student queries, approves or rejects them, and can reopen a decided or expired query. Every decision is audited.
 
@@ -342,38 +356,38 @@ Here is the full happy path, with the evidence boundary marked.
 
 ### Starting the check-in
 
-7. The teacher taps **Start check-in**.
+7. The teacher taps **Start and play round 0** once.
 8. The server checks that the class belongs to the teacher, that the class has a default room, and that there is no other active session for that class.
 9. The server creates a session at **wave 0** with a random key from 0 to 15⁷−1, a two-minute expiry, a class snapshot and a room snapshot.
 10. The server snapshots the active roster into one **pending** attendance row per student. This is the durable register. The operation is idempotent.
 11. The server notifies enrolled users that check-in is live.
 12. The server writes an audit entry `session.created`.
-13. The teacher's page receives the current key. Students never receive it.
+13. The teacher's page receives the current key and starts playing round 0 from the front. Students never receive the key from discovery.
 
 ### Hearing the wave
 
-14. The teacher plays the key through the transmitter page, which encodes it as 11 tones.
-15. A student opens `/student/check-in`, ticks the consent box, and presses Join.
+14. The teacher phone encodes the key as 11 tones and plays it repeatedly. Later rounds are carried by student phones, not auto-played by the teacher.
+15. A student opens `/student/check-in`, ticks the consent box once, and presses Join once.
 16. The browser captures mono audio at 44.1 kHz or higher, with echo cancellation, noise suppression and automatic gain control requested **off**.
 17. An AudioWorklet posts chunks of PCM to the main thread. A rolling buffer keeps recent audio.
 18. Every 700 ms the page tries to decode a frame: find the two-marker burst, measure 11 symbol windows with Goertzel filters, require roughly 9 dB above the median, invert the no-repeat tone walk, verify the checksum.
-19. If a valid frame is found, the page releases the microphone and keeps the decoded integer key. Raw audio never leaves the phone.
+19. If a valid frame is found, the phone keeps the decoded integer key and submits it. Raw audio never leaves the phone; the listener restarts after each handled frame.
 
 ### Submitting evidence
 
-20. The phone builds the exact message `bioattend-proof:v1|session=<id>|wave=<n>|key=<k>|student=<id>`.
+20. The phone builds the exact message `bioattend-proof:v1|session=<id>|wave=<n>|key=<k>|student=<id>`. The frame carries only the key, so the phone tries the displayed wave through the next two; the server accepts only its current or pending pair.
 21. It signs the UTF-8 bytes with ECDSA P-256 / SHA-256, using the private key in IndexedDB. The signature is 64 bytes in IEEE P1363 format, base64-encoded.
 22. It posts `{ wave, key, signature, location? }` to `/check-in-sessions/:id/proofs`.
 23. The server validates the shape, finds the session, checks that the student is on the active roster, checks that the device binding is approved, checks that no device change is pending, rebuilds the exact message, and verifies the signature against the stored public key.
 24. It checks for an existing proof for that student and wave. An identical retry is a **duplicate success** (200). A different key for the same wave is a **conflict** (409). A closed session, stale wave, expired key or wrong key is rejected with a precise status.
-25. On acceptance, it stores a proof document with session, class, student, email, device fingerprint, wave, key, signature, protocol version, optional location and timestamps. It increments the attendance row's evidence counter and adds the wave to the evidence list.
-26. The response says `recorded: true` and `attendanceDecided: false`. The student sees the evidence card, not a present mark.
+25. On current-round acceptance, it stores a proof document with session, class, student, email, device fingerprint, wave, key, signature, protocol version, optional location and timestamps. It increments the attendance row's evidence counter, adds the wave to the evidence list, and mints a **pending** next key.
+26. The response says `recorded: true`, `attendanceDecided: false` and returns the server-minted `next` signal. The student sees the evidence card, not a present mark, and the phone plays the next signal.
 
 ### Advancing and closing
 
-27. The teacher sees at least one evidence row for wave 0 and taps **Advance wave**. The server requires at least one proof for the current wave, archives the old key in a bounded 20-entry history (without returning old keys), mints a fresh distinct key with a new two-minute expiry, and uses an atomic compare-and-set so two taps cannot both win.
-28. Steps 14–27 may repeat for several waves.
-29. The teacher closes the session. Closing is idempotent. The server sets `closedAt`, computes `queryWindowEndsAt = closedAt + queryWindowHours`, notifies students, and audits `session.closed`. Proofs are no longer accepted.
+27. **Promotion is automatic.** A phone that proves the pending round causes the server to atomically promote that key, archive the old key in a bounded 20-entry history, and mint the following pending key. Promotion preserves the pending key's original expiry, so a cascade cannot extend a key's life. The proving phone relays the new signal. The teacher's **Nudge the class** sends a fresh pending signal; **Advance round** is an evidence-gated fallback and is not needed in the normal path.
+28. Steps 14–27 may repeat for several waves without a reload or a second Join. If a round expires with zero proofs, there is no pending signal to promote: close the session and start a fresh one.
+29. The teacher closes the session. Closing is idempotent, clears pending state and returns neither key nor pending state. The server sets `closedAt`, computes `queryWindowEndsAt = closedAt + queryWindowHours`, notifies students, and audits `session.closed`. Proofs are no longer accepted.
 
 ### Deciding the register
 
@@ -405,7 +419,7 @@ Here is the full happy path, with the evidence boundary marked.
 - The teacher-facing proof view exposes email, wave and recorded time only. It hides the key, signature, protocol version and device fingerprint.
 - No score is computed from proof count, wave number, timing, location or device.
 - No ID round is run.
-- No student cascade is run.
+- No automatic attendance decision comes from the cascade; the relay only moves the next server-minted signal.
 - The teacher confirms the register.
 - A query decision can change attendance, but a human decides it and the change is audited.
 
@@ -431,9 +445,9 @@ The system also forbids these shortcuts:
 - One bound device per student, with teacher review for first and changed devices in production.
 - Rooms, classes, CSV/paste rosters and enrollment sync.
 - Roster PDF text extraction into an editable preview.
-- Check-in sessions, two-minute wave keys, teacher display, wave advancement gated on evidence, bounded key history, closing.
-- Student live-session discovery and a consent-gated check-in shell.
-- Local FSK decode, P-256 signing, signed proof submission, duplicate handling.
+- Check-in sessions, one-tap teacher start, two-minute round keys, pending-key cascade, atomic promotion, bounded key history, closing.
+- Student live-session discovery and a consent-gated check-in relay.
+- Local FSK decode, P-256 signing, signed proof submission, duplicate handling, automatic relay of the server-minted next signal.
 - Teacher evidence view and session history.
 - Teacher-confirmed register, finalisation, edits and audit.
 - 24-hour queries with optional location evidence, decisions and reopen.
@@ -445,7 +459,7 @@ The system also forbids these shortcuts:
 
 ### Not built
 
-- Student cascade (phones retransmitting the next key).
+- A measured physical cascade rehearsal (the relay is built locally but uncommitted and unmeasured).
 - Automatic scoring or automatic attendance.
 - The ID round (neighbour hearing reports).
 - Structured timetable row parsing, class matching and slot preview/save (A2b).
@@ -673,7 +687,7 @@ A simple absolute threshold would fail when the room is loud or the microphone g
 
 ### Interference between phones
 
-If many phones play the **same** key at the same time, the sounds add. Identical signals can reinforce each other (constructive interference) or cancel at a point (destructive interference). The plan deliberately avoids random backoff: identical synchronised signals should reinforce, not collide. The current build does not implement the student cascade, so this is future work. The teacher's single phone is the only transmitter.
+If many phones play the **same** key at the same time, the sounds add. Identical signals can reinforce each other (constructive interference) or cancel at a point (destructive interference). The plan deliberately avoids random backoff: identical synchronised signals should reinforce, not collide. The working tree now implements the phone-to-phone relay: every accepted or duplicate proving phone plays the server-minted next signal, then listens again. Whether the added voices help or cancel in a real room is **unmeasured**.
 
 ### Doppler and motion
 
@@ -4665,7 +4679,7 @@ This part follows the code path behind each route. It is written as a sequence o
 
 ### In plain words
 
-A check-in starts when a teacher taps **Start check-in** for one of their classes. The server creates a session document, mints a random seven-symbol key, gives that key a two-minute life, copies the active roster into one attendance row per student, and notifies the enrolled students. The teacher's screen then shows the key and a transmitter link.
+A check-in starts when a teacher taps **Start and play round 0** for one of their classes. The server creates a session document, mints a random seven-symbol key, gives that key a two-minute life, copies the active roster into one attendance row per student, and notifies the enrolled students. The teacher's phone then shows the key and starts playing it; there is no separate transmitter page.
 
 ### Preconditions
 
@@ -5074,8 +5088,8 @@ It does not log the email, fingerprint, key or signature. The response is:
 ### What can go wrong
 
 - **Clock skew** — the key expiry is server time. A phone with a wrong clock still submits to the server, which compares its own time. The phone's local display may be misleading.
-- **Expired key during a slow decode** — the decode may finish after the two-minute window. The server rejects with 409. The teacher advances to a new wave and the student retries.
-- **Wave advanced between decode and submit** — the server rejects with 409 "wave is no longer current". This is expected; the phone should re-listen.
+- **Expired key during a slow decode** — the decode may finish after the two-minute window. The server rejects with 409. The phone keeps listening for a relayed pending signal; the teacher can tap **Nudge the class** or **Play this round**.
+- **Wave advanced between decode and submit** — the decoded key may now be the pending key, which the server still accepts, or an archived key, which it rejects with 409. The phone tries the displayed wave through +2 and re-listens after a rejection.
 - **Roster removed after snapshot** — enrollment check fails, proof rejected. The attendance row still exists for history.
 - **Attendance counter missing** — proof is stored but the register's `evidence.proofCount` does not increment. The teacher's proof list still shows the proof.
 - **Duplicate after close** — returns 200 duplicate, not 409. This is intentional idempotency.
@@ -5086,9 +5100,13 @@ It does not log the email, fingerprint, key or signature. The response is:
 
 ### In plain words
 
-A teacher advances only after at least one phone has submitted evidence for the current wave. The old key is archived, a new key is minted, and the new key gets a fresh two-minute life.
+Normal advancement comes from the proof path. A valid proof for the current wave mints a **pending** next key and returns it to the proving phone; a valid proof for that pending wave atomically promotes it, archives the old key, mints the following pending key and returns that. The proving phone then relays the signal. The teacher's manual **Advance round** remains as an evidence-gated fallback.
 
-### The evidence gate
+### The automatic path
+
+The proof controller accepts either the current or the pending wave. For a current-wave proof it mints a pending key. For a pending-wave proof it performs an atomic compare-and-set on `(session, pending key)` and mints the next pending key. Promotion preserves the pending key's original `keyExpiresAt`: promotion changes which key is current, not how long it lives. A duplicate proof is still a success and can still promote a pending key, because the phone's earlier submission may be the one that reached another listener.
+
+### The evidence gate on the manual fallback
 
 ```js
 const evidence = await CheckInProof.exists({
@@ -6489,7 +6507,7 @@ The frame contains data digits. `digitsToValue` converts them to the integer key
 
 4. Parses the response with `evidenceFromResponse`, which keeps `wave`, `recordedAt`, `duplicate` and `attendanceDecided`.
 
-The page never displays the key. It shows the wave and the time. If the key expires before submission, the server returns 409 and the page asks the student to wait for the next wave. If no one submitted evidence for that wave, the teacher cannot advance it and must close and restart the session. If the teacher advances the wave while the phone is listening, an effect compares `selectedSession.wave` with the wave the capture started on and stops the capture, so the phone cannot submit a frame from the old key.
+The page never displays the key. It shows the wave and the time. After acceptance or a duplicate, the response's `next` signal is played two or three times and the phone returns to listening. If the current key expires before submission, the server returns 409 and the phone keeps listening: another phone may still relay a fresh pending signal. If no one submitted evidence for that round, the teacher cannot advance it and must close and restart the session. A round change no longer stops the listener; the page dedupes keys it has already handled and resumes after relay, tab visibility or the 60-second capture safety limit.
 
 ### Optional location
 
@@ -6595,43 +6613,40 @@ The queue is teacher-scoped on the server. The client does not filter by class; 
 
 `CheckInSessions` has three regions:
 
-1. **Class and live session** — pick a class, start a session, or resume the active one.
-2. **Key panel** — the current wave, the key, a two-minute countdown, **Copy key**, **Open transmitter**, **Advance wave** and **Close session**.
-3. **Evidence and history** — live proof rows grouped by wave, and closed sessions for the class.
+1. **Class and live session** — pick a class, start a session with round-0 playback, or resume the active one.
+2. **Live console** — the current round and key, a two-minute countdown, **Play this round**, **Stop sound**, **Nudge the class**, the fresh pending-signal countdown, evidence stats and **Close check-in**.
+3. **Evidence and history** — live proof rows grouped by round, and closed sessions for the class.
 
 A session attendance modal opens the register for marking and finalising.
 
 ### Starting
 
-**Start check-in** posts to `/classes/:id/check-in-sessions`. The button is disabled while the request is in flight. On success, the response's session becomes the active session, the key panel appears, and the countdown starts.
+**Start and play round 0** posts to `/classes/:id/check-in-sessions`. The click first primes the browser audio context, then the response's session becomes active and its key plays from this phone. No geolocation prompt blocks the start. The button is disabled while the request is in flight.
 
-If the class has no default room, the server returns 409 and the page shows the message. If a session is already active, the page loads it instead of creating a second one.
+If the class has no default room, the page shows the message. If a session is already active, the page loads it instead of creating a second one.
 
-### The key panel
+### The live console
 
-The key is displayed as a large number. It is the teacher's secret to transmit, not a student credential. The panel shows:
+The current key is the teacher's secret to transmit, not a student credential. The console shows:
 
-- `Wave N`;
-- the key;
-- a badge: "Expires in mm:ss" or "Key expired";
-- **Copy key** for manual transmitter entry;
-- **Open transmitter**, which navigates to `/acoustic-tx?key=<key>&from=checkin`;
-- **Advance wave**, with a confirmation modal;
-- **Close session**, with a confirmation modal.
+- `Round N`, the key and a countdown;
+- **Play this round**, **Stop sound** and **Nudge the class**;
+- the next signal's remaining lifetime, when the server has minted one;
+- current-round and all-round evidence counts;
+- **Advanced controls** with repeats, gap, volume and an evidence-gated **Advance round**;
+- **Close check-in**, with a confirmation modal.
 
-The countdown is computed from `keyExpiresAt` on every render tick. `keyIsUsable` also checks the session is active and the key is a valid integer. When it expires, the transmitter button is disabled and the panel tells the teacher to wait for evidence, then advance or close. If the wave expired with **zero** proofs, the teacher cannot advance it; close the session and start a new one.
+The countdown is computed from `keyExpiresAt` on every render tick. `keyIsUsable` also checks the session is active and the key is a valid integer. When the current key expires, **Nudge** can still send a fresh pending signal. If neither is fresh, the panel tells the teacher to close the session and start a new one.
+
+A five-second poll follows the live session. When a student proof advances the round, the page stops old round audio if it was playing, but it does not auto-play later rounds: student phones carry those. The evidence poll runs every ten seconds.
 
 ### Advancing
 
-**Advance wave** is not a blind increment. The server refuses unless at least one proof exists for the current wave. The page opens a confirmation modal that explains:
+Normal advancement is automatic. A valid proof for the current round mints a pending next key and returns it to the proving phone. A valid proof for the pending round atomically promotes it, archives the old key and mints the following pending key. Promoting preserves the pending key's original expiry.
 
-- the current key stops being accepted;
-- a fresh two-minute key is minted;
-- students must listen again.
+**Advance round** is the manual fallback. The server refuses unless at least one proof exists for the current round. The confirmation explains that a fresh pending key is promoted if one is fresh, otherwise a new two-minute key is minted, and the old key stops being accepted. On success, the page replaces the session from the response; it does not increment the round locally. On 409, it shows the server message and refreshes the session.
 
-On success, the page replaces the session from the response. It does not increment the wave locally. On 409, it shows the server message ("Wait for a phone to submit evidence first") and refreshes the session.
-
-This is the acoustic progress rule expressed in the UI: a wave exists because someone heard it.
+This remains an acoustic progress rule expressed in the UI: a round exists because someone heard it.
 
 ### Evidence
 
@@ -7491,15 +7506,15 @@ There is no confidence score, no per-student rank, no "proof strength" number. T
 
 ### It does not run an ID round
 
-An ID round would ask each phone to transmit a unique signal back, or require a challenge-response across waves. It is not built. The current proof is one-way: the phone listens and signs what it heard. A future cascade might add rounds, but it is gated.
+An ID round would ask each phone to transmit a unique signal back, or require a challenge-response across waves. It is not built. The current relay moves a shared next key; it does not identify which phone heard which other phone.
 
-### It does not build a student cascade
+### It does not automatically decide attendance from the relay
 
-There is no multi-hop relay where one phone's proof helps another student. Every proof is per student, per device. The `evidence.waves` array is a summary for one student, not a graph.
+The cascade is a relay, not a graph of who helped whom. Every proof is per student, per device; a phone relaying a signal for others creates no extra evidence for those students. The `evidence.waves` array remains a summary for one student. The teacher still confirms the register.
 
-### It does not send the key back to the student
+### It returns only the next relay signal to the proving student
 
-Discovery returns `toStudentSession`, which omits `key` and `keyHistory`. There is no endpoint that returns the current key to a student. The only way to learn it is to decode the sound.
+Discovery returns `toStudentSession`, which omits `key`, `pending` and `keyHistory`. The only key a student receives is `next` in their own accepted or duplicate proof response, and only while the session is active. The server accepts only its current or pending pair. A closed session returns neither key nor pending state.
 
 ### It does not upload audio
 
@@ -8865,7 +8880,7 @@ npm test -- --test-isolation=none
 
 runs every test file in the same process. This catches accidental reliance on process-global state, module cache order or environment mutation. A suite that passes with isolation but fails without it is hiding a shared-state bug; a suite that passes both ways is more trustworthy.
 
-The current recorded result is **255/255 in both modes**. The repository has 39 test files. The static `test(...)` count is lower than 255 because several files generate cases in loops or tables; the runner counts each generated case.
+The current recorded result is **262/262 in both modes**. The repository has 39 test files. The static `test(...)` count is lower than 255 because several files generate cases in loops or tables; the runner counts each generated case.
 
 No test requires a live MongoDB. The tests either:
 
@@ -9004,13 +9019,13 @@ The test files use the suffix `*.node-tests.js`, not `*.test.js`, so Create Reac
 | --- | --- | --- | --- |
 | `test:proof` | `src/acoustic/proof.node-tests.js` | 15 | Proof message format, malformed fields, shared bounds, P-256 signing, signature length, missing key/WebCrypto, submit body, server error surfacing, non-JSON response, missing API URL, 204, null body, unreadable body, network failure |
 | `test:acoustic` | `fsk`, `lab`, `worklet`, `link`, `pcm-worklet` | 51 | Frame structure, value↔digits, random round trips, 48 kHz and 44.1 kHz decoding, leading silence, noise, echo, false positives, checksum, detection margins, probe list, sample-rate gate, verdict boundaries, sweep summary, tone plan/fades, medians, baseline gate, peak hold, meter clamping, mic errors, 19.5 kHz alias test, report formatting, run IDs, links, TX/RX plans and reports, PCM buffer |
-| `test:checkin` | `checkInSessionView.node-tests.js` | 7 | Active-session selection, labels, live key state, wave/key helpers, countdown formatting, history durations |
-| `test:studentcheckin` | `studentCheckInView.node-tests.js` | 9 | Session selection, Join gate order, decoded-key bounds, evidence view without key, idempotent retry, malformed response, countdown/time formatting |
+| `test:checkin` | `checkInSessionView.node-tests.js` | 10 | Active-session selection, labels, live key state, fresh-pending nudge, round evidence, pending lifetime, countdown formatting, history durations |
+| `test:studentcheckin` | `studentCheckInView.node-tests.js` | 12 | Session selection, Join gate order, decoded-key bounds, evidence view without key, idempotent retry, malformed response, live listening rules, relay keys, countdown/time formatting |
 | `test:auth` | `auth.node-tests.js` | 2 | Role-to-dashboard routing |
 | `test:rosterimport` | `rosterImport.node-tests.js` | 6 | PDF detection by MIME/extension, extraction summary plurals, no-email warning, scanned-PDF message, server-message fallback |
 | `test:timetableimport` | `timetableImport.node-tests.js` | 6 | PDF detection, page/line summary without claiming a slot, missing counts, scanned message, password/size errors, fallback |
 
-Total: **96/96**.
+Total: **102/102**.
 
 ### What the acoustic tests actually do
 
@@ -9193,7 +9208,7 @@ These steps are the short local smoke. The full deployed run — 4 phones, 3–4
 
 A safe sentence:
 
-> The backend suite passes 255/255 in both isolation modes, the frontend helper suites pass 96/96, and the production build is green. Those tests cover the algorithms, route wiring, validation and security contracts. The acoustic range, real college PDFs, live deployment and physical phone rehearsal remain open and are listed as such.
+> The backend suite passes 262/262 in both isolation modes, the frontend helper suites pass 102/102, and the production build is green. Those tests cover the algorithms, route wiring, validation and security contracts. The acoustic range, real college PDFs, live deployment and physical phone rehearsal remain open and are listed as such.
 
 An unsafe sentence:
 
@@ -9782,14 +9797,14 @@ Some free tiers require a card, train on submitted data, or have unclear retenti
 
 ## 110. The decisions that were deliberately deferred
 
-### Not built
+### Not built or not measured
 
 | Capability | Why deferred |
 | --- | --- |
 | Automatic attendance | The evidence does not prove presence; a human decision is required |
 | Confidence scoring | No calibrated probability; a score would imply precision the physics does not support |
 | ID round | A future challenge-response layer; not needed for evidence-only |
-| Student cascade | Multi-hop relay adds complexity and new trust assumptions |
+| Physical cascade rehearsal | The relay is built locally but uncommitted; no measured classroom run exists |
 | Native mobile app | The web app is sufficient; a native app would need a new device-key story |
 | Structured timetable import | Blocked on representative PDFs |
 | Local OCR | Blocked on representative scans and accuracy/runtime measurement |
@@ -10185,7 +10200,7 @@ The scripts are tested with stubs, not a real Atlas restore. Until a drill is re
 
 ### Deployment verification
 
-The repository's `HEAD`, `origin/main` and `origin/HEAD` are `433d522`, a `.gitleaksignore`-only commit over `8d2e873`, which added this book and the test plan; the tree includes the committed A2a timetable text preview. The live Render service answered `/api/v1/health` and `/api/v1/health/ready`, and its `main.14c6a1a8.js` bundle contained the A2a UI strings. The exact deployed commit was not compared with the Render dashboard while writing, so that comparison is a hard gate (**G2** in [`docs/testing-plan.md`](../testing-plan.md)) before signed testing:
+The repository's `HEAD`, `origin/main` and `origin/HEAD` are now `80dc2e1`; the phone-to-phone cascade is uncommitted in the working tree. The committed tree includes the A2a timetable text preview. The live Render service answered `/api/v1/health` and `/api/v1/health/ready`, and its `main.14c6a1a8.js` bundle contained the A2a UI strings. The exact deployed commit was not compared with the Render dashboard, so that comparison is a hard gate (**G2** in [`docs/testing-plan.md`](../testing-plan.md)) before signed testing:
 
 - a deploy may be from a different commit than the book describes;
 - a fix may be in the working tree but not deployed;
@@ -10282,7 +10297,7 @@ This is the current, honest list. Each item names the gate or the missing eviden
 | Automatic attendance | Rejected for now; the evidence does not prove presence |
 | Confidence scoring | No calibrated probability |
 | ID round | Not needed for evidence-only; future option |
-| Student cascade | Multi-hop trust and complexity; not built |
+| Student cascade | Built locally; classroom measurement and the "lowest wave heard" join rule remain open |
 | Native mobile app | Web app is sufficient; native device-key story would be new |
 | Offline proof queue | Replay risk; deliberately not built |
 | Paid OCR/LLM | Constraint: no paid service or card-required free tier |
@@ -11491,13 +11506,13 @@ The suite uses Node's built-in runner and needs no live MongoDB. See chapters 97
 | `src/ui/ThemeToggle.jsx` | Light/dark toggle |
 | `src/ui/Toast.jsx` | Transient feedback |
 | `src/index.css` | Global tokens/base styles |
-| `src/components/student/studentCheckInView.node-tests.js` | 9 helper tests |
-| `src/components/teacher/checkInSessionView.node-tests.js` | 7 helper tests |
+| `src/components/student/studentCheckInView.node-tests.js` | 12 helper tests |
+| `src/components/teacher/checkInSessionView.node-tests.js` | 10 helper tests |
 | `src/utils/auth.node-tests.js` | 2 routing tests |
 | `src/utils/rosterImport.node-tests.js` | 6 helper tests |
 | `src/utils/timetableImport.node-tests.js` | 6 helper tests |
 
-The acoustic test files are listed in the acoustic table. Total frontend helper tests: **96/96**.
+The acoustic test files are listed in the acoustic table. Total frontend helper tests: **102/102**.
 
 ### Frontend public and PWA files
 
@@ -11681,7 +11696,7 @@ For a new maintainer:
 | **SHA-256** | A cryptographic hash producing 256 bits. Used for the audit chain and device fingerprint. |
 | **Signature** | A cryptographic proof that the holder of a private key approved a message. The server stores only the public key. |
 | **Step-up** | A fresh passkey assertion required before a destructive admin action. It opens a five-minute window. |
-| **Student cascade** | A hypothetical multi-hop relay of a key between phones. It is deliberately not built. |
+| **Student cascade** | A server-minted multi-hop relay: a proving phone plays the next signal, then listens again. Built locally; classroom measurement remains open. |
 
 ### T–Z
 
@@ -11691,7 +11706,7 @@ For a new maintainer:
 | **Token version** | A per-user counter. Incrementing it invalidates every existing session token for that user. |
 | **TTL** | Time to live. MongoDB can delete a document after a set age; proofs use 24 hours. |
 | **Ultrasound** | Sound above the usual human hearing range, roughly above 20 kHz. Bio Attend's band is near-ultrasound, not fully ultrasonic. |
-| **Wave** | A numbered key generation inside a session. Starting is wave 0; advancing increments it and mints a fresh key. |
+| **Wave** | A numbered key generation inside a session. Starting is wave 0; a valid proof of the pending key promotes it, and the manual Advance is a fallback. |
 | **WebAuthn** | The browser/authenticator standard behind passkeys. |
 | **Web Crypto** | The browser API (`crypto.subtle`) used to generate keys, export public JWKs and sign proof messages. |
 | **Worklet** | A small audio-processing script that runs on the audio thread. Bio Attend uses worklets to stream PCM/tone measurements without blocking the UI. |
@@ -11822,13 +11837,13 @@ On the teacher screen:
 
 1. Open **Teacher → Check-in**.
 2. Choose the demo class.
-3. Press **Start check-in**.
+3. Press **Start and play round 0**; the phone starts playing immediately.
 4. Point at the live key and the two-minute countdown.
-5. Press **Open transmitter** and show the key prefilled in the transmitter URL.
+5. Point at the pending next signal and explain that an accepted student phone relays it.
 
 Say:
 
-> The server minted this key for wave zero. It expires in two minutes. The sound carries only the key; it does not carry the student's identity. The student's phone will sign the key with its own device key.
+> The server minted this key for round zero and this phone is playing it now. It expires in two minutes. The sound carries only the key; it does not carry the student's identity. The student's phone will sign the key with its own device key, receive the next server-minted signal, and relay it.
 
 Do not read the key aloud as if it were a password. It is broadcast by design, but the audience does not need to memorise it.
 
@@ -11954,7 +11969,7 @@ Do not add a second acoustic run at 5 m just to show failure. If you want to dis
 | Microphone permission denied | Re-enable in the browser site settings, reload, retry | "Audio capture needs explicit permission." |
 | Sample-rate gate refuses | Use another phone or the fallback | "This device's audio pipeline cannot represent the band; the gate is protecting the result." |
 | Student device pending | Open the teacher review queue and approve, or use a pre-approved device | "A new browser must be approved by a teacher; that is the device-binding control." |
-| Proof says key expired | If the wave has a proof, the teacher advances or replays; if zero proofs, close and restart. The student listens again | "The key lifetime is two minutes." |
+| Proof says key expired | Keep the page visible and listening; another phone may still relay a fresh pending signal. The teacher can tap **Nudge the class** or **Play this round**. If the round has zero proofs, close and restart | "The key lifetime is two minutes; the relay mints the next one." |
 | Start returns 409 | There is already an active session or no room | "The state conflict is deliberate; close the old session or set a room." |
 | 401 on a page | Sign in again; confirm the cookie and origin | "The session expired; this is not an acoustic failure." |
 | 429 | Wait for the window; check `Retry-After` | "A rate limit is protecting the route." |
@@ -12341,7 +12356,7 @@ A raw roster contains names and college emails. Sending it to a hosted model is 
 
 **44. What does the test suite prove?**
 
-It proves the pure algorithms, route wiring, validation, security contracts, evidence-only views and startup refusal. Backend 255/255 in both isolation modes; frontend helpers 96/96; production build green. It does not prove physical range, real college PDFs, a live MongoDB, a real Google login, the deployed version or a classroom pilot.
+It proves the pure algorithms, route wiring, validation, security contracts, evidence-only views and startup refusal. Backend 262/262 in both isolation modes; frontend helpers 102/102; production build green. It does not prove physical range, real college PDFs, a live MongoDB, a real Google login, the deployed version or a classroom pilot.
 
 **45. Why run the backend suite with `--test-isolation=none`?**
 
@@ -12411,7 +12426,7 @@ That answer is stronger than "it works" because it cannot be embarrassed by the 
 - "The system records evidence; the teacher decides attendance."
 - "The recorded sweep decoded 33 of 50 frames; 1–3 m was strong, 5–10 m was weak."
 - "Layer 1 is a build-planning assumption, not a measured pass."
-- "The backend suite passes 255/255 in both isolation modes; the frontend helpers pass 96/96; the production build is green."
+- "The backend suite passes 262/262 in both isolation modes; the frontend helpers pass 102/102; the production build is green."
 - "The tests cover algorithms, route wiring, validation and security contracts, not physical range or real college PDFs."
 - "A new device waits for teacher approval."
 - "The audit chain is tamper-evident, not tamper-proof."

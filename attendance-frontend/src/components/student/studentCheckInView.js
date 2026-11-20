@@ -10,10 +10,15 @@
  * receives the session key, and the decoded tone value is not displayed.
  */
 
-const { MAX_KEY_VALUE } = require("../../acoustic/proofTransport");
+const { MAX_KEY_VALUE, MAX_WAVE } = require("../../acoustic/proofTransport");
 
 const CONSENT_VERSION = "2026-10-28";
+const CONSENT_STORAGE_KEY = "bioattend.checkin.consent.v1";
 const EVIDENCE_TTL_HOURS = 24;
+// The discovery poll can lag two promotions during a fast cascade. Trying the
+// local round plus the next two lets a phone prove a signal another phone just
+// relayed without inventing a wave or a key.
+const PROOF_WAVE_SPAN = 2;
 
 const isActiveSession = (session) =>
   Boolean(session && session.id && session.status === "active");
@@ -43,6 +48,82 @@ const toTime = (value) => {
   return new Date(value).getTime();
 };
 
+const proofWaveCandidates = (sessionWave, { span = PROOF_WAVE_SPAN, maxWave = MAX_WAVE } = {}) => {
+  if (!Number.isInteger(sessionWave) || sessionWave < 0) return [];
+  const waves = [];
+  const last = Math.min(maxWave, sessionWave + Math.max(0, span));
+  for (let wave = sessionWave; wave <= last; wave += 1) waves.push(wave);
+  return waves;
+};
+
+const signalFromValue = (value) => {
+  if (!value || !Number.isInteger(value.wave) || value.wave < 0 || value.wave > MAX_WAVE) {
+    return null;
+  }
+  if (!isDecodedKey(value.key)) return null;
+  return {
+    wave: value.wave,
+    key: value.key,
+    keyIssuedAt: value.keyIssuedAt || null,
+    keyExpiresAt: value.keyExpiresAt || null,
+  };
+};
+
+/**
+ * The proof response is the only place a student receives a relay signal.
+ * Malformed values become null rather than a transmission of an invented key.
+ */
+const nextSignalFromResponse = (response) => signalFromValue(response?.next);
+
+const signalRemainingMs = (signal, now = new Date()) => {
+  if (!signal || !signal.keyExpiresAt) return 0;
+  const expiresAt = toTime(signal.keyExpiresAt);
+  const current = toTime(now);
+  if (!Number.isFinite(expiresAt) || !Number.isFinite(current)) return 0;
+  return Math.max(0, expiresAt - current);
+};
+
+const signalIsFresh = (signal, now = new Date()) => signalRemainingMs(signal, now) > 0;
+
+const readCheckInConsent = (storage, sessionId, version = CONSENT_VERSION) => {
+  if (!storage || !sessionId) return false;
+  try {
+    const raw = storage.getItem(CONSENT_STORAGE_KEY);
+    if (!raw) return false;
+    const saved = JSON.parse(raw);
+    return saved?.sessionId === String(sessionId) && saved?.version === version;
+  } catch {
+    return false;
+  }
+};
+
+const writeCheckInConsent = (
+  storage,
+  sessionId,
+  { version = CONSENT_VERSION, acknowledgedAt = new Date().toISOString() } = {}
+) => {
+  if (!storage || !sessionId) return false;
+  try {
+    storage.setItem(
+      CONSENT_STORAGE_KEY,
+      JSON.stringify({ sessionId: String(sessionId), version, acknowledgedAt })
+    );
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const clearCheckInConsent = (storage) => {
+  if (!storage) return false;
+  try {
+    storage.removeItem(CONSENT_STORAGE_KEY);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 const keyRemainingMs = (session, now = new Date()) => {
   if (!isActiveSession(session) || !session.keyExpiresAt) return 0;
   const expiresAt = toTime(session.keyExpiresAt);
@@ -62,11 +143,15 @@ const sessionPhase = (session, now = new Date()) => {
   return keyRemainingMs(session, now) > 0 ? "live" : "expired";
 };
 
-const joinBlockReason = ({ session, deviceStatus, consent, now = new Date() }) => {
+/**
+ * Join stays open while the session is active, even if the round key shown by
+ * discovery has expired: another phone may still relay a fresh next signal.
+ * The server, not this display gate, decides whether a decoded key is fresh.
+ */
+const joinBlockReason = ({ session, deviceStatus, consent }) => {
   if (deviceStatus !== "approved") return "device";
   if (!session) return "no-session";
   if (session.status !== "active") return "closed";
-  if (keyRemainingMs(session, now) <= 0) return "expired";
   if (!consent) return "consent";
   return null;
 };
@@ -108,7 +193,9 @@ const formatCountdown = (milliseconds) => {
 
 module.exports = {
   CONSENT_VERSION,
+  CONSENT_STORAGE_KEY,
   EVIDENCE_TTL_HOURS,
+  PROOF_WAVE_SPAN,
   isActiveSession,
   selectSession,
   sessionLabel,
@@ -118,6 +205,13 @@ module.exports = {
   sessionPhase,
   joinBlockReason,
   isDecodedKey,
+  proofWaveCandidates,
+  nextSignalFromResponse,
+  signalRemainingMs,
+  signalIsFresh,
+  readCheckInConsent,
+  writeCheckInConsent,
+  clearCheckInConsent,
   evidenceFromResponse,
   formatTime,
   formatCountdown,

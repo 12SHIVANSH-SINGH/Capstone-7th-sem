@@ -52,7 +52,7 @@ const disposeEngine = (engine) => {
   if (context && context.state !== "closed") context.close().catch(() => {});
 };
 
-export const useCheckInAudio = ({ onFrame } = {}) => {
+export const useCheckInAudio = ({ onFrame, shouldAcceptFrame } = {}) => {
   const [phase, setPhase] = useState("idle");
   const [error, setError] = useState("");
   const engineRef = useRef(null);
@@ -61,10 +61,15 @@ export const useCheckInAudio = ({ onFrame } = {}) => {
   const wakeLockRef = useRef(null);
   const limitTimerRef = useRef(null);
   const onFrameRef = useRef(onFrame);
+  const shouldAcceptFrameRef = useRef(shouldAcceptFrame);
 
   useEffect(() => {
     onFrameRef.current = onFrame;
   }, [onFrame]);
+
+  useEffect(() => {
+    shouldAcceptFrameRef.current = shouldAcceptFrame;
+  }, [shouldAcceptFrame]);
 
   const disposeCurrent = useCallback(() => {
     const engine = engineRef.current;
@@ -127,10 +132,20 @@ export const useCheckInAudio = ({ onFrame } = {}) => {
     const engine = engineRef.current;
     if (!engine || engine.disposed) return;
 
-    const frame = extractNextFrame(engine.buffer, {
-      sampleRate: engine.context.sampleRate,
-    });
-    if (frame) handleFrame(frame);
+    // Repeated relays of a key this phone already handled are consumed and
+    // ignored. The mic keeps running so the next distinct key is decoded
+    // without reopening the microphone for every repeated frame.
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      const frame = extractNextFrame(engine.buffer, {
+        sampleRate: engine.context.sampleRate,
+      });
+      if (!frame) return;
+      const accept = shouldAcceptFrameRef.current;
+      if (!accept || accept(frame)) {
+        handleFrame(frame);
+        return;
+      }
+    }
   }, [handleFrame]);
 
   const start = useCallback(async () => {

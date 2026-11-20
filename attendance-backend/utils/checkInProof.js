@@ -12,7 +12,13 @@
  */
 
 const crypto = require("crypto");
-const { MAX_KEY_VALUE, MAX_WAVE, STATUS_ACTIVE, keyIsFresh } = require("./checkInSession");
+const {
+  MAX_KEY_VALUE,
+  MAX_WAVE,
+  STATUS_ACTIVE,
+  keyIsFresh,
+  pendingKeyIsFresh,
+} = require("./checkInSession");
 const { sanitizePublicKeyJwk } = require("./deviceBinding");
 
 const PROOF_MESSAGE_VERSION = "bioattend-proof:v1";
@@ -125,10 +131,13 @@ const evaluateProof = ({ session, proof, wave, key, now = new Date() }) => {
 
   if (proof) {
     if (proof.wave === wave && proof.key === key) {
+      const pending = session.pendingWave === proof.wave;
       return {
         outcome: PROOF_OUTCOMES.DUPLICATE,
         status: 200,
         message: "This proof was already recorded.",
+        waveRole: pending ? "pending" : proof.wave === session.wave ? "current" : "stale",
+        advances: pending && pendingKeyIsFresh(session, now),
       };
     }
     return reject(409, "A different proof is already recorded for this wave.");
@@ -137,23 +146,44 @@ const evaluateProof = ({ session, proof, wave, key, now = new Date() }) => {
   if (session.status !== STATUS_ACTIVE) {
     return reject(409, "This check-in session is closed.");
   }
-  if (!Number.isInteger(session.wave) || wave !== session.wave) {
+
+  const isCurrent = Number.isInteger(session.wave) && wave === session.wave;
+  const isPending = Number.isInteger(session.pendingWave) && wave === session.pendingWave;
+  if (!isCurrent && !isPending) {
     return reject(409, "This wave is no longer current.");
   }
-  // Freshness before key equality: otherwise an expired wave answers 409 for
-  // the correct key but 400 for a wrong one, telling an attacker which guess
-  // was right after expiry.
-  if (!keyIsFresh(session, now)) {
-    return reject(409, "The current wave key has expired.");
-  }
-  if (key !== session.key) {
-    return reject(400, "The decoded key does not match the current wave.");
+
+  if (isCurrent) {
+    // Freshness before key equality: otherwise an expired wave answers 409 for
+    // the correct key but 400 for a wrong one, telling an attacker which guess
+    // was right after expiry.
+    if (!keyIsFresh(session, now)) {
+      return reject(409, "The current wave key has expired.");
+    }
+    if (key !== session.key) {
+      return reject(400, "The decoded key does not match the current wave.");
+    }
+    return {
+      outcome: PROOF_OUTCOMES.ACCEPT,
+      status: 201,
+      message: "Proof recorded.",
+      waveRole: "current",
+      advances: false,
+    };
   }
 
+  if (!pendingKeyIsFresh(session, now)) {
+    return reject(409, "The next wave key has expired.");
+  }
+  if (key !== session.pendingKey) {
+    return reject(400, "The decoded key does not match the next wave.");
+  }
   return {
     outcome: PROOF_OUTCOMES.ACCEPT,
     status: 201,
-    message: "Proof recorded.",
+    message: "Proof recorded. The cascade advanced.",
+    waveRole: "pending",
+    advances: true,
   };
 };
 

@@ -249,6 +249,10 @@ exports.closeSession = catchAsyncError(async (req, res, next) => {
     const settings = await getSettings();
     session.status = closed.status;
     session.closedAt = closed.closedAt;
+    session.pendingWave = closed.pendingWave;
+    session.pendingKey = closed.pendingKey;
+    session.pendingKeyIssuedAt = closed.pendingKeyIssuedAt;
+    session.pendingKeyExpiresAt = closed.pendingKeyExpiresAt;
     session.queryWindowEndsAt = queryWindowEnd(session.closedAt, settings);
     await session.save();
 
@@ -291,12 +295,13 @@ exports.closeSession = catchAsyncError(async (req, res, next) => {
 
 /**
  * Advance to the next wave only after the current wave has at least one
- * accepted proof. This keeps wave numbers tied to real acoustic progress and
- * stops a teacher from skipping waves by tapping repeatedly.
+ * accepted proof. This is now the manual fallback beside the server-driven
+ * cascade. If a fresh pending relay key exists, it is promoted rather than
+ * replaced, so phones that already received it keep a valid key.
  *
- * The update is matched on the wave the request read. Two concurrent taps mint
- * two keys, but only one can win; the loser gets a clear conflict instead of
- * silently overwriting the winner.
+ * The update is matched on the wave the request read. Two concurrent advances
+ * can mint two keys, but only one can win; the loser gets a clear conflict
+ * instead of silently overwriting the winner.
  */
 exports.advanceSession = catchAsyncError(async (req, res, next) => {
   const session = await getOwnedSession(req.params.sessionId, req.user._id, next);
@@ -321,7 +326,7 @@ exports.advanceSession = catchAsyncError(async (req, res, next) => {
 
   let advanced;
   try {
-    advanced = advanceSessionState(session);
+    advanced = advanceSessionState(session, { now: new Date() });
   } catch (error) {
     return next(new ErrorHandler(error.message, 409));
   }
@@ -340,6 +345,10 @@ exports.advanceSession = catchAsyncError(async (req, res, next) => {
         key: advanced.key,
         keyIssuedAt: advanced.keyIssuedAt,
         keyExpiresAt: advanced.keyExpiresAt,
+        pendingWave: null,
+        pendingKey: null,
+        pendingKeyIssuedAt: null,
+        pendingKeyExpiresAt: null,
       },
       $push: {
         keyHistory: {
@@ -365,6 +374,7 @@ exports.advanceSession = catchAsyncError(async (req, res, next) => {
     entityType: "CheckInSession",
     entityId: updated._id,
     summary: `Advanced check-in from wave ${session.wave} to wave ${updated.wave}.`,
+    metadata: { promotedPendingKey: advanced.promotedFromPending },
     isDemo: updated.isDemo,
   });
 

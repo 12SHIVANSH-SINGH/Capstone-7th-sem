@@ -1,6 +1,6 @@
 @startuml
 !pragma layout smetana
-title Bio Attend — system components (evidence-only pilot)
+title Bio Attend — system components (evidence-only relay pilot)
 
 skinparam defaultFontName "Arial"
 skinparam defaultFontSize 13
@@ -24,24 +24,25 @@ hide stereotype
 
 rectangle "Teacher phone — Android Chrome" as TP {
   rectangle "Teacher dashboard\nclasses · rosters · device review" as TD
-  rectangle "Check-in screen\nstart · wave · key · advance" as TC
+  rectangle "Check-in screen\nstart · round · key · nudge\nmanual advance fallback" as TC
   rectangle "Evidence view\nread-only · email · wave · time\nno attendance" as TE
-  rectangle "Acoustic transmitter\nplays the current wave key" as TX
+  rectangle "Acoustic transmitter\nplays round 0 and nudges" as TX
 }
 
 rectangle "Student phone — Android Chrome" as SP {
   rectangle "Student dashboard\nidentity · device status" as SD
-  rectangle "Student check-in shell\nconsent · mic · evidence" as SHELL
+  rectangle "Student check-in shell\nconsent once · evidence\nlisten again" as SHELL
   rectangle "Acoustic receiver\nmic + FSK decode" as RX
+  rectangle "Relay transmitter\nplays the server-minted next signal" as RTX
   rectangle "Device key\nP-256 in IndexedDB" as DK
 }
 
 rectangle "Bio Attend web service\nNode.js · Express · one origin" as SRV {
   rectangle "Sign-in & policy\nGoogle · teacher/student · roster" as AUTH
   rectangle "Device binding\nfirst device · review queue" as BIND
-  rectangle "Check-in sessions\nkeys · current wave · advance\nbounded key history" as SESS
+  rectangle "Check-in sessions\nkeys · current + pending\natomic promotion · history" as SESS
   rectangle "Student discovery\nlive sessions · no key" as DISC
-  rectangle "Proof transport\nsignature · evidence · 24 h TTL" as PROOF
+  rectangle "Proof transport\nsignature · evidence · next signal\n24 h TTL" as PROOF
   rectangle "Document import\nPDF text layer · preview only" as DOC
   rectangle "Safety guards\nCSRF origin · rate limit · startup indexes" as GUARD
 }
@@ -49,7 +50,7 @@ rectangle "Bio Attend web service\nNode.js · Express · one origin" as SRV {
 database "MongoDB Atlas" as DB {
   rectangle "Users\n+ device bindings" as U
   rectangle "Classes · rooms\nrosters" as C
-  rectangle "Check-in sessions\ncurrent key + bounded history" as S
+  rectangle "Check-in sessions\ncurrent + pending key\nbounded history" as S
   rectangle "Proof evidence\nTTL ~24 h" as P
   rectangle "Timetable\nweekly slots" as T
 }
@@ -61,7 +62,8 @@ TP --> SRV : HTTPS
 SP --> SRV : HTTPS
 SHELL --> SRV : HTTPS
 SHELL ..> DISC : live sessions\n(no key)
-TX ..> RX : near-ultrasonic key tones\n(phone-to-phone; server never hears audio)
+TX ..> RX : near-ultrasonic key tones\n(round 0; server never hears audio)
+RTX ..> RX : relayed next signal\n(to nearby phones)
 SRV --> G : verify Google ID token
 AUTH --> U
 BIND --> U
@@ -72,6 +74,7 @@ DISC --> C
 DISC --> S
 PROOF --> S
 PROOF --> P
+PROOF ..> SESS : mint or promote pending key\nreturn next signal
 DOC ..> C : roster text preview\nno auto-save
 DOC ..> T : timetable text preview\nno slot write
 PROOF ..> L3 : evidence feeds scoring\nonly after the owner starts it

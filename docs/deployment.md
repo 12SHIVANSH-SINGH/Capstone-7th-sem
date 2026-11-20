@@ -2,11 +2,11 @@
 
 This is the production guide for Bio Attend. All account-level setup (GitHub, Render,
 MongoDB Atlas, Google Cloud) is done by the project owner. The repository is built and tested
-locally. Local `HEAD`, `origin/main` and `origin/HEAD` are `433d522`, a `.gitleaksignore`-only
-commit over `8d2e873`; the tree includes the committed A2a timetable PDF text preview. The live
-service is reachable and its bundle
-contains the A2a UI strings, but the exact deployed commit must be compared in the Render
-dashboard before signed testing. The owner controls every push and deploy.
+locally. Local `HEAD`, `origin/main` and `origin/HEAD` are `80dc2e1`; the tree includes the
+committed A2a timetable PDF text preview. The phone-to-phone cascade changes are **uncommitted**
+in the working tree. The live service was last observed serving the A2a UI strings, but the
+exact deployed commit must be compared in the Render dashboard before signed testing. The owner
+controls every push and deploy.
 
 Recommended shape:
 
@@ -57,13 +57,13 @@ print **nothing**. `config.env` holds the database URL and JWT secret and must s
 ```bash
 cd attendance-backend
 npm test
-npm test -- --test-isolation=none         # 255/255 both modes
+npm test -- --test-isolation=none         # 262/262 both modes
 
 cd ../attendance-frontend
 npm run test:proof                        # 15
 npm run test:acoustic                     # 51
-npm run test:checkin                      # 7
-npm run test:studentcheckin               # 9
+npm run test:checkin                      # 10
+npm run test:studentcheckin               # 12
 npm run test:auth                         # 2
 npm run test:rosterimport                 # 6
 npm run test:timetableimport              # 6
@@ -74,7 +74,7 @@ CI=true REACT_APP_API_URL=/api/v1 \
   npm run build
 ```
 
-Expected frontend total: **96/96** across the seven suites. The build must pass; Render sets
+Expected frontend total: **102/102** across the seven suites. The build must pass; Render sets
 `CI=true`, so warnings are errors. Roster and timetable PDF extraction use PDF.js 6 and
 multer; the service must run Node 22.13+ or 24+ (the documented `NODE_VERSION=24` is fine).
 
@@ -441,8 +441,8 @@ third-party, which Safari and some Chrome modes block.
 ## 9. Deployment checklist
 
 - [ ] `config.env` is ignored; no secrets in `git ls-files`
-- [ ] Backend **255/255** (`npm test` and `npm test -- --test-isolation=none`)
-- [ ] Frontend **96/96** (proof 15, acoustic 51, check-in 7, student check-in 9, auth 2, roster import 6, timetable import 6)
+- [ ] Backend **262/262** (`npm test` and `npm test -- --test-isolation=none`)
+- [ ] Frontend **102/102** (proof 15, acoustic 51, teacher check-in 10, student check-in 12, auth 2, roster import 6, timetable import 6)
 - [ ] `CI=true` production build passes locally
 - [ ] CSP browser audit shows zero violations on `/`, `/login`, a teacher page, analytics,
       help and `/admin`; Google button renders; service worker is active

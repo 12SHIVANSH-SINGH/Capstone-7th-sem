@@ -69,6 +69,84 @@ test("a key is usable only while the session is active and unexpired", () => {
   assert.equal(view.keyIsUsable(null), false);
 });
 
+test("a fresh pending signal wins the manual boost, then the current round", () => {
+  const now = new Date("2026-10-24T12:00:30.000Z");
+  const active = session({
+    wave: 2,
+    key: 555,
+    pending: {
+      wave: 3,
+      key: 777,
+      keyIssuedAt: "2026-10-24T12:00:10.000Z",
+      keyExpiresAt: "2026-10-24T12:02:10.000Z",
+      keyExpired: false,
+    },
+  });
+
+  assert.deepEqual(view.boostSignal(active, now), {
+    kind: "next",
+    wave: 3,
+    key: 777,
+    keyExpiresAt: "2026-10-24T12:02:10.000Z",
+  });
+
+  const noPending = session({ wave: 2, key: 555 });
+  assert.deepEqual(view.boostSignal(noPending, now), {
+    kind: "current",
+    wave: 2,
+    key: 555,
+    keyExpiresAt: "2026-10-24T12:02:00.000Z",
+  });
+
+  const expiredPending = session({
+    wave: 2,
+    key: 555,
+    pending: {
+      wave: 3,
+      key: 777,
+      keyExpiresAt: "2026-10-24T12:00:00.000Z",
+    },
+  });
+  assert.equal(view.boostSignal(expiredPending, now)?.kind, "current");
+
+  const stale = session({
+    wave: 2,
+    key: 555,
+    keyExpiresAt: "2026-10-24T11:59:00.000Z",
+    pending: {
+      wave: 3,
+      key: 777,
+      keyExpiresAt: "2026-10-24T11:59:30.000Z",
+    },
+  });
+  assert.equal(view.boostSignal(stale, now), null);
+  assert.equal(view.boostSignal(session({ status: "closed" }), now), null);
+  assert.equal(view.boostSignal(null, now), null);
+});
+
+test("round evidence counts only the live round", () => {
+  const evidence = {
+    total: 7,
+    byWave: [
+      { wave: 0, count: 4 },
+      { wave: 1, count: 3 },
+    ],
+  };
+  assert.equal(view.roundEvidenceCount(evidence, 0), 4);
+  assert.equal(view.roundEvidenceCount(evidence, 1), 3);
+  assert.equal(view.roundEvidenceCount(evidence, 2), 0);
+  assert.equal(view.roundEvidenceCount({ byWave: [{ wave: 1, count: "2" }] }, 1), 2);
+  assert.equal(view.roundEvidenceCount(null, 0), 0);
+});
+
+test("signal remaining time uses the pending lifetime", () => {
+  const signal = { keyExpiresAt: "2026-10-24T12:02:00.000Z" };
+  assert.equal(view.signalRemainingMs(signal, new Date("2026-10-24T12:01:30.500Z")), 29500);
+  assert.equal(view.signalRemainingMs(signal, new Date("2026-10-24T12:03:00.000Z")), 0);
+  assert.equal(view.signalRemainingMs({ keyExpiresAt: "bad" }), 0);
+  assert.equal(view.signalRemainingMs(null), 0);
+});
+
 test("countdown formatting rounds up and clamps bad values", () => {
   assert.equal(view.formatCountdown(120000), "2:00");
   assert.equal(view.formatCountdown(119001), "2:00");

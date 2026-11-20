@@ -13,7 +13,7 @@ The server mints keys, records signed proof evidence and keeps an audited attend
 register. A **teacher confirms attendance**; a decoded tone is not an automatic verdict.
 Full detail is in `plan.md`; do not restate or redesign it here.
 
-## Current phase (2026-11-11, session 29)
+## Current phase (2026-11-20, session 30)
 
 - **Layer 1 is assumed passed by owner direction (2026-10-29) for build planning only.** This
   is **not** a measured pass. The 2026-10-25 sweep decoded 10/10 at 1 m, 9/10 at 2 m, 9/10 at
@@ -22,10 +22,11 @@ Full detail is in `plan.md`; do not restate or redesign it here.
   gate as measured-passed.
 - **The product is built through the attendance/admin layer:** Google sign-in, classes,
   rosters, teacher-approved device binding, check-in sessions, signed proof evidence, student
-  discovery and shell, evidence-gated wave advancement, teacher evidence view,
-  teacher-confirmed register, 24-hour queries, analytics, PDF/Excel exports, session history,
-  notifications, timetable, profile/help, PWA/dark theme and a production-capable super-admin
-  console.
+  discovery and shell, the server-minted phone-to-phone relay cascade, teacher-confirmed
+  register, 24-hour queries, analytics, PDF/Excel exports, session history, notifications,
+  timetable, profile/help, PWA/dark theme and a production-capable super-admin console. The
+  cascade is built and locally tested but has **not** been measured in a physical classroom;
+  owner-reported classroom attempts remain planning evidence, not measured results.
 - **P0 and P1 security are built and tested locally:** strict CSP, first-party cookies,
   `tokenVersion` session revocation, impersonation hardening, teacher-approved first device
   binding, WebAuthn/passkey step-up (5-minute `admin_step_up` cookie, **428** without it),
@@ -33,21 +34,22 @@ Full detail is in `plan.md`; do not restate or redesign it here.
   `/health/ready`, verification-only `JWT_SECRET_PREVIOUS` rotation and the settings
   `$set`/`$setOnInsert` conflict fix.
 - **Acoustic proof remains evidence-only.** The proof endpoint does not mark attendance or
-  score. The teacher opens the register, sees evidence/optional location and marks
-  present/absent/excused; finalisation and every correction are audited. Scoring, the ID
-  round and the student cascade remain unbuilt.
-- **Repository state (2026-11-10):** local `HEAD`, `origin/main` and `origin/HEAD` are all
-  **`433d522`**, a `.gitleaksignore`-only commit over `8d2e873` (which contains the test plan
-  and guide). The tree includes the A1 roster PDF slice, A2a timetable text preview, P0/P1
-  security, PWA and dark-mode work. `003f900` was the earlier product commit; the `32a2078`
-  claims in older status docs are stale and were corrected in session 27. The live service is
-  reachable and its bundle contains A2a strings, but the exact deployed commit was **not
-  verified against the Render dashboard**; do not claim the deployment matches the repository
-  without checking.
+  score. A valid proof earns the server-minted next relay signal, but it never marks a
+  student present. The teacher opens the register, sees evidence/optional location and marks
+  present/absent/excused; finalisation and every correction are audited. Scoring and the ID
+  round remain unbuilt.
+- **Repository state (2026-11-20):** local `HEAD`, `origin/main` and `origin/HEAD` are all
+  **`80dc2e1`** (“doc push”), on top of `433d522`. The committed tree includes the A1 roster
+  PDF slice, A2a timetable text preview, P0/P1 security, PWA and dark-mode work. The
+  phone-to-phone cascade changes (backend pending-key state, relay UI, transmitter hook and
+  helper tests) are **uncommitted in the working tree**. The live service was last observed
+  serving A2a strings, but the exact deployed commit was **not verified against the Render
+  dashboard**; do not claim the deployment matches the repository without checking.
 - **Deployed test plan:** [`docs/testing-plan.md`](docs/testing-plan.md) is the execution
   script for the 4-phone/3–4-laptop run. It covers acoustic range and controls, the signed
-  attendance/query flow on Render with real college accounts, device/passkey/admin security,
-  PDF previews, deployment verification and the conditional encrypted restore drill.
+  attendance/query flow on Render with real college accounts — including the automatic
+  phone-to-phone cascade and teacher fallback — device/passkey/admin security, PDF previews,
+  deployment verification and the conditional encrypted restore drill.
 - **Test PDF fixtures:** `attendance-backend/scripts/generate-test-pdfs.js` writes synthetic
   text-layer roster/timetable PDFs and a no-text-layer PDF to the gitignored `test-artifacts/`
   directory. It verifies each file through `extractPdfText` before exiting.
@@ -73,10 +75,10 @@ Full detail is in `plan.md`; do not restate or redesign it here.
 - **Gemini gate:** raw rosters may go to the free tier only after an explicit student notice
   and a documented risk acceptance are written into `plan.md`. That text does not exist yet;
   do not write the AI path before it does.
-- **Still blocked:** automatic scoring, the ID round, the student cascade, the "lowest wave
-  heard" join rule, the mobile app, a verified live Render commit, the real Google/phone
-  multi-wave rehearsal in the deployed plan, physical 5 m/10 m range diagnosis with
-  reverse/muted control, and the encrypted Atlas restore drill (URI, passphrase,
+- **Still blocked:** automatic scoring, the ID round, the "lowest wave heard" join rule, the
+  mobile app, a verified live Render commit, the real Google/phone phone-to-phone cascade
+  rehearsal in the deployed plan, physical 5 m/10 m range diagnosis with reverse/muted
+  control, and the encrypted Atlas restore drill (URI, passphrase,
   `mongodb-database-tools` and scratch-database permission are unconfirmed).
 
 ## Core working rule: small slices, one session at a time
@@ -134,15 +136,16 @@ Full detail is in `plan.md`; do not restate or redesign it here.
 Current local gate (all must pass before asking the owner to deploy):
 
 ```bash
-cd attendance-backend && npm test                              # 255/255
-cd attendance-backend && npm test -- --test-isolation=none     # 255/255
+cd attendance-backend && npm test                              # 262/262
+cd attendance-backend && npm test -- --test-isolation=none     # 262/262
 cd attendance-frontend && npm run test:proof                    # 15/15
 cd attendance-frontend && npm run test:acoustic                 # 51/51
-cd attendance-frontend && npm run test:checkin                  # 7/7
-cd attendance-frontend && npm run test:studentcheckin           # 9/9
+cd attendance-frontend && npm run test:checkin                  # 10/10
+cd attendance-frontend && npm run test:studentcheckin           # 12/12
 cd attendance-frontend && npm run test:auth                     # 2/2
 cd attendance-frontend && npm run test:rosterimport             # 6/6
 cd attendance-frontend && npm run test:timetableimport          # 6/6
+# frontend helper total: 102/102
 ```
 
 Production build (same API path and empty hosted-domain hint as the deployed site):
@@ -180,10 +183,18 @@ checks. A pure unit test is not enough for those routes.
 - **Acoustic proof is evidence, not attendance.** Do not add an automatic `present` flag,
   score or ID-round decision to the proof path. The response keeps
   `attendanceDecided: false`. Attendance lives in the separate teacher register.
-- **Wave advancement is teacher-only and evidence-gated.** It does not live on the proof
-  path. It must refuse a closed session or a wave with no accepted proof.
-- **Keys and key history stay server-side.** Students receive only the current wave and
-  expiry. The teacher view returns the current key but a key-free `waveHistory`. Evidence
+- **Wave advancement is server-driven on accepted proof, with a teacher-only, evidence-gated
+  manual fallback.** A valid proof for the current round mints a pending next signal and
+  returns it to that proving phone. A valid proof for the pending round atomically promotes
+  it and mints the following pending signal. The teacher's manual Advance must refuse a
+  closed session or a round with no accepted proof, and it must preserve the original expiry
+  of a fresh pending key. Never auto-mark attendance from an advance.
+- **Keys and key history stay server-side; phones never invent keys.** Students receive the
+  wave and expiry from discovery, and only the proving student receives the server-minted
+  next signal in the proof response. A student may try the displayed wave and the next two
+  because an acoustic frame carries only the key; the server accepts only its current or
+  pending round. The active teacher view returns the current key and pending signal but a
+  key-free `waveHistory`; a closed session returns neither current key nor pending. Evidence
   returns no key, signature, protocol version or device fingerprint.
 - **The proof endpoint stays student-only and roster-bound.** Only an enrolled, active
   student with an approved device binding may submit. A pending device change blocks proofs.
@@ -198,8 +209,9 @@ checks. A pure unit test is not enough for those routes.
 - **Unsafe cross-origin requests are rejected.** The origin guard runs before routes.
   Split hosting needs the exact frontend origin in `CLIENT_URLS`.
 - **Logout is POST-only.** Do not add a GET mutation back.
-- **Teacher's phone stays at the front; student phones are 1–10 m away.** Use **TX/RX**
-  terminology in reports and diagrams.
+- **Teacher's phone stays at the front; student phones are 1–10 m away.** It plays round 0
+  and the manual nudge; later rounds are carried by phones whose evidence was accepted. Use
+  **TX/RX** terminology in reports and diagrams.
 - **Test accounts are env-gated and non-college.** `TEACHER_EMAILS` and real rosters are
   college-only. `ALLOW_TEST_ROSTER_EMAILS` is non-production only. Dev personas never join a
   roster.

@@ -1,6 +1,6 @@
 @startuml
 !pragma layout smetana
-title Layer 2.3 — proof submission (built; evidence-only)
+title Layer 2.3 — proof submission and relay signal (built; evidence-only)
 
 skinparam defaultFontName "Arial"
 skinparam defaultFontSize 13
@@ -33,22 +33,34 @@ API -> API: Verify signature with the\nbound public key
 API -> DB: Find existing proof for\n(session, student, wave)
 
 alt Exact retry
-  API --> Phone: 200\nduplicate: true · attendanceDecided: false
-else New proof — active, fresh, current wave, key matches
+  API -> DB: If this wave is still pending,\npromote it atomically
+  API --> Phone: 200\nduplicate: true · attendanceDecided: false\nnext: server-minted relay signal when one is live
+else New proof — current round, key fresh and matching
   API -> DB: Insert evidence + signature +\nprotocol version (unique per student/wave)
+  API -> DB: Mint pending K(n+1)\nwith a two-minute lifetime
   DB --> API: Stored, TTL ~24 h
-  API --> Phone: 201\nrecorded: true · duplicate: false\nattendanceDecided: false
+  API --> Phone: 201\nrecorded: true · duplicate: false\nattendanceDecided: false\nnext: K(n+1)
+else New proof — pending round, key fresh and matching
+  API -> DB: Insert evidence + signature
+  API -> DB: Atomically promote pending K(n+1)\narchive the old key, mint pending K(n+2)
+  API --> Phone: 201\nrecorded: true · duplicate: false\nattendanceDecided: false\nnext: K(n+2)
 else Invalid, stale, wrong device or rate limited
   API --> Phone: 400 / 401 / 403 / 409 / 429
 end
+
+Phone -> Phone: Play the returned signal 2-3 times\nthen listen again automatically
 
 note over API, DB
   No score, attendance flag or ID round.
   The signed proof binds the submission to the bound account/device.
   It does not prove the phone was physically inside the room.
-  A teacher may advance only after the current wave has
-  at least one accepted proof; old keys are archived
-  server-side and never returned to students.
+  The server mints every relay key; phones never invent one.
+  A student may try the displayed round through +2 because the
+  frame carries only the key; the server accepts only its
+  current or pending pair.
+  The teacher can advance manually only after accepted evidence;
+  a fresh pending key keeps its original expiry.
+  A closed session returns neither current key nor pending state.
 end note
 
 @enduml

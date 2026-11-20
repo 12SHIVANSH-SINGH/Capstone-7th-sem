@@ -128,42 +128,60 @@ parser is not invented from guesswork. The same 10 MB, 20-page, 200,000-characte
 
 ## Check-in sessions and evidence
 
-The teacher opens **Check-in** (`/teacher/check-in`), chooses an owned class and starts a
-session. The server:
+The teacher opens **Check-in** (`/teacher/check-in`), chooses an owned class and taps
+**Start and play round 0** once. No location permission is needed. The server:
 
 - creates one session per class (a partial unique index prevents two active sessions);
-- starts at **wave 0** with a fresh seven-symbol key from the 15^7 space;
+- starts at **round 0** with a fresh seven-symbol key from the 15^7 space;
 - keeps the key alive for **two minutes** and returns it only to the owning teacher;
-- exposes the live session's class, room, wave and expiry to enrolled students, never the
+- exposes the live session's class, room, round and expiry to enrolled students, never the
   key.
 
-A student opens `/student/check-in` while the session is live:
+Starting the session also plays round 0 from the teacher's phone. The teacher screen polls
+the live session, stops old audio when the cascade advances, and keeps **Play**, **Stop**,
+**Nudge** and an evidence-gated **Advance** as fallbacks. It does not auto-play later rounds:
+those are carried by student phones.
 
-1. The retention/consent notice must be accepted before **Join** enables.
-2. The phone listens through an AudioWorklet, decodes the current wave locally and keeps
-   raw audio on the device.
-3. It signs the canonical `session / wave / key / student` message with the bound P-256
-   key and submits the proof.
-4. The server checks the signature, active roster enrollment, approved binding and fresh
-   key, then stores the proof as **evidence only**. Retries are idempotent per
-   student/wave, submissions are capped at 60/minute per student, and evidence expires
+A student opens `/student/check-in` while the session is live and taps **Join once**:
+
+1. The retention/consent notice must be accepted before Join enables. The acknowledgement
+   is remembered for that session, so a reload does not ask again.
+2. The phone listens through an AudioWorklet, decodes a round locally and keeps raw audio on
+   the device. It keeps listening while the session is live, even after the round shown by
+   discovery expires, because another phone may still relay a fresh signal.
+3. It signs the canonical `session / wave / key / student` message with the bound P-256 key
+   and submits the proof. An acoustic frame carries only the key, so the phone tries the
+   displayed round and the next two; the server accepts only its current or pending pair.
+4. The server checks the signature, active roster enrollment, approved binding and key
+   freshness, then stores the proof as **evidence only**. Retries are idempotent per
+   student/round, submissions are capped at 60/minute per student, and evidence expires
    after about one day.
-5. The page shows a recorded-evidence card. It never displays the key. If the teacher
-   advances the wave while the phone is listening, listening stops and the student is
-   asked to tap Join for the new wave.
+5. The response includes the server-minted **next relay signal**. The phone plays it three
+   times through its speaker, then goes back to listening. Every phone whose proof was
+   accepted or already recorded relays; identical signals add instead of colliding.
 
-**Advance wave** is a separate teacher-only action. It requires at least one accepted
-proof in the current wave, atomically matches the session/wave, archives the old key in a
-bounded 20-entry server-side history and mints a fresh two-minute key. The teacher view
-returns a key-free timeline; students never receive key history.
+The cascade advances itself:
 
-The teacher **Evidence** card is read-only: student email, wave, recorded time and
-per-wave counts, with `attendanceDecided: false`. It selects no key, signature, protocol
-version or device fingerprint.
+- A valid proof for the **current** round records evidence and asks the server to mint a
+  pending next key. The proving phone receives that key and relays it.
+- A valid proof for the **pending** round atomically promotes that key to current, archives
+  the old key in a bounded 20-entry server-side history, and mints the following pending key.
+  Promotion preserves the pending key's original two-minute expiry.
+- The teacher **Nudge** plays the fresh pending signal if one exists, otherwise the current
+  round. The manual **Advance** fallback still requires accepted evidence in the current
+  round. If a round expires with zero proofs, close the session and start a fresh one; there
+  is no re-key endpoint.
+- A closed session returns neither the current key nor pending state, and no further proof is
+  accepted.
 
-The student cascade that would hand the next key back to phones and have them retransmit
-is **not built**. Today the teacher advances waves manually and phones submit evidence for
-the live wave only. Scoring and the ID round remain future work.
+The teacher **Evidence** card is read-only: student email, round, recorded time and per-round
+counts, with `attendanceDecided: false`. It selects no key, signature, protocol version or
+device fingerprint. The teacher view returns the current key and pending signal only while
+the session is active, and a key-free history; students never receive key history.
+
+The cascade is **built and locally tested**, but it has **not** been measured in a physical
+classroom. Owner-reported phone runs are planning evidence, not measured results. Scoring and
+the ID round remain future work.
 
 ## Attendance, queries and reports
 
@@ -240,7 +258,7 @@ that is an assumption, not a measurement.
 | Admin passkeys and step-up | `attendance-backend/controllers/adminPasskeyController.js`, `utils/webauthn.js`, `utils/adminStepUp.js`, `middleware/adminStepUp.js` |
 | Audit hash chain and JWT rotation | `attendance-backend/utils/auditChain.js`, `utils/verifyJwt.js` |
 | Teacher check-in screen | `attendance-frontend/src/components/teacher/checkInSessions.jsx`, `checkInSessionView.js`, `SessionAttendanceModal.jsx` |
-| Student check-in shell | `attendance-frontend/src/components/student/studentCheckIn.jsx`, `studentCheckInView.js`, `src/acoustic/useCheckInAudio.js` |
+| Student check-in relay | `attendance-frontend/src/components/student/studentCheckIn.jsx`, `studentCheckInView.js`, `src/acoustic/useCheckInAudio.js`, `src/acoustic/useSignalTransmitter.js` |
 | Attendance, query, export, session and admin pages | `attendance-frontend/src/components/{attendance,queries,exports,sessions,admin}/` |
 | Shared shell and UI | `attendance-frontend/src/ui/`, `src/hooks/useRoleSession.js` |
 

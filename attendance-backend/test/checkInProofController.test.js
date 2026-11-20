@@ -22,6 +22,7 @@ const { ObjectId } = mongoose.Types;
 const staticSlots = {
   userFindById: [User, "findById"],
   sessionFindById: [CheckInSession, "findById"],
+  sessionFindOneAndUpdate: [CheckInSession, "findOneAndUpdate"],
   enrollmentExists: [Enrollment, "exists"],
   deviceRequestExists: [DeviceBindingRequest, "exists"],
   proofFindOne: [CheckInProof, "findOne"],
@@ -119,12 +120,26 @@ const installBase = ({ user, session, enrolled = true, pending = null, existing 
     state.authLookup = String(id);
     return user;
   });
+  state.sessionDoc = session ? { ...session } : null;
   mockStatic("sessionFindById", (id) => {
     state.sessionLookup = String(id);
     return {
       select: async (fields) => {
         state.sessionSelect = fields;
-        return session;
+        return state.sessionDoc;
+      },
+    };
+  });
+  mockStatic("sessionFindOneAndUpdate", (filter, update, options) => {
+    state.sessionUpdates.push({ filter, update, options });
+    const next = state.sessionDoc
+      ? { ...state.sessionDoc, ...(update?.$set || {}) }
+      : null;
+    state.sessionDoc = next;
+    return {
+      select: async (fields) => {
+        state.sessionUpdateSelect = fields;
+        return next;
       },
     };
   });
@@ -195,11 +210,13 @@ beforeEach(() => {
   state.deviceQueries = [];
   state.proofQueries = [];
   state.created = [];
+  state.sessionUpdates = [];
   state.proofId = new ObjectId();
   state.proofCreatedAt = new Date("2026-10-25T10:00:01.000Z");
   state.authLookup = null;
   state.sessionLookup = null;
   state.sessionSelect = null;
+  state.sessionUpdateSelect = null;
 });
 
 afterEach(() => {
@@ -228,18 +245,16 @@ testWithEnv("201 records the signed proof without deciding attendance or leaking
 
   assert.equal(result.status, 201);
   assert.equal(result.headers.get("cache-control"), "no-store");
-  assert.deepEqual(result.body, {
-    success: true,
-    recorded: true,
+  assert.equal(result.body.success, true);
+  assert.equal(result.body.recorded, true);
+  assert.equal(result.body.duplicate, false);
+  assert.equal(result.body.attendanceDecided, false);
+  assert.deepEqual(result.body.proof, {
+    id: String(state.proofId),
+    sessionId: String(session._id),
+    wave: session.wave,
+    recordedAt: state.proofCreatedAt.toISOString(),
     duplicate: false,
-    attendanceDecided: false,
-    proof: {
-      id: String(state.proofId),
-      sessionId: String(session._id),
-      wave: session.wave,
-      recordedAt: state.proofCreatedAt.toISOString(),
-      duplicate: false,
-    },
   });
   assert.deepEqual(Object.keys(result.body.proof).sort(), [
     "duplicate",
@@ -248,8 +263,31 @@ testWithEnv("201 records the signed proof without deciding attendance or leaking
     "sessionId",
     "wave",
   ]);
+
+  // A current-wave proof receives the server-minted next relay key.
+  assert.equal(result.body.next.wave, session.wave + 1);
+  assert.ok(Number.isInteger(result.body.next.key));
+  assert.notEqual(result.body.next.key, session.key);
+  assert.ok(result.body.next.keyExpiresAt);
+  assert.equal(state.sessionUpdates.length, 1);
+  assert.deepEqual(state.sessionUpdates[0].filter, {
+    _id: session._id,
+    status: "active",
+    wave: session.wave,
+    key: session.key,
+    $or: [
+      { pendingKey: null },
+      { pendingKeyExpiresAt: null },
+      { pendingKeyExpiresAt: { $lte: state.sessionUpdates[0].update.$set.pendingKeyIssuedAt } },
+      { pendingWave: { $ne: session.wave + 1 } },
+    ],
+  });
+  assert.equal(state.sessionUpdates[0].update.$set.pendingWave, session.wave + 1);
+  assert.equal(state.sessionUpdates[0].update.$set.pendingKey, result.body.next.key);
+  assert.equal(state.sessionUpdates[0].options.runValidators, true);
+  assert.match(state.sessionUpdateSelect, /pendingKey/);
+
   for (const forbidden of [
-    "key",
     "signature",
     "protocolVersion",
     "studentEmail",
@@ -258,6 +296,7 @@ testWithEnv("201 records the signed proof without deciding attendance or leaking
     assert.equal(Object.hasOwn(result.body.proof, forbidden), false, forbidden);
     assert.equal(result.text.includes(`"${forbidden}"`), false, forbidden);
   }
+  assert.equal(Object.hasOwn(result.body.proof, "key"), false);
   assert.equal(state.created.length, 1);
   assert.deepEqual(state.created[0], {
     session: session._id,
@@ -276,7 +315,56 @@ testWithEnv("201 records the signed proof without deciding attendance or leaking
     email: "student@nitjsr.ac.in",
     status: "active",
   });
-  assert.equal(state.sessionSelect, "courseClass status wave key keyExpiresAt");
+  assert.match(state.sessionSelect, /courseClass status wave key keyIssuedAt keyExpiresAt/);
+  assert.match(state.sessionSelect, /pendingWave pendingKey/);
+});
+
+testWithEnv("a pending-wave proof promotes the relay key and returns the next one", async () => {
+  const user = makeUser();
+  const issuedAt = new Date(Date.now() - 10_000);
+  const expiresAt = new Date(Date.now() + 60_000);
+  const session = makeSession({
+    wave: 0,
+    key: 42,
+    pendingWave: 1,
+    pendingKey: 43,
+    pendingKeyIssuedAt: issuedAt,
+    pendingKeyExpiresAt: expiresAt,
+  });
+  installBase({ user, session });
+  const signature = await sign({
+    sessionId: session._id,
+    wave: 1,
+    key: 43,
+    studentId: user._id,
+  });
+
+  const result = await postProof({
+    sessionId: session._id,
+    token: tokenFor(user),
+    body: { wave: 1, key: 43, signature },
+  });
+
+  assert.equal(result.status, 201);
+  assert.equal(result.body.proof.wave, 1);
+  assert.equal(result.body.next.wave, 2);
+  assert.ok(Number.isInteger(result.body.next.key));
+  assert.notEqual(result.body.next.key, 43);
+  assert.equal(state.created[0].wave, 1);
+  assert.equal(state.created[0].key, 43);
+
+  assert.equal(state.sessionUpdates.length, 2);
+  const promotion = state.sessionUpdates[0];
+  assert.equal(promotion.update.$set.wave, 1);
+  assert.equal(promotion.update.$set.key, 43);
+  assert.equal(promotion.update.$set.keyExpiresAt.getTime(), expiresAt.getTime());
+  assert.equal(promotion.update.$set.pendingWave, null);
+  assert.deepEqual(promotion.filter.pendingWave, 1);
+  assert.deepEqual(promotion.filter.pendingKey, 43);
+
+  const mint = state.sessionUpdates[1];
+  assert.equal(mint.update.$set.pendingWave, 2);
+  assert.equal(mint.update.$set.pendingKey, result.body.next.key);
 });
 
 testWithEnv("200 returns the same proof for an exact retry and does not create again", async () => {
@@ -309,6 +397,8 @@ testWithEnv("200 returns the same proof for an exact retry and does not create a
   assert.equal(result.body.attendanceDecided, false);
   assert.equal(result.body.proof.id, String(existing._id));
   assert.equal(result.body.proof.duplicate, true);
+  assert.equal(result.body.next.wave, session.wave + 1);
+  assert.ok(Number.isInteger(result.body.next.key));
   assert.equal(state.created.length, 0);
 });
 

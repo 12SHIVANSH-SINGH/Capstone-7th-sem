@@ -85,6 +85,10 @@ const buildInitialSession = ({ now = new Date(), key = mintKey(), keyTtlMs = KEY
     key,
     keyIssuedAt: startedAt,
     keyExpiresAt: new Date(startedAt.getTime() + keyTtlMs),
+    pendingWave: null,
+    pendingKey: null,
+    pendingKeyIssuedAt: null,
+    pendingKeyExpiresAt: null,
     startedAt,
     closedAt: null,
   };
@@ -101,15 +105,83 @@ const closeSessionState = (session, { now = new Date() } = {}) => {
     return {
       status: STATUS_CLOSED,
       closedAt: asDate(session.closedAt || now, "closedAt"),
+      pendingWave: null,
+      pendingKey: null,
+      pendingKeyIssuedAt: null,
+      pendingKeyExpiresAt: null,
     };
   }
-  return { status: STATUS_CLOSED, closedAt: asDate(now, "now") };
+  return {
+    status: STATUS_CLOSED,
+    closedAt: asDate(now, "now"),
+    pendingWave: null,
+    pendingKey: null,
+    pendingKeyIssuedAt: null,
+    pendingKeyExpiresAt: null,
+  };
+};
+
+/**
+ * A pending key is the server-minted next signal. It is handed only to a
+ * student whose proof for the current wave was accepted. It becomes current
+ * when a signed proof for that exact pending wave/key arrives.
+ */
+const pendingKeyIsFresh = (session, now = new Date()) => {
+  if (!session || session.status !== STATUS_ACTIVE) return false;
+  if (!Number.isInteger(session.pendingWave)) return false;
+  if (session.pendingWave !== session.wave + 1) return false;
+  if (!isValidKey(session.pendingKey)) return false;
+  const expiresAt = new Date(session.pendingKeyExpiresAt);
+  if (Number.isNaN(expiresAt.getTime())) return false;
+  return asDate(now, "now").getTime() < expiresAt.getTime();
+};
+
+/**
+ * Build the fields for the next relay key without mutating the session. The
+ * controller writes them only when no fresh pending key exists, so concurrent
+ * proofs keep one shared relay key.
+ */
+const buildPendingState = (
+  session,
+  { now = new Date(), key, keyTtlMs = KEY_TTL_MS } = {}
+) => {
+  if (!session || session.status !== STATUS_ACTIVE) {
+    throw new TypeError("session must be active to mint a pending key.");
+  }
+  if (!Number.isInteger(session.wave) || session.wave < 0 || session.wave >= MAX_WAVE) {
+    throw new RangeError("session wave cannot advance further.");
+  }
+  if (!isValidKey(session.key)) {
+    throw new TypeError("session key is not valid.");
+  }
+  if (!Number.isFinite(keyTtlMs) || keyTtlMs <= 0) {
+    throw new RangeError("keyTtlMs must be a positive number.");
+  }
+
+  const nextKey = key === undefined ? mintDistinctKey(session.key) : key;
+  if (!isValidKey(nextKey)) {
+    throw new RangeError(`key must be an integer from 0 to ${MAX_KEY_VALUE}.`);
+  }
+  if (nextKey === session.key) {
+    throw new RangeError("the next key must differ from the current key.");
+  }
+
+  const issuedAt = asDate(now, "now");
+  return {
+    pendingWave: session.wave + 1,
+    pendingKey: nextKey,
+    pendingKeyIssuedAt: issuedAt,
+    pendingKeyExpiresAt: new Date(issuedAt.getTime() + keyTtlMs),
+  };
 };
 
 /**
  * Move an active session to the next wave. The old key is archived (without
- * growing past maxHistory) and the new key gets a fresh lifetime. The caller
- * decides whether the current wave earned advancement; this helper is pure.
+ * growing past maxHistory) and the new key is either the fresh pending relay
+ * key or a newly minted one. Promoting a pending key keeps its original
+ * lifetime: students already received that key, so promotion must not extend
+ * it. The caller decides whether the current wave earned advancement; this
+ * helper is pure.
  */
 const advanceSessionState = (
   session,
@@ -118,6 +190,7 @@ const advanceSessionState = (
     key,
     keyTtlMs = KEY_TTL_MS,
     maxHistory = MAX_KEY_HISTORY,
+    preferPending = true,
   } = {}
 ) => {
   if (!session || session.status !== STATUS_ACTIVE) {
@@ -136,15 +209,30 @@ const advanceSessionState = (
     throw new RangeError("maxHistory must be a positive integer.");
   }
 
-  const nextKey = key === undefined ? mintDistinctKey(session.key) : key;
-  if (!isValidKey(nextKey)) {
-    throw new RangeError(`key must be an integer from 0 to ${MAX_KEY_VALUE}.`);
-  }
-  if (nextKey === session.key) {
-    throw new RangeError("the next key must differ from the current key.");
+  const usePending =
+    preferPending &&
+    pendingKeyIsFresh(session, now) &&
+    (key === undefined || key === session.pendingKey);
+
+  let nextKey;
+  let issuedAt;
+  let expiresAt;
+  if (usePending) {
+    nextKey = session.pendingKey;
+    issuedAt = asDate(session.pendingKeyIssuedAt, "pendingKeyIssuedAt");
+    expiresAt = asDate(session.pendingKeyExpiresAt, "pendingKeyExpiresAt");
+  } else {
+    nextKey = key === undefined ? mintDistinctKey(session.key) : key;
+    if (!isValidKey(nextKey)) {
+      throw new RangeError(`key must be an integer from 0 to ${MAX_KEY_VALUE}.`);
+    }
+    if (nextKey === session.key) {
+      throw new RangeError("the next key must differ from the current key.");
+    }
+    issuedAt = asDate(now, "now");
+    expiresAt = new Date(issuedAt.getTime() + keyTtlMs);
   }
 
-  const issuedAt = asDate(now, "now");
   const previous = {
     wave: session.wave,
     key: session.key,
@@ -158,8 +246,13 @@ const advanceSessionState = (
     wave: session.wave + 1,
     key: nextKey,
     keyIssuedAt: issuedAt,
-    keyExpiresAt: new Date(issuedAt.getTime() + keyTtlMs),
+    keyExpiresAt: expiresAt,
     keyHistory: history.slice(-maxHistory),
+    pendingWave: null,
+    pendingKey: null,
+    pendingKeyIssuedAt: null,
+    pendingKeyExpiresAt: null,
+    promotedFromPending: usePending,
   };
 };
 
@@ -233,22 +326,48 @@ const keyHistoryView = (session) => {
 };
 
 /**
- * Teachers need the current key to play it. Students receive only the wave and
- * lifetime: a student gets the next key by proving they heard the current one,
- * which is the next slice.
+ * The pending relay signal is teacher-visible so the owner can Boost a stalled
+ * cascade. It is never part of the student session view; a student receives it
+ * only in the response to an accepted proof.
  */
-const toTeacherSession = (session, { now = new Date() } = {}) => ({
-  ...baseView(session, now),
-  key: session.key,
-  waveHistory: keyHistoryView(session),
-  teacherLocation: session.teacherLocation ? {
-    latitude: session.teacherLocation.latitude,
-    longitude: session.teacherLocation.longitude,
-    accuracy: session.teacherLocation.accuracy ?? null,
-    capturedAt: asIsoString(session.teacherLocation.capturedAt),
-    source: session.teacherLocation.source || "unknown",
-  } : null,
-});
+const pendingSignalView = (session, now = new Date()) => {
+  if (!session || session.pendingWave === null || session.pendingWave === undefined) {
+    return null;
+  }
+  if (!Number.isInteger(session.pendingWave) || !isValidKey(session.pendingKey)) {
+    return null;
+  }
+  return {
+    wave: session.pendingWave,
+    key: session.pendingKey,
+    keyIssuedAt: asIsoString(session.pendingKeyIssuedAt),
+    keyExpiresAt: asIsoString(session.pendingKeyExpiresAt),
+    keyExpired: !pendingKeyIsFresh(session, now),
+  };
+};
+
+/**
+ * Teachers need the current key to play it. Students receive only the wave and
+ * lifetime: a student gets the next key by proving they heard the current one.
+ * A closed session exposes neither key: the cascade is over and a response
+ * must not hand out a signal that no longer has a live wave.
+ */
+const toTeacherSession = (session, { now = new Date() } = {}) => {
+  const active = session.status === STATUS_ACTIVE;
+  return {
+    ...baseView(session, now),
+    key: active ? session.key : null,
+    pending: active ? pendingSignalView(session, now) : null,
+    waveHistory: keyHistoryView(session),
+    teacherLocation: session.teacherLocation ? {
+      latitude: session.teacherLocation.latitude,
+      longitude: session.teacherLocation.longitude,
+      accuracy: session.teacherLocation.accuracy ?? null,
+      capturedAt: asIsoString(session.teacherLocation.capturedAt),
+      source: session.teacherLocation.source || "unknown",
+    } : null,
+  };
+};
 
 const toStudentSession = (session, { now = new Date() } = {}) => baseView(session, now);
 
@@ -269,9 +388,12 @@ module.exports = {
   mintDistinctKey,
   buildInitialSession,
   closeSessionState,
+  pendingKeyIsFresh,
+  buildPendingState,
   advanceSessionState,
   keyIsFresh,
   keyHistoryView,
+  pendingSignalView,
   toTeacherSession,
   toStudentSession,
 };

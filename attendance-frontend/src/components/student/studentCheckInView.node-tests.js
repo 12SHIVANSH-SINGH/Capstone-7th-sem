@@ -69,6 +69,8 @@ test("the Join gate checks device, session, expiry and consent in order", () => 
     view.joinBlockReason({ session: null, deviceStatus: "approved", consent: true, now }),
     "no-session"
   );
+  // The displayed round can expire while a peer's fresh relay signal is still
+  // arriving. The server decides freshness; Join stays open for a live session.
   assert.equal(
     view.joinBlockReason({
       session: live,
@@ -76,7 +78,7 @@ test("the Join gate checks device, session, expiry and consent in order", () => 
       consent: true,
       now: new Date("2026-10-28T12:02:00.000Z"),
     }),
-    "expired"
+    null
   );
   assert.equal(
     view.joinBlockReason({ session: live, deviceStatus: "approved", consent: false, now }),
@@ -100,6 +102,77 @@ test("decoded keys use the same bounds as the proof transport", () => {
   assert.equal(view.isDecodedKey(15 ** 7), false);
   assert.equal(view.isDecodedKey(1.5), false);
   assert.equal(view.isDecodedKey("42"), false);
+});
+
+test("proof wave candidates include the local round and the next two", () => {
+  assert.deepEqual(view.proofWaveCandidates(0), [0, 1, 2]);
+  assert.deepEqual(view.proofWaveCandidates(5), [5, 6, 7]);
+  assert.deepEqual(view.proofWaveCandidates(0, { span: 0 }), [0]);
+  assert.deepEqual(view.proofWaveCandidates(1_000_000, { span: 1 }), [1_000_000]);
+  assert.deepEqual(view.proofWaveCandidates(-1), []);
+  assert.deepEqual(view.proofWaveCandidates(1.5), []);
+});
+
+test("the next relay signal is accepted only when it is a real key and wave", () => {
+  const next = view.nextSignalFromResponse({
+    next: {
+      wave: 3,
+      key: 98765,
+      keyIssuedAt: "2026-10-28T12:01:00.000Z",
+      keyExpiresAt: "2026-10-28T12:03:00.000Z",
+    },
+  });
+  assert.deepEqual(next, {
+    wave: 3,
+    key: 98765,
+    keyIssuedAt: "2026-10-28T12:01:00.000Z",
+    keyExpiresAt: "2026-10-28T12:03:00.000Z",
+  });
+  assert.equal(view.nextSignalFromResponse({ next: { wave: 3, key: -1 } }), null);
+  assert.equal(view.nextSignalFromResponse({ next: { wave: -1, key: 2 } }), null);
+  assert.equal(view.nextSignalFromResponse({ next: { wave: 1, key: "42" } }), null);
+  assert.equal(view.nextSignalFromResponse({ next: null }), null);
+  assert.equal(view.nextSignalFromResponse(null), null);
+  assert.equal(view.nextSignalFromResponse({}), null);
+
+  assert.equal(
+    view.signalIsFresh(next, new Date("2026-10-28T12:02:59.999Z")),
+    true
+  );
+  assert.equal(view.signalIsFresh(next, new Date("2026-10-28T12:03:00.000Z")), false);
+  assert.equal(view.signalRemainingMs(next, new Date("2026-10-28T12:02:00.000Z")), 60000);
+});
+
+test("consent is remembered for one session and invalidated by a new one", () => {
+  const values = new Map();
+  const storage = {
+    getItem: (key) => (values.has(key) ? values.get(key) : null),
+    setItem: (key, value) => values.set(key, String(value)),
+    removeItem: (key) => values.delete(key),
+  };
+
+  assert.equal(view.readCheckInConsent(storage, "session-1"), false);
+  assert.equal(view.writeCheckInConsent(storage, "session-1"), true);
+  assert.equal(view.readCheckInConsent(storage, "session-1"), true);
+  assert.equal(view.readCheckInConsent(storage, "session-2"), false);
+  assert.equal(view.writeCheckInConsent(storage, "session-2"), true);
+  assert.equal(view.readCheckInConsent(storage, "session-2"), true);
+  assert.equal(view.readCheckInConsent(storage, "session-1"), false);
+  assert.equal(view.readCheckInConsent(storage, "session-2", "old-version"), false);
+
+  const broken = {
+    getItem: () => "{not json",
+    setItem: () => {
+      throw new Error("quota");
+    },
+    removeItem: () => {
+      throw new Error("blocked");
+    },
+  };
+  assert.equal(view.readCheckInConsent(broken, "session-1"), false);
+  assert.equal(view.writeCheckInConsent(broken, "session-1"), false);
+  assert.equal(view.clearCheckInConsent(broken), false);
+  assert.equal(view.readCheckInConsent(null, "session-1"), false);
 });
 
 test("a new proof becomes an evidence view without exposing the key", () => {

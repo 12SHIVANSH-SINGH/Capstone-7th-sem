@@ -37,7 +37,7 @@ the signed proof is submitted.
 | One device per student + teacher approval queue | ✅ working |
 | "Sound lab" page that tests a phone's speaker and microphone | ✅ working |
 | Modern responsive UI, dark theme and installable web shell | ✅ done; service worker/offline shell verified in a production build |
-| Teacher check-in sessions + signed evidence | ✅ session core, teacher screen, student discovery, rehearsal enrollment, student shell, evidence-gated wave advancement and teacher evidence view built |
+| Teacher check-in sessions + signed evidence | ✅ session core, one-tap teacher start with round-0 playback, student discovery, rehearsal enrollment, consent-gated student relay, server-minted pending-key cascade, evidence-gated manual fallback and teacher evidence view built locally; physical cascade rehearsal pending |
 | Teacher-confirmed attendance register | ✅ mark present/absent/excused, finalise, edit with an audit note, inspect evidence and query history |
 | Attendance queries | ✅ 24-hour window after session close, location/time evidence, approve/reject/reopen with audit; approved queries count as present |
 | Analytics, exports and supporting pages | ✅ per-class/per-student analytics, trends, session history, PDF/Excel exports, notifications, timetable, profile and help |
@@ -45,14 +45,14 @@ the signed proof is submitted.
 | Super-admin console | ✅ users/classes/sessions, settings, audit with hash-chain verification, overrides/deletion, impersonation; `SUPER_ADMIN_EMAILS` is an environment grant and works in production; demo seed/reset is development-only |
 | Admin security | ✅ passkey step-up for destructive actions (five-minute approval cookie), teacher-approved first/replacement devices, revocable sessions, strict CSP and SHA-256 audit chain |
 | Live phone-to-phone tone test | ⚠️ 1 m 10/10, 2 m 9/10, 3 m 9/10, **5 m 4/10**, **10 m 1/10** (2026-10-25 sweep); reverse direction and muted control unmeasured; gate not measured as met |
-| Full flow on real phones | ⏳ attendance is teacher-confirmed and the local browser flow works end to end; a real-phone/Google multi-wave rehearsal, measured acoustic range, the student cascade, automatic scoring and the ID round are still pending |
+| Full flow on real phones | ⏳ attendance is teacher-confirmed and the local browser flow works end to end; a real-phone/Google phone-to-phone cascade rehearsal, measured acoustic range, automatic scoring and the ID round are still pending |
 
 This is a demo-ready capstone prototype — not yet used for real attendance. The repository's
-`HEAD`, `origin/main` and `origin/HEAD` are `433d522` (a `.gitleaksignore`-only commit over
-`8d2e873`), which includes the attendance/query/admin layer, the P0/P1 security hardening and
-the committed A2a timetable PDF text preview. The live
-service is reachable and serves A2a UI strings, but its exact deployed commit has not been
-checked in the Render dashboard. The click-level deployed test run is
+`HEAD`, `origin/main` and `origin/HEAD` are `80dc2e1`, which includes the
+attendance/query/admin layer, the P0/P1 security hardening and the committed A2a timetable PDF
+text preview. The phone-to-phone cascade changes are **uncommitted in the working tree**. The
+live service was last observed serving A2a UI strings, but its exact deployed commit has not
+been checked in the Render dashboard. The click-level deployed test run is
 [`testing-plan.md`](testing-plan.md).
 
 ## Learn more

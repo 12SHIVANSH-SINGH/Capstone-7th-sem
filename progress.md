@@ -3,10 +3,9 @@
 Update this at the end of every session. If it disagrees with the real code, the code wins:
 fix this file and tell the owner.
 
-Last updated: **2026-11-11** (session 29: newcomer reading-order and testing-setup guide;
-session 28 reconciled current-state commits and completed the deployed-test-plan accuracy
-pass; backend **255/255** and frontend **96/96** remain the last recorded gate before these
-documentation/tooling sessions).
+Last updated: **2026-11-20** (session 30: phone-to-phone cascade — server pending keys,
+atomic promotion, automatic student relay and one-click teacher start; backend **262/262**
+and frontend **102/102**; the physical cascade rehearsal is still pending).
 
 ## Status
 
@@ -24,6 +23,14 @@ documentation/tooling sessions).
   A2a never parses rows, matches classes, creates a class or writes a slot. Structured
   timetable import (A2b), local OCR (A3) and consent-gated Gemini extraction (A4) are not
   built. Scoring, automatic attendance decisions and the ID round are not built.
+- **Phone-to-phone cascade:** built locally and **uncommitted**. A valid proof for the current
+  round mints a server-side pending next key and returns it to the proving phone; a valid proof
+  for the pending round atomically promotes that key and mints the following one. Every
+  accepted or duplicate proving phone relays the returned signal three times, then listens
+  again. The teacher screen starts and plays round 0 in one tap, stops old audio when the
+  server advances, and keeps an evidence-gated manual Advance plus a fresh-pending Nudge as
+  fallbacks. Zero-proof expiry recovery is close and start fresh. No physical cascade
+  rehearsal has been run; owner-reported classroom attempts are planning evidence only.
 - **Deployed test plan:** [`docs/testing-plan.md`](docs/testing-plan.md) is the click-level
   execution script for the 4-phone/3–4-laptop run. It covers acoustic range and controls, the
   signed attendance/query flow on Render with real college accounts, device/passkey/admin
@@ -57,21 +64,20 @@ documentation/tooling sessions).
 - **Device binding:** a student's first browser and every changed browser now enter the
   teacher device-review queue; only dev/test personas auto-approve. Replacing an approved
   device bumps `tokenVersion`, so the old session cannot submit proofs.
-- **Repository state:** local `HEAD`, `origin/main` and `origin/HEAD` are all **`433d522`**,
-  a `.gitleaksignore`-only commit over `8d2e873` (the docs/test-plan commit). The A1 roster PDF
-  slice, A2a timetable text preview, P0/P1 security, PWA and dark-mode work are committed and
-  pushed; `003f900` was the earlier product commit. The earlier `32a2078`/“A2a uncommitted”
-  claims were stale and were corrected in session 27. The live service is reachable:
-  `/api/v1/health/ready` returned ready with the database connected, and `main.14c6a1a8.js`
-  contained A2a UI strings
-  (“Timetable PDF text preview”, “Import PDF text”). The exact deployed commit was **not
-  compared with the Render dashboard**, so G2 of the test plan remains open. No push, tag,
-  merge or deploy was performed in this session.
+- **Repository state:** local `HEAD`, `origin/main` and `origin/HEAD` are all **`80dc2e1`**
+  (“doc push”), on top of `433d522`. The A1 roster PDF slice, A2a timetable text preview,
+  P0/P1 security, PWA and dark-mode work are committed and pushed. The phone-to-phone cascade
+  changes are **uncommitted in the working tree** and have not been pushed. The live service
+  was last observed serving A2a strings; the exact deployed commit was **not compared with
+  the Render dashboard**, so G2 of the test plan remains open. No push, tag, merge or deploy
+  was performed in this session.
 - **Next action:** execute [`docs/testing-plan.md`](docs/testing-plan.md) in order. First pass
-  G0–G7, especially G2 (owner compares the Render dashboard commit with `433d522`) and G5
-  (Atlas URI, passphrase, `mongodump`/`mongorestore` and scratch-database permission). If G2
-  fails, stop signed testing. If G5 fails, mark the restore suite **BLOCKED** and do not claim
-  restore coverage. Then run AC → FL → AD → PDF → DP/RS. Only after that, and only when
+  G0–G7, especially G2 (owner compares the Render dashboard commit with `80dc2e1` plus the
+  uncommitted cascade if it is published) and G5 (Atlas URI, passphrase,
+  `mongodump`/`mongorestore` and scratch-database permission). If G2 fails, stop signed
+  testing. If G5 fails, mark the restore suite **BLOCKED** and do not claim restore coverage.
+  Then run AC → FL → AD → PDF → DP/RS; FL now exercises the automatic cascade, a fresh-pending
+  promotion, the manual fallback and zero-proof recovery. Only after that, and only when
   representative timetable PDFs exist, build **A2b structured timetable parsing**: match rows
   to existing owned classes, show a slot preview, require teacher confirmation and flag
   unmatched rows for manual class creation. Do not invent timetable layouts. Local OCR (A3)
@@ -91,9 +97,9 @@ documentation/tooling sessions).
 | Roster PDF text extraction → editable preview | ✅ built and tested with generated PDF fixtures; no auto-save; scanned OCR and real-college layouts unvalidated |
 | Timetable PDF text extraction → read-only preview | ✅ built and tested with generated PDF fixtures; never parses rows, creates classes or writes slots; real timetable layouts unvalidated |
 | Structured timetable import, local OCR, Gemini extraction | ⛔ not built / gated |
-| Check-in sessions, wave keys, teacher check-in screen | ✅ built and tested |
+| Check-in sessions, wave keys, one-click teacher start | ✅ built and tested |
 | Signed proof transport, student discovery, student check-in shell | ✅ built and tested; evidence only |
-| Evidence-gated wave advancement and bounded key history | ✅ built and tested |
+| Server-minted pending-key cascade, atomic promotion, automatic student relay and manual advance fallback | ✅ built and locally tested; physical rehearsal pending |
 | Teacher evidence view and session history | ✅ built and tested |
 | Teacher-confirmed register, finalisation, edits and audit | ✅ built and browser-smoke-tested |
 | 24-hour student queries with optional location evidence | ✅ built and browser-smoke-tested |
@@ -104,24 +110,24 @@ documentation/tooling sessions).
 | Admin passkey step-up, audit hash chain, export limits and readiness | ✅ built and browser-E2E-tested |
 | Demo seed/reset (`@demo.invalid`) | ✅ development only; 404 in production |
 | PWA manifest, service worker, offline shell, dark theme and overflow-aware navigation | ✅ production build verified |
-| Student cascade, automatic scoring, ID round, mobile app | ⛔ not built / gated |
+| Automatic scoring, ID round, mobile app | ⛔ not built / gated |
 | Deployed manual test plan + synthetic PDF fixtures | ✅ plan written; generator verified (`roster`/`timetable` text layers true, `no-text-layer` false); execution pending |
-| Real Google + physical-phone multi-wave rehearsal | ⏳ pending; the deployed test plan is the execution script |
+| Real Google + physical-phone phone-to-phone cascade rehearsal | ⏳ pending; the deployed test plan is the execution script |
 
 ## Tests
 
 | Gate | Result |
 | --- | --- |
-| Backend (`npm test`) | **255/255** |
-| Backend (`npm test -- --test-isolation=none`) | **255/255** |
+| Backend (`npm test`) | **262/262** |
+| Backend (`npm test -- --test-isolation=none`) | **262/262** |
 | Proof transport | **15/15** |
 | Acoustic (codec, lab, worklets, TX/RX link) | **51/51** |
-| Teacher check-in view | **7/7** |
-| Student check-in view | **9/9** |
+| Teacher check-in view | **10/10** |
+| Student check-in view | **12/12** |
 | Auth routing | **2/2** |
 | Roster PDF import helpers | **6/6** |
 | Timetable PDF import helpers | **6/6** |
-| Frontend total | **96/96** |
+| Frontend total | **102/102** |
 | Synthetic PDF fixture generator | ✅ `roster-text-layer.pdf` and `timetable-text-layer.pdf` extract text; `no-text-layer.pdf` reports no text layer |
 | Production build | ✅ compiles successfully (`CI=true REACT_APP_API_URL=/api/v1 npm run build`) |
 | Browser smoke (dev) | **65/65** |
@@ -139,9 +145,9 @@ documentation/tooling sessions).
 The browser smokes used temporary browser harnesses outside the repo's npm test commands.
 The backend suite covers auth policy, controllers, middleware, startup, env guards, origin
 guard, cookies, rate limits, rosters, roster/timetable PDF text reconstruction and upload
-previews, device binding, session core, wave advancement, proof transport, teacher evidence,
-student discovery, rehearsal enrollment, super-admin access, WebAuthn step-up, audit-chain
-integrity, export auditing, readiness and JWT rotation.
+previews, device binding, session core, pending-key cascade and promotion, proof transport,
+teacher evidence, student discovery, rehearsal enrollment, super-admin access, WebAuthn
+step-up, audit-chain integrity, export auditing, readiness and JWT rotation.
 
 ## Layer 1 measurements
 
@@ -193,8 +199,13 @@ build planning only; never call the physical gate measured-passed.
 - **Real-device rehearsal:** the student shell and teacher flow were browser-smoke-tested
   with a JWT cookie and, for the student shell, fake audio. No real Google sign-in or physical
   phone has exercised the full multi-wave flow.
-- **Student cascade:** not built. Waves advance only by explicit teacher action; phones do
-  not receive or retransmit the next key.
+- **Physical cascade rehearsal:** the relay is built and locally tested, but no real classroom
+  run has measured how many phones reach each round or how long relay takes. Owner-reported
+  classroom attempts are accepted for planning only and are not measured evidence. The
+  "lowest wave heard" join rule is still not built.
+- **Known UI audit items (not fixed in this slice):** `SessionAttendanceModal` still has
+  proof-loading and note-edit issues, and the dashboard Register deep link does not open the
+  intended session register directly.
 - **Scoring and ID round:** not built and still gated.
 - **Device-binding retention:** bindings persist indefinitely while proof evidence is TTL'd
   after about one day. Decide whether bindings should follow the same retention.
@@ -232,6 +243,7 @@ build planning only; never call the physical gate measured-passed.
 
 | Date | What changed | Result |
 | --- | --- | --- |
+| 2026-11-20 | Phone-to-phone cascade: pending-key fields and atomic promotion on the proof path, `next` in accepted/duplicate responses, lifetime preservation, closed-session key redaction, one-click teacher start with round-0 playback, fresh-pending Nudge and evidence-gated manual advance fallback, automatic student relay with persisted per-session consent, and the reusable `useSignalTransmitter` hook. Docs reconciled to the new flow. | Backend **262/262** in both modes; frontend **102/102**; production build green. Physical cascade rehearsal not run. Changes are uncommitted; no push. |
 | 2026-11-11 | Added `docs/reading-order.md`: a plain-language path from the idea and honest limits, through local setup and the deployed test sequence, to a file-by-file code-reading order. Linked it from the root README and docs index. | Documentation only; no product code changed. Structural checks passed (diff whitespace, fenced blocks, table columns, relative links). |
 | 2026-11-10 | Reconciled every current-state commit reference to `433d522`, the `.gitleaksignore`-only commit over docs commit `8d2e873`; completed the click-level accuracy pass on FL wave sequencing, AD step-up paths, PDF preview controls, AC receiver transfer and the zero-proof key-expiry recovery. | Documentation only; no product code changed. Structural checks passed (diff whitespace, fenced blocks, table columns, relative links). G2 (live commit) and G5 (restore prerequisites) remain hard gates. |
 | 2026-11-09 | Wrote `docs/testing-plan.md` for the deployed 4-phone/3–4-laptop run, added a synthetic text-layer/no-text PDF fixture generator, and reconciled stale `32a2078`/“A2a uncommitted” claims across the status docs. The live service answered health/readiness and its bundle contained A2a strings; the exact Render commit was not compared with the dashboard. | Documentation/tooling only; generator verified both text-layer PDFs and the no-text rejection. No product tests were changed. G2 (live commit) and G5 (restore prerequisites) remain hard gates before signed testing. |

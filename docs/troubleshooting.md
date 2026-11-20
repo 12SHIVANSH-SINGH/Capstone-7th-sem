@@ -154,22 +154,30 @@ Cloudflare quick tunnels get a new random URL each run and die when the laptop s
 the command stops. Re-run `cloudflared tunnel --url http://localhost:3000` and use the new
 link.
 
-**"Advance wave" is disabled or returns 409**
-The current wave has no accepted evidence yet, the session is closed, or another tab
-advanced first. Keep the current key playing, confirm a phone submitted, and reload before
-retrying. Advance only after phones have had time to submit.
+**"Advance round" is disabled or returns 409**
+The current round has no accepted evidence yet, the session is closed, or another tab
+advanced first. Normal advancement comes from an accepted proof for the pending round; this
+button is only the manual fallback. Confirm a phone submitted, then retry. With an expired
+round and zero evidence, close the check-in and start a new one.
 
 **The evidence card is empty**
 Evidence is per session. Confirm the teacher screen is showing the live session (or the
 correct closed session from history), the student joined after the session started, and
 their account is on the class roster with an approved device. Exact retries do not add a
-second row. A phone still listening for an old key is refused.
+second row. A frame from a round outside the server's current/pending pair is refused.
 
-**The student page says the key expired or the wave changed**
-A wave key lives two minutes. If at least one phone already submitted evidence for that wave,
-ask the teacher to advance to a new wave, then tap **Join** again. If the wave has no evidence
-at all, the teacher cannot advance it because advance is gated on a proof: close the session
-and start a new one. The old frame is deliberately rejected.
+**The student page says the key expired or the round changed**
+A round key lives two minutes. The student should keep the page open and keep listening: a
+phone that already received the next signal may still relay it, and no second Join is needed
+when the round changes. If nothing arrives, ask the teacher to tap **Nudge the class** (fresh
+pending signal) or **Play this round**. If the round has no evidence at all, the teacher cannot
+advance it; close the check-in and start a new one. A stale frame is deliberately rejected.
+
+**A student phone is not relaying the next signal**
+Check that the page is visible, media volume is up, and the browser is current Chrome on
+Android over HTTPS. The proof response only contains `next` after an accepted or duplicate
+proof; a 400/409 means the phone guessed a round the server does not accept. The phone should
+keep listening rather than ask for another Join.
 
 **The register is missing a student**
 Only active roster rows become attendance rows. Check the roster and enrollment status,

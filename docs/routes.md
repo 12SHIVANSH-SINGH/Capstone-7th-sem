@@ -39,10 +39,10 @@ then checks `/islogin`; the access column describes where the page sends you.
 | `/` | Public | Product landing page. A signed-in visitor gets a role-aware dashboard action instead of sign-in links. |
 | `/login` | Public | Google sign-in and, in development only, one-click dev personas. An existing session is redirected to its dashboard. |
 | `/student-dashboard` | Student | Student home: device-binding state, live-session card, check-in and sound-lab actions. A teacher is redirected to `/teacher-dashboard`; signed-out visitors go to `/login`. |
-| `/student/check-in` | Student | Consent-gated microphone capture. Decodes the current wave locally, signs the session/wave/key proof with the bound device key, and shows the recorded-evidence card. Never displays the key. |
+| `/student/check-in` | Student | Consent-gated relay. Join once, decode a round locally, sign the session/wave/key proof with the bound device key, play the server-minted next signal after acceptance, then listen again. Survives round changes and reloads without a second Join. Never displays the key. |
 | `/teacher-dashboard` | Teacher | Teacher home: class/student counts, device-review queue, quick actions. Non-teachers are redirected. |
 | `/teacher/classes` | Teacher | Rooms, classes, CSV/paste roster preview/save, text-based PDF roster extraction and the device approval queue. |
-| `/teacher/check-in` | Teacher | Start/close a check-in session, show the live two-minute key, advance a wave after evidence, open the transmitter, inspect live evidence and history. |
+| `/teacher/check-in` | Teacher | Start a session and play round 0 in one tap, show the live two-minute key and pending next signal, stop/play sound, nudge with a fresh pending signal, use an evidence-gated manual advance fallback, inspect live evidence and history, and close the session. |
 | `/teacher/sessions` | Staff | Closed-session history, registers, attendance edits and the teacher audit log. A super-admin sees every teacher's sessions and can open any register. |
 | `/attendance` | Signed in | Analytics. A student sees their own percentages and sessions; a teacher sees class overviews and per-student detail; a super-admin can switch across classes. |
 | `/queries` | Signed in | Students raise and track 24-hour queries; teachers review, approve, reject and reopen; a super-admin sees every query. |
@@ -105,11 +105,11 @@ then checks `/islogin`; the access column describes where the page sends you.
 | POST | `/classes/:classId/check-in-sessions` | Teacher | Start a session at wave 0 and mint the first two-minute key. One active session per class. |
 | GET | `/classes/:classId/check-in-sessions/active` | Student | Read the live session for one class the student is enrolled in; returns no key. |
 | GET | `/student/check-in-sessions/active` | Student | Discover all live sessions across the student's active enrollments; returns no key. |
-| POST | `/check-in-sessions/:sessionId/proofs` | Student, 60/min | Submit a signed session/wave/key proof as **evidence only**. Idempotent per student/wave; pending device changes are blocked. |
+| POST | `/check-in-sessions/:sessionId/proofs` | Student, 60/min | Submit a signed session/wave/key proof as **evidence only**. Accepts the current or pending round; a valid or duplicate proof can return the server-minted `next` relay signal. Idempotent per student/wave; pending device changes are blocked. |
 | GET | `/check-in-sessions/:sessionId/proofs` | Teacher | Read-only evidence rows and per-wave counts. No key, signature, protocol version or fingerprint; `attendanceDecided: false`. |
 | GET | `/check-in-sessions/:sessionId/queries` | Teacher | Queries attached to one session. |
-| GET | `/check-in-sessions/:sessionId` | Teacher | Read session state, current key for the owner and key-free wave history. |
-| POST | `/check-in-sessions/:sessionId/advance` | Teacher | Advance only after the current wave has accepted evidence; archive the old key in bounded history and mint a fresh key. |
+| GET | `/check-in-sessions/:sessionId` | Teacher | Read session state, current key and pending signal for the owner and key-free wave history. A closed session returns neither key nor pending state. |
+| POST | `/check-in-sessions/:sessionId/advance` | Teacher | Manual fallback: advance only after the current wave has accepted evidence. Promote a fresh pending key with its original expiry, or archive the old key in bounded history and mint a fresh one. |
 | POST | `/check-in-sessions/:sessionId/close` | Teacher | Close the session and stop accepting proofs. Idempotent. |
 | POST | `/check-in-sessions/:sessionId/location` | Student | Attach an optional one-shot check-in location to the student's session attempt. A denied permission never blocks a proof. |
 

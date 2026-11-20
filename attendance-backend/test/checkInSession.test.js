@@ -41,6 +41,10 @@ test("a new session starts active at wave 0 with a fresh two-minute key", () => 
   assert.equal(state.keyExpiresAt.toISOString(), "2026-10-24T12:02:00.000Z");
   assert.equal(state.startedAt.toISOString(), "2026-10-24T12:00:00.000Z");
   assert.equal(state.closedAt, null);
+  assert.equal(state.pendingWave, null);
+  assert.equal(state.pendingKey, null);
+  assert.equal(state.pendingKeyIssuedAt, null);
+  assert.equal(state.pendingKeyExpiresAt, null);
   assert.equal(core.keyIsFresh(state, now), true);
 });
 
@@ -136,6 +140,99 @@ test("advancing refuses closed sessions, the wave ceiling and a repeated key", (
   );
 });
 
+test("a pending relay key is minted once and keeps its lifetime when promoted", () => {
+  const now = new Date("2026-10-24T12:00:00.000Z");
+  const session = {
+    ...core.buildInitialSession({ now, key: 42 }),
+    wave: 3,
+    key: 555,
+    keyHistory: [],
+  };
+
+  const pending = core.buildPendingState(session, { now, key: 777 });
+  assert.deepEqual(pending, {
+    pendingWave: 4,
+    pendingKey: 777,
+    pendingKeyIssuedAt: new Date("2026-10-24T12:00:00.000Z"),
+    pendingKeyExpiresAt: new Date("2026-10-24T12:02:00.000Z"),
+  });
+
+  const withPending = { ...session, ...pending };
+  assert.equal(core.pendingKeyIsFresh(withPending, now), true);
+  assert.equal(
+    core.pendingKeyIsFresh(withPending, new Date("2026-10-24T12:02:00.000Z")),
+    false,
+    "the pending key expires at its original instant"
+  );
+
+  // Promotion happens after the pending key was already handed to phones.
+  // It must not restart or extend that key's two-minute lifetime.
+  const promoted = core.advanceSessionState(withPending, {
+    now: new Date("2026-10-24T12:01:15.000Z"),
+  });
+  assert.equal(promoted.wave, 4);
+  assert.equal(promoted.key, 777);
+  assert.equal(promoted.keyIssuedAt.toISOString(), "2026-10-24T12:00:00.000Z");
+  assert.equal(promoted.keyExpiresAt.toISOString(), "2026-10-24T12:02:00.000Z");
+  assert.equal(promoted.promotedFromPending, true);
+  assert.equal(promoted.pendingWave, null);
+  assert.equal(promoted.pendingKey, null);
+  assert.deepEqual(promoted.keyHistory.at(-1), {
+    wave: 3,
+    key: 555,
+    keyIssuedAt: new Date("2026-10-24T12:00:00.000Z"),
+    keyExpiresAt: new Date("2026-10-24T12:02:00.000Z"),
+  });
+});
+
+test("an expired pending key falls back to a fresh manual key", () => {
+  const now = new Date("2026-10-24T12:00:00.000Z");
+  const session = {
+    ...core.buildInitialSession({ now, key: 42 }),
+    wave: 3,
+    key: 555,
+    keyHistory: [],
+    pendingWave: 4,
+    pendingKey: 777,
+    pendingKeyIssuedAt: new Date("2026-10-24T11:58:00.000Z"),
+    pendingKeyExpiresAt: new Date("2026-10-24T12:00:00.000Z"),
+  };
+
+  assert.equal(core.pendingKeyIsFresh(session, now), false);
+  const advanced = core.advanceSessionState(session, { now, key: 888 });
+  assert.equal(advanced.wave, 4);
+  assert.equal(advanced.key, 888);
+  assert.equal(advanced.promotedFromPending, false);
+  assert.equal(advanced.keyIssuedAt.toISOString(), "2026-10-24T12:00:00.000Z");
+  assert.equal(advanced.keyExpiresAt.toISOString(), "2026-10-24T12:02:00.000Z");
+});
+
+test("pending key building rejects bad input and closing clears the relay state", () => {
+  const now = new Date("2026-10-24T12:00:00.000Z");
+  const session = {
+    ...core.buildInitialSession({ now, key: 42 }),
+    pendingWave: 1,
+    pendingKey: 99,
+    pendingKeyIssuedAt: now,
+    pendingKeyExpiresAt: new Date(now.getTime() + 60_000),
+  };
+
+  assert.throws(() => core.buildPendingState({ ...session, status: core.STATUS_CLOSED }), /active/);
+  assert.throws(() => core.buildPendingState(session, { key: 42 }), /must differ/);
+  assert.throws(() => core.buildPendingState(session, { key: core.KEY_SPACE }), /integer/);
+  assert.throws(() => core.buildPendingState(session, { keyTtlMs: 0 }), /positive number/);
+  assert.throws(
+    () => core.buildPendingState({ ...session, wave: core.MAX_WAVE }, { key: 43 }),
+    /cannot advance/
+  );
+
+  const closed = core.closeSessionState(session, { now });
+  assert.equal(closed.pendingWave, null);
+  assert.equal(closed.pendingKey, null);
+  assert.equal(closed.pendingKeyIssuedAt, null);
+  assert.equal(closed.pendingKeyExpiresAt, null);
+});
+
 test("the default next-key mint retries a collision and fails closed if it cannot", () => {
   const values = [42, 42, 43];
   assert.equal(core.mintDistinctKey(42, () => values.shift()), 43);
@@ -199,6 +296,54 @@ test("teacher and student views expose the right session fields", () => {
   assert.equal(student.wave, 0);
   assert.equal(student.keyExpired, false);
   assert.deepEqual(student.class, teacher.class);
+
+  const closed = core.toTeacherSession(
+    {
+      ...session,
+      status: core.STATUS_CLOSED,
+      closedAt: new Date("2026-10-24T12:01:00.000Z"),
+      pendingWave: 1,
+      pendingKey: 555,
+      pendingKeyIssuedAt: new Date("2026-10-24T12:00:40.000Z"),
+      pendingKeyExpiresAt: new Date("2026-10-24T12:02:40.000Z"),
+    },
+    { now }
+  );
+  assert.equal(closed.status, core.STATUS_CLOSED);
+  assert.equal(closed.key, null, "a closed session must not return its key");
+  assert.equal(closed.pending, null, "a closed session must not return a relay key");
+  assert.equal(JSON.stringify(closed).includes("555"), false);
+  assert.equal(JSON.stringify(closed).includes("314159"), false);
+});
+
+test("the teacher can see a pending signal while the student view stays key-free", () => {
+  const now = new Date("2026-10-24T12:00:30.000Z");
+  const session = {
+    _id: "session-1",
+    courseClass: { _id: "class-1", courseCode: "CS301", title: "Networks", section: "A" },
+    room: { _id: "room-1", roomNo: "B-204" },
+    ...core.buildInitialSession({ now: new Date("2026-10-24T12:00:00.000Z"), key: 42 }),
+    wave: 2,
+    key: 555,
+    pendingWave: 3,
+    pendingKey: 777,
+    pendingKeyIssuedAt: new Date("2026-10-24T12:00:10.000Z"),
+    pendingKeyExpiresAt: new Date("2026-10-24T12:02:10.000Z"),
+  };
+
+  const teacher = core.toTeacherSession(session, { now });
+  assert.deepEqual(teacher.pending, {
+    wave: 3,
+    key: 777,
+    keyIssuedAt: "2026-10-24T12:00:10.000Z",
+    keyExpiresAt: "2026-10-24T12:02:10.000Z",
+    keyExpired: false,
+  });
+
+  const student = core.toStudentSession(session, { now });
+  assert.equal(Object.hasOwn(student, "pending"), false);
+  assert.equal(Object.hasOwn(student, "key"), false);
+  assert.equal(JSON.stringify(student).includes("777"), false);
 });
 
 test("the model enforces one active check-in per class and the key range", () => {

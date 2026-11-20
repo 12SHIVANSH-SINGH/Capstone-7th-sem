@@ -12,11 +12,13 @@ import {
   FiRefreshCw,
   FiShield,
   FiSquare,
+  FiVolume2,
 } from "react-icons/fi";
 import SERVER_URL from "../../config/api";
 import { digitsToValue } from "../../acoustic/fsk";
 import { buildProofMessage, submitProof } from "../../acoustic/proofTransport";
 import { useCheckInAudio } from "../../acoustic/useCheckInAudio";
+import { useSignalTransmitter } from "../../acoustic/useSignalTransmitter";
 import { signDeviceMessage } from "../../utils/deviceKey";
 import { getCurrentLocation } from "../../utils/geolocation";
 import { classLabel, formatDateTime, relativeTime, givenName } from "../../utils/format";
@@ -30,31 +32,57 @@ import { PageLoader } from "../../ui/Spinner";
 import { useToast } from "../../ui/Toast";
 import {
   EVIDENCE_TTL_HOURS,
+  clearCheckInConsent,
   evidenceFromResponse,
   formatCountdown,
   formatTime,
   isDecodedKey,
   joinBlockReason,
   keyRemainingMs,
+  nextSignalFromResponse,
+  proofWaveCandidates,
+  readCheckInConsent,
   roomLabel,
   selectSession,
   sessionLabel,
   sessionPhase,
   sessionTitle,
+  signalIsFresh,
+  writeCheckInConsent,
 } from "./studentCheckInView";
 import "./studentCheckIn.css";
 
 const requestConfig = { withCredentials: true };
 const DISCOVERY_INTERVAL_MS = 10 * 1000;
+const RELAY_REPEATS = 3;
+const RELAY_GAP_MS = 300;
+const RELAY_AMPLITUDE = 0.6;
+const RELAY_SETTLE_MS = 350;
+const RELAY_RESTART_MS = 1200;
 
 const isUnauthorised = (error) => error?.response?.status === 401;
 
 const messageFor = (error, fallback) =>
   error?.response?.data?.message || error?.message || fallback;
 
+const consentStorage = () => {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+};
+
 const StudentCheckIn = () => {
   const navigate = useNavigate();
   const toast = useToast();
+  const {
+    phase: txPhase,
+    error: txError,
+    prime: primeTransmitter,
+    play: playSignal,
+    stop: stopTransmitter,
+  } = useSignalTransmitter();
 
   const [user, setUser] = useState(null);
   const [deviceStatus, setDeviceStatus] = useState("checking");
@@ -71,13 +99,18 @@ const StudentCheckIn = () => {
   const [attemptStartedAt, setAttemptStartedAt] = useState(null);
   const [locationState, setLocationState] = useState("idle");
   const [recentSessions, setRecentSessions] = useState([]);
+  const [relayActive, setRelayActive] = useState(false);
+  const [lastRelayedWave, setLastRelayedWave] = useState(null);
+  const [relayCount, setRelayCount] = useState(0);
 
   const mountedRef = useRef(true);
   const sessionsRequestRef = useRef(0);
   const submittingRef = useRef(false);
   const selectedSessionRef = useRef(null);
   const userRef = useRef(null);
-  const listeningWaveRef = useRef(null);
+  const relayActiveRef = useRef(false);
+  const handledKeysRef = useRef(new Set());
+  const restartListeningRef = useRef(null);
 
   const selectedSession = useMemo(
     () => selectSession(sessions, selectedId),
@@ -96,6 +129,7 @@ const StudentCheckIn = () => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
+      relayActiveRef.current = false;
       sessionsRequestRef.current += 1;
     };
   }, []);
@@ -235,20 +269,66 @@ const StudentCheckIn = () => {
     }
   }, []);
 
+  const markHandled = useCallback((sessionId, key) => {
+    handledKeysRef.current.add(`${sessionId}:${key}`);
+  }, []);
+
+  /**
+   * Try the locally known round and the next two. Discovery polling can lag a
+   * fast cascade, and the acoustic frame carries only the key. The server still
+   * accepts only its current or pending pair, so a wrong guess records nothing.
+   */
+  const submitDecodedKey = useCallback(
+    async ({ session, studentId, key }) => {
+      let lastError = null;
+      for (const wave of proofWaveCandidates(session.wave)) {
+        const message = buildProofMessage({
+          sessionId: session.id,
+          wave,
+          key,
+          studentId,
+        });
+        const signature = await signDeviceMessage(message);
+        try {
+          const response = await submitProof({
+            sessionId: session.id,
+            wave,
+            key,
+            signature,
+            apiUrl: SERVER_URL,
+          });
+          const nextEvidence = evidenceFromResponse(response, session);
+          if (!nextEvidence) {
+            throw new Error("The proof server returned an unreadable response.");
+          }
+          return { response, evidence: nextEvidence, wave };
+        } catch (error) {
+          lastError = error;
+          if (error?.status === 401) throw error;
+          // 400/409 can mean "wrong guess" for this candidate. Try the next
+          // candidate; the server decides freshness and advance role.
+          if (error?.status !== 400 && error?.status !== 409) throw error;
+        }
+      }
+      throw lastError || new Error("The proof could not be submitted.");
+    },
+    []
+  );
+
   const handleDecodedFrame = useCallback(
     async (frame) => {
       const session = selectedSessionRef.current;
       const currentUser = userRef.current;
+      if (!relayActiveRef.current) return;
+
       if (!session || !currentUser) {
         setSubmitError("No live check-in is selected. Refresh and try again.");
         return;
       }
-
-      if (session.status !== "active" || keyRemainingMs(session) <= 0) {
-        setSubmitError(
-          "The wave key is no longer live. Ask your teacher to advance the wave or restart the session."
-        );
-        loadSessions({ quiet: true });
+      if (session.status !== "active") {
+        relayActiveRef.current = false;
+        setRelayActive(false);
+        setSubmitError("The check-in closed, so listening stopped.");
         return;
       }
 
@@ -256,11 +336,19 @@ const StudentCheckIn = () => {
       try {
         key = digitsToValue(frame.dataDigits);
       } catch (error) {
-        setSubmitError("This phone heard an unreadable key. Try listening again.");
+        setSubmitError("This phone heard an unreadable signal. Listening again.");
+        restartListeningRef.current?.();
         return;
       }
       if (!isDecodedKey(key)) {
-        setSubmitError("This phone heard an unreadable key. Try listening again.");
+        setSubmitError("This phone heard an unreadable signal. Listening again.");
+        restartListeningRef.current?.();
+        return;
+      }
+
+      const marker = `${session.id}:${key}`;
+      if (handledKeysRef.current.has(marker)) {
+        restartListeningRef.current?.();
         return;
       }
 
@@ -269,32 +357,50 @@ const StudentCheckIn = () => {
       setSubmitError("");
 
       try {
-        const message = buildProofMessage({
-          sessionId: session.id,
-          wave: session.wave,
-          key,
+        const result = await submitDecodedKey({
+          session,
           studentId: String(currentUser._id || currentUser.id),
-        });
-        const signature = await signDeviceMessage(message);
-        const response = await submitProof({
-          sessionId: session.id,
-          wave: session.wave,
           key,
-          signature,
-          apiUrl: SERVER_URL,
         });
-        const nextEvidence = evidenceFromResponse(response, session);
-        if (!nextEvidence) {
-          throw new Error("The proof server returned an unreadable response.");
+        markHandled(session.id, key);
+        if (mountedRef.current) {
+          setEvidence(result.evidence);
+          setSubmitError("");
         }
-        if (mountedRef.current) setEvidence(nextEvidence);
         refreshRecentSessions();
+
+        const next = nextSignalFromResponse(result.response);
+        if (next && signalIsFresh(next) && relayActiveRef.current) {
+          primeTransmitter();
+          const played = await playSignal({
+            key: next.key,
+            repeats: RELAY_REPEATS,
+            gapMs: RELAY_GAP_MS,
+            amplitude: RELAY_AMPLITUDE,
+          });
+          if (played && mountedRef.current) {
+            setLastRelayedWave(next.wave);
+            setRelayCount((count) => count + 1);
+          }
+        } else if (next) {
+          setSubmitError(
+            "The next signal had already expired. This phone is still listening for a fresh one."
+          );
+        }
       } catch (error) {
         if (error?.status === 401) {
           navigate("/login");
           return;
         }
-        if (mountedRef.current) {
+        if (!mountedRef.current) return;
+
+        if (error?.status === 400 || error?.status === 409) {
+          // A stale or already-recorded signal is not a failure of the relay.
+          markHandled(session.id, key);
+          setSubmitError(
+            "That signal was no longer accepted. Still listening for the next round."
+          );
+        } else {
           setSubmitError(
             messageFor(
               error,
@@ -306,14 +412,62 @@ const StudentCheckIn = () => {
       } finally {
         submittingRef.current = false;
         if (mountedRef.current) setSubmitting(false);
+        if (relayActiveRef.current && mountedRef.current) {
+          window.setTimeout(() => {
+            if (relayActiveRef.current) restartListeningRef.current?.();
+          }, RELAY_SETTLE_MS);
+        }
       }
     },
-    [loadSessions, navigate, refreshRecentSessions]
+    [
+      loadSessions,
+      markHandled,
+      navigate,
+      playSignal,
+      primeTransmitter,
+      refreshRecentSessions,
+      submitDecodedKey,
+    ]
   );
 
-  const { phase: audioPhase, error: audioError, start, stop } = useCheckInAudio({
+  const shouldAcceptFrame = useCallback((frame) => {
+    const session = selectedSessionRef.current;
+    if (!session?.id) return false;
+    try {
+      const key = digitsToValue(frame.dataDigits);
+      if (!isDecodedKey(key)) return false;
+      return !handledKeysRef.current.has(`${session.id}:${key}`);
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const {
+    phase: audioPhase,
+    error: audioError,
+    start: startAudio,
+    stop: stopAudio,
+  } = useCheckInAudio({
     onFrame: handleDecodedFrame,
+    shouldAcceptFrame,
   });
+
+  const startListening = useCallback(async () => {
+    if (!relayActiveRef.current || submittingRef.current) return false;
+    if (document.visibilityState !== "visible") return false;
+    return startAudio();
+  }, [startAudio]);
+
+  useEffect(() => {
+    restartListeningRef.current = startListening;
+  }, [startListening]);
+
+  const stopRelay = useCallback(() => {
+    relayActiveRef.current = false;
+    setRelayActive(false);
+    stopTransmitter();
+    stopAudio();
+  }, [stopAudio, stopTransmitter]);
 
   const phase = selectedSession ? sessionPhase(selectedSession, now) : "none";
   const remainingMs = selectedSession ? keyRemainingMs(selectedSession, now) : 0;
@@ -321,57 +475,96 @@ const StudentCheckIn = () => {
     session: selectedSession,
     deviceStatus,
     consent,
-    now,
   });
   const audioReady =
     audioPhase === "idle" || audioPhase === "stopped" || audioPhase === "captured";
-  const canJoin = !blockReason && !submitting && !evidence && audioReady;
+  const canJoin = !blockReason && !relayActive && !submitting && audioReady;
+  const txBusy = txPhase === "playing" || txPhase === "preparing";
   const listening = audioPhase === "starting" || audioPhase === "listening";
+  const relayBusy = submitting || txBusy;
 
   useEffect(() => {
-    setConsent(false);
+    stopRelay();
+    handledKeysRef.current = new Set();
+    setRelayCount(0);
+    setLastRelayedWave(null);
     setEvidence(null);
     setSubmitError("");
     setAttemptStartedAt(null);
     setLocationState("idle");
-  }, [selectedSession?.id]);
+    const sessionId = selectedSession?.id;
+    setConsent(sessionId ? readCheckInConsent(consentStorage(), sessionId) : false);
+  }, [selectedSession?.id, stopRelay]);
 
   useEffect(() => {
-    if (phase === "live") return;
-    if (!listening) return;
-    stop();
-    setSubmitError(
-      phase === "expired"
-        ? "The wave key expired, so listening stopped. Ask your teacher to advance the wave."
-        : "The check-in session closed, so listening stopped."
-    );
-  }, [listening, phase, stop]);
-
-  // The teacher can advance the wave while a phone is listening. Stop the old
-  // capture so the student does not submit a frame from the previous key.
-  useEffect(() => {
-    if (!listening) return;
-    if (
-      listeningWaveRef.current !== null &&
-      selectedSession?.wave !== listeningWaveRef.current
-    ) {
-      stop();
-      setSubmitError("The teacher advanced to a new wave. Tap Join to listen for the new key.");
+    if (!selectedSession) return;
+    if (selectedSession.status !== "active" && relayActiveRef.current) {
+      stopRelay();
+      setSubmitError("The check-in closed, so this phone stopped listening.");
     }
-  }, [selectedSession?.wave, listening, stop]);
+  }, [selectedSession, stopRelay]);
+
+  // A hidden tab releases the mic. Returning to the page resumes the relay
+  // without asking the student to Join again.
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState !== "visible") return;
+      if (!relayActiveRef.current || submittingRef.current) return;
+      if (txPhase === "playing" || txPhase === "preparing") return;
+      if (audioPhase === "idle" || audioPhase === "stopped") {
+        startListening();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, [audioPhase, startListening, txPhase]);
+
+  // The mic releases after the one-minute safety limit. While the relay is on,
+  // reopen it so a later round can still be heard without another tap.
+  useEffect(() => {
+    if (!relayActive || submitting || txBusy || audioPhase !== "stopped") {
+      return undefined;
+    }
+    const timer = window.setTimeout(() => {
+      if (relayActiveRef.current && document.visibilityState === "visible") {
+        startListening();
+      }
+    }, RELAY_RESTART_MS);
+    return () => window.clearTimeout(timer);
+  }, [audioPhase, relayActive, startListening, submitting, txBusy]);
+
+  const handleConsent = (checked) => {
+    setConsent(checked);
+    const sessionId = selectedSession?.id;
+    if (!sessionId) return;
+    if (checked) writeCheckInConsent(consentStorage(), sessionId);
+    else clearCheckInConsent(consentStorage());
+  };
 
   const handleJoin = async () => {
     if (!canJoin) return;
+    // Unlock the speaker in the tap gesture; later signals play after network
+    // responses without another user interaction.
+    if (!primeTransmitter()) {
+      setSubmitError(
+        "This browser cannot play the next signal. Use current Chrome on Android over HTTPS."
+      );
+      return;
+    }
     setSubmitError("");
-    setEvidence(null);
     setAttemptStartedAt(new Date().toISOString());
+    relayActiveRef.current = true;
+    setRelayActive(true);
     void captureAttemptLocation();
-    listeningWaveRef.current = selectedSession?.wave ?? null;
-    await start();
+    const started = await startAudio();
+    if (!started && mountedRef.current && relayActiveRef.current) {
+      relayActiveRef.current = false;
+      setRelayActive(false);
+    }
   };
 
   const handleStop = () => {
-    stop();
+    stopRelay();
   };
 
   const handleLogout = useCallback(async () => {
@@ -392,13 +585,11 @@ const StudentCheckIn = () => {
   const firstName = givenName(name);
 
   const joinLabel = () => {
-    if (evidence) return "Evidence recorded";
     if (submitting) return "Submitting proof…";
     if (audioPhase === "starting") return "Opening the microphone…";
-    if (audioPhase === "listening") return "Listening for the key…";
+    if (audioPhase === "listening") return "Listening…";
     if (submitError) return "Listen again";
     if (blockReason === "consent") return "Acknowledge the notice to join";
-    if (blockReason === "expired") return "Wave key expired";
     return "Join check-in";
   };
 
@@ -411,6 +602,26 @@ const StudentCheckIn = () => {
       ? "Location not shared"
       : "Location optional";
 
+  const listenTitle = relayActive
+    ? txBusy
+      ? "Passing the next signal on…"
+      : listening
+      ? "Listening for the next round…"
+      : "Relay is on"
+    : "Ready when you are.";
+
+  const listenCopy = relayActive
+    ? txBusy
+      ? "Your phone is playing the signal it received from the server. It will listen again as soon as playback finishes."
+      : listening
+      ? "Keep this page visible. When a signal is heard, this phone signs the evidence and passes the next signal on automatically."
+      : "This phone is between rounds. It will keep listening while the check-in is live."
+    : audioPhase === "listening"
+    ? "Keep this page visible. The phone will sign what it hears and pass the next signal on."
+    : submitError
+    ? submitError
+    : "Tap Join, allow the microphone, and point the phone toward the class. The next signal is passed on automatically after evidence is accepted.";
+
   const stageItems = selectedSession
     ? [
         {
@@ -421,23 +632,40 @@ const StudentCheckIn = () => {
         },
         {
           id: "listen",
-          label: listening ? "Listening for the wave" : evidence ? "Wave heard" : "Ready to listen",
-          detail: listening
-            ? "Keep this page visible; listening stops after the first valid frame."
-            : evidence
-            ? `Wave ${evidence.wave} arrived at ${formatTime(evidence.recordedAt)}.`
-            : "Tap Join after acknowledging the notice.",
-          state: evidence ? "done" : listening ? "active" : attemptStartedAt ? "done" : "pending",
+          label: relayActive
+            ? listening
+              ? "Listening for the next round"
+              : txBusy
+              ? "Passing the signal on"
+              : "Relay active"
+            : "Ready to listen",
+          detail: relayActive
+            ? "The microphone and speaker take turns automatically. You can stop at any time."
+            : "Tap Join after acknowledging the notice. The phone keeps listening while the session is live.",
+          state: relayActive ? "active" : attemptStartedAt ? "done" : "pending",
         },
         {
           id: "evidence",
           label: "Signed evidence",
           detail: evidence
             ? evidence.duplicate
-              ? "This device had already submitted evidence for this wave."
-              : "The decoded key was signed and recorded by the server."
+              ? `Round ${evidence.wave} was already recorded for this phone.`
+              : `Round ${evidence.wave} was signed and recorded by the server.`
             : "The server has not received a signed proof yet.",
           state: evidence ? "done" : submitting ? "active" : "pending",
+        },
+        {
+          id: "relay",
+          label: "Signal passed on",
+          detail:
+            relayCount > 0
+              ? `This phone has passed ${relayCount} next signal${
+                  relayCount === 1 ? "" : "s"
+                } on to the room.`
+              : lastRelayedWave !== null
+              ? `Round ${lastRelayedWave} was played from this phone.`
+              : "After accepted evidence, the next signal plays automatically.",
+          state: relayCount > 0 ? "done" : txBusy ? "active" : "pending",
         },
         {
           id: "register",
@@ -460,8 +688,8 @@ const StudentCheckIn = () => {
         <div>
           <h1 className="ui-page-head__title">Check in, {firstName}</h1>
           <p className="ui-page-head__sub">
-            Join while your teacher’s session is live. This phone listens for the current wave,
-            signs what it heard, and records evidence. It does not mark attendance.
+            Join while your teacher’s session is live. This phone hears a round, signs the
+            evidence, and passes the next signal on to the class. It does not mark attendance.
           </p>
         </div>
         <div className="ui-page-head__actions">
@@ -469,7 +697,7 @@ const StudentCheckIn = () => {
             variant="secondary"
             size="sm"
             onClick={() => loadSessions()}
-            disabled={refreshing || listening || submitting}
+            disabled={refreshing || relayBusy}
           >
             <FiRefreshCw aria-hidden="true" />
             {refreshing ? "Refreshing…" : "Refresh"}
@@ -483,7 +711,7 @@ const StudentCheckIn = () => {
             <FiShield />
           </span>
           <div>
-            <h2 className="student-checkin__notice-title">Before you listen</h2>
+            <h2 className="student-checkin__notice-title">Before you join</h2>
             <p className="student-checkin__notice-sub">
               A short, plain-language notice. Please read it before the microphone opens.
             </p>
@@ -498,14 +726,19 @@ const StudentCheckIn = () => {
             uploaded.
           </li>
           <li>
+            <strong>This phone also plays the next signal.</strong> After the server accepts
+            your evidence, this phone briefly plays the next signal through its speaker so
+            nearby phones can hear it. That is how the class covers itself.
+          </li>
+          <li>
             <strong>Only signed evidence is sent.</strong> The server receives the session,
-            wave, decoded key and a signature from this browser’s bound device key. Evidence
+            round, decoded key and a signature from this browser’s bound device key. Evidence
             expires after about {EVIDENCE_TTL_HOURS} hours.
           </li>
           <li>
-            <strong>This is not an attendance decision.</strong> Hearing the key records
-            evidence. Your teacher owns the register and decides attendance; if you were present
-            but missed the register, you can raise a query after the session closes.
+            <strong>This is not an attendance decision.</strong> Hearing a key records
+            evidence. Your teacher owns the register and decides attendance; if you were
+            present but missed the register, you can raise a query after the session closes.
           </li>
         </ul>
 
@@ -514,12 +747,12 @@ const StudentCheckIn = () => {
             id="checkin-consent"
             type="checkbox"
             checked={consent}
-            onChange={(event) => setConsent(event.target.checked)}
-            disabled={Boolean(evidence) || submitting}
+            onChange={(event) => handleConsent(event.target.checked)}
+            disabled={relayActive || submitting}
           />
           <span>
-            I understand this phone will use the microphone and that hearing a key records
-            evidence, not attendance.
+            I understand this phone will use the microphone and speaker and that hearing a
+            key records evidence, not attendance. This choice lasts for this check-in.
           </span>
         </label>
       </Card>
@@ -573,10 +806,10 @@ const StudentCheckIn = () => {
           <Card
             className="student-checkin__live"
             title="Live check-in"
-            subtitle="Join while the key countdown is running."
+            subtitle="Join once. The phone keeps the relay going while the session is live."
             actions={
               <Badge variant={phase === "live" ? "success" : "warning"} dot>
-                {phase === "live" ? "Live" : "Key expired"}
+                {phase === "live" ? "Live" : "Signal expired"}
               </Badge>
             }
           >
@@ -587,7 +820,7 @@ const StudentCheckIn = () => {
                   className="ui-input"
                   value={selectedSession.id}
                   onChange={(event) => setSelectedId(event.target.value)}
-                  disabled={listening || submitting}
+                  disabled={relayActive || relayBusy}
                 >
                   {sessions.map((session) => (
                     <option key={session.id} value={session.id}>
@@ -604,7 +837,8 @@ const StudentCheckIn = () => {
                 <h2 className="student-checkin__session-title">{sessionTitle(selectedSession)}</h2>
                 <p className="student-checkin__session-meta">
                   <span>{roomLabel(selectedSession)}</span>
-                  <span>Wave {selectedSession.wave}</span>
+                  <span>Round {selectedSession.wave}</span>
+                  {relayCount > 0 && <span>Relayed {relayCount}</span>}
                 </p>
               </div>
               <div className={`student-checkin__countdown is-${phase}`}>
@@ -612,70 +846,67 @@ const StudentCheckIn = () => {
                   {phase === "live" ? formatCountdown(remainingMs) : "0:00"}
                 </span>
                 <span className="student-checkin__countdown-label">
-                  {phase === "live" ? "key time left" : "key expired"}
+                  {phase === "live" ? "signal time left" : "signal expired"}
                 </span>
               </div>
             </div>
 
             <div className={`student-checkin__listen is-${audioPhase}`}>
               <span className="student-checkin__listen-icon" aria-hidden="true">
-                {audioPhase === "listening" ? <FiMic /> : <FiHeadphones />}
+                {txBusy ? <FiVolume2 /> : listening || relayActive ? <FiMic /> : <FiHeadphones />}
               </span>
               <div>
-                <strong>
-                  {audioPhase === "listening"
-                    ? "Listening for the current wave…"
-                    : audioPhase === "starting"
-                    ? "Opening the microphone…"
-                    : submitError
-                    ? "The key was heard, but the proof was not recorded."
-                    : "Ready when you are."}
-                </strong>
-                <p>
-                  {audioPhase === "listening"
-                    ? "Hold this phone still and keep this page visible. Listening stops automatically after the first valid frame or one minute."
-                    : submitError
-                    ? submitError
-                    : "Tap Join, allow the microphone, and point the phone toward the teacher’s phone. Only the current wave is accepted."}
-                </p>
+                <strong>{listenTitle}</strong>
+                <p>{listenCopy}</p>
               </div>
             </div>
 
-            {audioError && (
+            {(audioError || txError) && (
               <div className="student-checkin__alert" role="alert">
                 <FiAlertTriangle aria-hidden="true" />
                 <div>
-                  <strong>Microphone could not start.</strong>
-                  <p>{audioError}</p>
+                  <strong>
+                    {txError ? "The next signal could not play." : "Microphone could not start."}
+                  </strong>
+                  <p>{txError || audioError}</p>
                 </div>
               </div>
             )}
 
-            {blockReason === "expired" && (
+            {submitError && !txError && (
               <p className="student-checkin__hint student-checkin__hint--warning">
-                The two-minute key for this wave has expired. Ask your teacher to advance the wave
-                so a fresh key is minted.
+                {submitError}
+              </p>
+            )}
+
+            {phase === "expired" && (
+              <p className="student-checkin__hint student-checkin__hint--warning">
+                This round’s signal has expired. Keep listening: a phone that already received
+                the next signal may still pass it on. If nothing arrives, ask your teacher to
+                nudge the class or start a fresh check-in.
               </p>
             )}
 
             {blockReason === "consent" && (
               <p className="student-checkin__hint">
-                Acknowledge the notice above to enable Join.
+                Acknowledge the notice above to enable Join. It stays acknowledged if this
+                page reloads during the same check-in.
               </p>
             )}
 
             <div className="student-checkin__actions">
-              <Button
-                onClick={handleJoin}
-                disabled={!canJoin}
-                loading={audioPhase === "starting" || submitting}
-              >
-                {joinLabel()}
-              </Button>
-              {audioPhase === "listening" && (
+              {relayActive ? (
                 <Button variant="secondary" onClick={handleStop}>
                   <FiSquare aria-hidden="true" />
-                  Stop listening
+                  Stop listening and relaying
+                </Button>
+              ) : (
+                <Button
+                  onClick={handleJoin}
+                  disabled={!canJoin}
+                  loading={audioPhase === "starting"}
+                >
+                  {joinLabel()}
                 </Button>
               )}
               <Link className="ui-btn ui-btn--ghost" to="/acoustic-lab">
@@ -702,7 +933,11 @@ const StudentCheckIn = () => {
                 {stageItems.map((stage) => (
                   <li key={stage.id} className={`checkin-progress__item is-${stage.state}`}>
                     <span className="checkin-progress__dot" aria-hidden="true">
-                      {stage.state === "done" ? <FiCheckCircle /> : stage.state === "active" ? <FiMic /> : null}
+                      {stage.state === "done" ? (
+                        <FiCheckCircle />
+                      ) : stage.state === "active" ? (
+                        <FiMic />
+                      ) : null}
                     </span>
                     <div>
                       <strong>{stage.label}</strong>
@@ -712,15 +947,15 @@ const StudentCheckIn = () => {
                 ))}
               </ol>
               <p className="student-checkin__fineprint">
-                Location is optional evidence: a denied permission never blocks a check-in. The
-                teacher sees the attempt time and distance when it is available.
+                Location is optional evidence: a denied permission never blocks a check-in.
+                The teacher sees the attempt time and distance when it is available.
               </p>
             </div>
 
             <p className="student-checkin__fineprint">
-              The transmitter plays from your teacher’s phone at the front. Do not share a
-              recording of the key: a forwarded key is evidence, not proof that you were in the
-              room.
+              Signals pass phone to phone. A forwarded key still shows only that a phone
+              heard a round; it does not prove who was in the room. Your teacher judges the
+              register and any query.
             </p>
           </Card>
 
@@ -736,7 +971,7 @@ const StudentCheckIn = () => {
                       {evidence.duplicate ? "Already recorded" : "Evidence recorded"}
                     </h2>
                     <p className="student-checkin__evidence-sub">
-                      {evidence.classLabel} · Wave {evidence.wave}
+                      {evidence.classLabel} · Round {evidence.wave}
                     </p>
                   </div>
                 </div>
@@ -755,9 +990,10 @@ const StudentCheckIn = () => {
                   </div>
                 </dl>
                 <p className="student-checkin__evidence-note">
-                  This proof says this phone heard the current wave and signed it with the
-                  bound device key. It is evidence only; your teacher owns the attendance
-                  decision and can still correct the register from a query.
+                  This proof says this phone heard a round and signed it with the bound device
+                  key. If the server returned the next signal, this phone passed it on
+                  automatically. It is evidence only; your teacher owns the attendance
+                  decision.
                 </p>
                 <Link className="ui-btn ui-btn--secondary ui-btn--block" to="/student-dashboard">
                   Back to dashboard
@@ -767,8 +1003,9 @@ const StudentCheckIn = () => {
               <Card title="What happens next" subtitle="Evidence, not a roll-call.">
                 <ol className="student-checkin__steps">
                   <li>
-                    <strong>Hear the key.</strong>
-                    The teacher’s phone plays the current wave from the front of the room.
+                    <strong>Hear a round.</strong>
+                    The teacher’s phone plays the first signal; nearby phones pass the next
+                    one on.
                   </li>
                   <li>
                     <strong>Sign on this phone.</strong>
@@ -776,15 +1013,19 @@ const StudentCheckIn = () => {
                     never leaves the phone.
                   </li>
                   <li>
+                    <strong>Pass the next signal on.</strong>
+                    When the server accepts your evidence, this phone plays the server-minted
+                    next signal, then listens again.
+                  </li>
+                  <li>
                     <strong>Show the evidence.</strong>
-                    The server records the session, wave and signature. A teacher decides
+                    The server records the session, round and signature. A teacher decides
                     attendance later.
                   </li>
                 </ol>
                 <p className="student-checkin__side-note">
-                  Waves and proofs are evidence, not a roll-call. A forwarded key shows that a
-                  phone heard a wave; it does not prove who was in the room. Your teacher judges
-                  the register and any query.
+                  Rounds and proofs are evidence, not a roll-call. A forwarded key shows that
+                  a phone heard a signal; it does not prove who was in the room.
                 </p>
               </Card>
             )}

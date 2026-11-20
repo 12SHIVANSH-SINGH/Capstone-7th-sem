@@ -13,7 +13,7 @@ Capstone project · NIT Jamshedpur
 
 </div>
 
-**Live prototype:** [https://bio-attend.onrender.com](https://bio-attend.onrender.com) — the repository's `HEAD`, `origin/main` and `origin/HEAD` are **`433d522`** (a `.gitleaksignore`-only commit over `8d2e873`), which includes the full attendance product, P0/P1 security hardening and the committed A2a timetable PDF text preview. The live service is reachable and serves A2a UI strings, but its exact deployed commit was **not verified against the Render dashboard**; the owner must confirm that before signed testing. The owner controls every push and deploy.
+**Live prototype:** [https://bio-attend.onrender.com](https://bio-attend.onrender.com) — the repository's `HEAD`, `origin/main` and `origin/HEAD` are **`80dc2e1`**, which includes the full attendance product, P0/P1 security hardening and the committed A2a timetable PDF text preview. The phone-to-phone cascade changes are **uncommitted** in the working tree. The live service was last observed serving A2a UI strings, but its exact deployed commit was **not verified against the Render dashboard**; the owner must confirm that before signed testing. The owner controls every push and deploy.
 
 > **Layer 1 gate status:** the owner has directed that Layer 1 be treated as **passed for build planning only**. This is an assumption, not a measurement. The 2026-10-25 sweep still fails at 5 m (4/10) and 10 m (1/10), and the reverse direction and muted control are unmeasured. Do not read this build as proof that the physical gate passed.
 
@@ -26,17 +26,17 @@ Roll calls and QR codes are easy to fake — a friend answers "present", or a QR
 ## How it works
 
 1. **Teacher starts a check-in** — the server mints a one-time key for that class and wave.
-2. **Phones listen** — a student taps Join, accepts the retention notice and lets the browser listen for the current near-ultrasonic wave. Nothing to install.
-3. **The server records signed evidence** — the phone decodes the wave locally, signs session/wave/key with its bound P-256 device key, and submits the proof. The server stores evidence; it does not mark attendance.
+2. **Phones listen once** — a student taps Join, accepts the retention notice and lets the browser listen for the current near-ultrasonic round. Nothing to install.
+3. **The server records signed evidence and mints the relay** — the phone decodes the round locally, signs session/wave/key with its bound P-256 device key, and submits the proof. The server stores evidence and returns the server-minted next signal to that phone, which plays it for nearby phones and listens again. Evidence never marks attendance.
 4. **The teacher confirms the register** — the teacher closes the session, marks present/absent/excused from the evidence and finalises the register; later corrections keep an audit trail. A student who was present but unmarked can raise a query for 24 hours after the session closes; an approved query counts as present.
 
-The student cascade (phones retransmitting the next key), automatic scoring and the ID round remain future work.
+Automatic scoring and the ID round remain future work. The phone-to-phone relay cascade is built and locally tested but has not been measured in a physical classroom.
 
 ## What is built
 
 - **Accounts and access** — Google-only sign-in, college-domain and roster gates, environment-gated Gmail test accounts, exact-match `SUPER_ADMIN_EMAILS` grant, and one bound device per student. A first or replacement device waits for teacher approval in production; dev/test personas auto-approve.
-- **Teacher tools** — rooms, classes, CSV/paste rosters, text-based PDF roster extraction with an editable preview, check-in sessions, live two-minute wave keys, evidence-gated wave advancement, session history, teacher-confirmed registers and audit.
-- **Student flow** — live-session discovery, consent-gated `/student/check-in`, local decode, signed evidence, recorded-evidence card, attendance history and 24-hour queries.
+- **Teacher tools** — rooms, classes, CSV/paste rosters, text-based PDF roster extraction with an editable preview, one-tap check-in start with round-0 playback, live two-minute round keys, a server-minted pending relay, an evidence-gated manual advance fallback, session history, teacher-confirmed registers and audit.
+- **Student flow** — live-session discovery, consent-gated `/student/check-in`, one Join, local decode, signed evidence, automatic relay of the server-minted next signal, attendance history and 24-hour queries.
 - **Operations** — class/per-student analytics, session trends, branded PDF/Excel exports, notifications, timetable, profile/settings, help and a dark theme.
 - **Super-admin console** — users, classes, sessions, attendance overrides/deletion, queries, audit, settings and time-limited impersonation. Demo seed/reset is development-only and returns 404 in production.
 - **Admin security** — passkey step-up for destructive console actions, a five-minute `HttpOnly` approval cookie, a SHA-256 audit hash chain with a verification view, audited and rate-limited exports, `/health/ready`, and verification-only `JWT_SECRET_PREVIOUS` rotation.
@@ -48,7 +48,7 @@ The student cascade (phones retransmitting the next key), automatic scoring and 
 | --- | --- |
 | Acoustic lab, FSK codec, two-phone TX/RX pages | ✅ built and deployed; link works at 1 m but degrades sharply at 5–10 m |
 | Distance sweep (2026-10-25, final) | ⚠️ 1 m 10/10 · 2 m 9/10 · 3 m 9/10 · **5 m 4/10** · **10 m 1/10**; reverse/control pending; gate **not measured as passed** |
-| Session core, teacher screen, signed proof transport, student discovery and shell, wave advancement, teacher evidence view | ✅ built and tested locally |
+| Session core, one-tap teacher start, signed proof transport, student discovery and shell, server-minted relay cascade, evidence-gated manual fallback, teacher evidence view | ✅ built and tested locally; physical cascade rehearsal pending |
 | Teacher-confirmed attendance, queries, analytics, exports, notifications, timetable, profile/help | ✅ built and browser-smoke-tested locally |
 | Super-admin console, audit, settings, impersonation, demo data | ✅ built and locally verified, including a Gmail super-admin in a production-mode check |
 | Passkey step-up, audit hash chain, export limits, readiness, JWT rotation | ✅ built; browser E2E passed with a Chrome virtual authenticator |
@@ -56,8 +56,8 @@ The student cascade (phones retransmitting the next key), automatic scoring and 
 | Timetable PDF text extraction → read-only preview | ✅ text-based PDFs only; no row parsing, class matching or slot creation; needs sample timetable PDFs for structured import |
 | Production deployment of this tree | ⏳ live service reachable and serves A2a UI strings; exact commit must be checked in the Render dashboard before signed testing |
 | Deployed manual test plan | 📋 [docs/testing-plan.md](docs/testing-plan.md) — 4 phones + 3–4 laptops, acoustic range, signed flow, admin security, PDF previews and conditional restore drill |
-| Real Google/phone multi-wave rehearsal | ⏳ pending; the deployed test plan is the execution script |
-| Student cascade, automatic scoring, ID round, mobile app | ⛔ not built / gated |
+| Real Google/phone phone-to-phone cascade rehearsal | ⏳ pending; the deployed test plan is the execution script |
+| Automatic scoring, ID round, mobile app | ⛔ not built / gated |
 
 This is a demo-ready capstone prototype — not yet used for real attendance.
 
@@ -114,12 +114,12 @@ available in production. Resetting demo data preserves the signed-in admin accou
 ## Tests
 
 ```bash
-cd attendance-backend && npm test                     # 255 tests
+cd attendance-backend && npm test                     # 262 tests
 cd attendance-backend && npm test -- --test-isolation=none
 cd attendance-frontend && npm run test:proof          # 15 tests
 cd attendance-frontend && npm run test:acoustic       # 51 tests
-cd attendance-frontend && npm run test:checkin        # 7 tests
-cd attendance-frontend && npm run test:studentcheckin # 9 tests
+cd attendance-frontend && npm run test:checkin        # 10 tests
+cd attendance-frontend && npm run test:studentcheckin # 12 tests
 cd attendance-frontend && npm run test:auth           # 2 tests
 cd attendance-frontend && npm run test:rosterimport   # 6 tests
 cd attendance-frontend && npm run test:timetableimport # 6 tests

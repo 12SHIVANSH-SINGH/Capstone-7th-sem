@@ -110,24 +110,34 @@ Hardware reality:
 
 ## 6. Cascade logic
 
-The long-term design:
+The implemented design:
 
-1. Teacher taps Start. Server creates K0 and the teacher's phone plays it repeatedly.
+1. Teacher taps Start once. The server creates K0 and the teacher's phone plays it repeatedly
+   from the front.
 2. A student phone that decodes Kn submits its credential, Kn and a device signature.
-3. Server checks Kn is valid, fresh and unused by that student, records the evidence and
-   returns K(n+1).
-4. The phone plays K(n+1) two or three times, then mutes for the session.
-5. Phones in the same wave play the identical signal, so sounds add instead of colliding.
-6. The server advances waves only after the current wave has accepted evidence, archives the
-   old key in bounded history and mints a fresh two-minute key.
-7. The cascade ends when a wave adds no new students or the check-in window closes.
+3. The server accepts either its current round or its pending round, records the evidence and
+   never marks attendance.
+4. If the proof is for the current round, the server mints a pending K(n+1) and returns it to
+   that phone. The phone plays K(n+1) two or three times, then returns to listening.
+5. If the proof is for the pending round, the server atomically promotes that key, archives the
+   old key in bounded history, mints a new pending K(n+2) and returns it to the proving phone.
+6. Phones in the same wave play the identical signal, so sounds add instead of colliding.
+7. A promoted pending key keeps its original two-minute expiry. The cascade ends when a round
+   adds no new accepted evidence or the check-in window closes.
+8. The teacher can advance manually after accepted evidence as a fallback. With zero evidence
+   and an expired key, the teacher closes and starts fresh; there is no re-key endpoint.
 
-Phone state machine: Listening → Decoding → Server check → Transmitting → Muted. Rejected or
-expired keys return to Listening. The server mints keys; phones never invent them.
+Phone state machine: Listening → Decoding → Server check → Transmitting → Listening. Rejected,
+expired or already-handled keys return to Listening. Discovery polling can lag a fast cascade,
+so the student tries the displayed round through the next two; the frame carries only the key,
+and the server accepts only its current or pending pair. The server mints every key; phones
+never invent them.
 
-**Current build:** teacher-driven waves plus evidence. The teacher advances manually after at
-least one accepted proof. Students do not receive or retransmit the next key, so the
-multi-hop cascade and the "lowest wave heard" join rule are **not built**.
+**Current build:** the server-minted relay cascade is implemented locally — pending-key state,
+atomic promotion, `next` in accepted and duplicate proof responses, automatic student relay,
+one-click teacher start, a fresh-pending Nudge and an evidence-gated manual advance fallback.
+It has **not** been physically rehearsed in a classroom; owner-reported phone tests remain
+planning evidence, not measurements. The "lowest wave heard" join rule is still **not built**.
 
 ## 7. Anti-cheat: the ID round
 
@@ -159,11 +169,12 @@ teacher-confirmed attendance instead.
 **Current phase:** the product layer is built, including teacher-confirmed registers,
 queries, analytics, exports, notifications, timetable, PWA and a production-capable
 super-admin console. Roster PDF text extraction with an editable preview is built, and
-timetable PDF text extraction with a read-only preview is built (A2a). Both are in the committed
-tree at `433d522`. Structured timetable row parsing, local OCR and Gemini extraction are not. It is
-still **evidence-only for acoustic proof**: the app does not automatically score attendance
-or run the ID round. The attendance decision belongs to the teacher and is audited. The
-click-level execution script for the deployed 4-phone/3–4-laptop run is
+timetable PDF text extraction with a read-only preview is built (A2a). The phone-to-phone relay
+cascade is built and locally tested but is **uncommitted** and not physically rehearsed.
+Structured timetable row parsing, local OCR and Gemini extraction are not built. The product is
+still **evidence-only for acoustic proof**: the app does not automatically score attendance or
+run the ID round. The attendance decision belongs to the teacher and is audited. The click-level
+execution script for the deployed 4-phone/3–4-laptop run is
 [`docs/testing-plan.md`](docs/testing-plan.md).
 
 **Next work, in order:**
@@ -171,7 +182,7 @@ click-level execution script for the deployed 4-phone/3–4-laptop run is
 | Order | Slice | Scope | Pass test |
 | --- | --- | --- | --- |
 | 1 (physical) | 1.10 range diagnosis | Lower the band and/or tune TX settings; rerun 1 m, 5 m, 10 m, then reverse and muted control | ≥95% decoded at 1 m/5 m/10 m both directions; 0 decodes in the muted control |
-| 2 (rehearsal) | 2.6 multi-wave rehearsal | 10–20 phones for 5–6 minutes; measure waves, timing and range | Every phone reaches a wave; timing measured; no false-accept claim without scoring |
+| 2 (rehearsal) | 2.6 phone-to-phone cascade rehearsal | 10–20 phones for 5–6 minutes; verify automatic relay, teacher fallback and zero-proof recovery; measure waves, timing and range | Every phone reaches a wave through the relay without a per-wave reload; a fresh pending key is promoted; timing measured; no false-accept claim without scoring |
 | 3 (owner) | Deploy and verify | Configure Render, deploy the current tree, compare the Render dashboard commit with the reviewed `HEAD`, verify real Google sign-in and `/admin` | Health/readiness, test-plan G2 commit match, Google sign-in, no demo or dev routes in production |
 | 4 (test) | Deployed manual test run | Execute [`docs/testing-plan.md`](docs/testing-plan.md): AC → FL → AD → PDF → DP/RS with 4 phones and 3–4 laptops | Preflight gates G0–G7 pass; every suite records PASS/FAIL/BLOCKED with evidence; no open P0/P1 defect |
 | 5 (gated) | 3.x scoring, ID round, review queue | Only after the physical gate is genuinely measured | Layer 3 gate |
@@ -210,7 +221,7 @@ click-level execution script for the deployed 4-phone/3–4-laptop run is
 
 **Status (2026-11-06):** implemented and tested locally. The P1 slice passed at backend
 **227/227** in both test modes and frontend **84/84**; after the roster and timetable PDF
-text-preview slices the current gate is backend **255/255** and frontend **96/96**. The
+text-preview and cascade slices the current gate is backend **262/262** and frontend **102/102**. The
 production build is green, and a
 Chrome virtual-authenticator run passed the full enrollment → 428 → step-up →
 settings-save → chain-verify path.

@@ -133,11 +133,13 @@ normal development; CORS allows `localhost:3000` and `127.0.0.1:3000`.
 3. Open **Timetable** (`/timetable`) to plan the week. **Import PDF text** extracts only the
    embedded text layer into a read-only preview; it creates no slot or class. Add each slot
    with **Add slot** and choose an existing owned class.
-4. Open **Check-in** (`/teacher/check-in`): choose the class and start a session. The
-   screen shows wave 0, a two-minute key and a countdown.
-5. Open the transmitter with **Open transmitter**, or inspect live evidence in the
-   **Evidence** card. **Advance wave** is enabled only after the current wave has at least
-   one accepted proof.
+4. Open **Check-in** (`/teacher/check-in`): choose the class and tap **Start and play round
+   0**. The session starts at round 0 with a two-minute key and begins playing from this
+   phone. There is no location prompt and no separate transmitter page.
+5. Students join once. Each accepted proof returns the server-minted next signal to that
+   phone, which relays it and listens again. Watch the **Evidence** card and the pending
+   signal; **Play this round**, **Stop sound**, **Nudge the class** and an evidence-gated
+   **Advance round** stay available as fallbacks.
 6. When the class is done, **confirm close** on the check-in screen. Then open the
    **Register**, mark students present/absent/excused and **finalise**. Finalising publishes
    the register; the 24-hour query window started when the session closed.
@@ -149,8 +151,9 @@ normal development; CORS allows `localhost:3000` and `127.0.0.1:3000`.
    teacher must approve before the student can submit evidence. In development, dev personas
    auto-approve.
 3. While a session is live, open **Check-in** (`/student/check-in`), read the retention
-   notice, tick consent and tap **Join**. The phone listens for the current wave, decodes
-   it locally, signs the proof and shows a recorded-evidence card.
+   notice, tick consent and tap **Join once**. The phone listens, decodes the round locally,
+   signs the proof, shows a recorded-evidence card, plays the server-minted next signal and
+   listens again. A round change does not need a reload or a second Join.
 4. Evidence is not attendance. The query window opens when the teacher closes the session
    and lasts 24 hours; the published result appears after the teacher finalises the
    register.
@@ -256,16 +259,16 @@ npm test -- --test-isolation=none        # also run without file isolation
 cd ../attendance-frontend
 npm run test:proof                       # 15
 npm run test:acoustic                    # 51
-npm run test:checkin                     # 7
-npm run test:studentcheckin              # 9
+npm run test:checkin                     # 10
+npm run test:studentcheckin              # 12
 npm run test:auth                        # 2
 npm run test:rosterimport                # 6
 npm run test:timetableimport             # 6
 CI=true REACT_APP_API_URL=/api/v1 npm run build
 ```
 
-The current expected counts are **backend 255/255** in both default and
-`--test-isolation=none` modes, and **frontend 96/96** across the seven frontend suites. The
+The current expected counts are **backend 262/262** in both default and
+`--test-isolation=none` modes, and **frontend 102/102** across the seven frontend suites. The
 production build writes `attendance-frontend/build/`; the backend serves it automatically
 when that folder exists.
 

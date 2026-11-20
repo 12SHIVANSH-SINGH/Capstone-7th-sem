@@ -158,6 +158,71 @@ test("a fresh current-wave proof is accepted", () => {
   assert.equal(decision.status, 201);
 });
 
+test("a fresh pending-wave proof is accepted and advances the cascade", () => {
+  const session = {
+    ...activeSession(),
+    pendingWave: 3,
+    pendingKey: 87654321,
+    pendingKeyIssuedAt: new Date(now.getTime() - 10_000),
+    pendingKeyExpiresAt: new Date(now.getTime() + 60_000),
+  };
+
+  const pending = core.evaluateProof({ session, wave: 3, key: 87654321, now });
+  assert.equal(pending.outcome, core.PROOF_OUTCOMES.ACCEPT);
+  assert.equal(pending.status, 201);
+  assert.equal(pending.waveRole, "pending");
+  assert.equal(pending.advances, true);
+
+  const current = core.evaluateProof({ session, wave: 2, key: 12345678, now });
+  assert.equal(current.outcome, core.PROOF_OUTCOMES.ACCEPT);
+  assert.equal(current.waveRole, "current");
+  assert.equal(current.advances, false);
+
+  const duplicate = core.evaluateProof({
+    session,
+    proof: { wave: 3, key: 87654321 },
+    wave: 3,
+    key: 87654321,
+    now,
+  });
+  assert.equal(duplicate.outcome, core.PROOF_OUTCOMES.DUPLICATE);
+  assert.equal(duplicate.advances, true);
+});
+
+test("pending-wave proofs reject expiry and a wrong key without leaking which was right", () => {
+  const session = {
+    ...activeSession(),
+    pendingWave: 3,
+    pendingKey: 87654321,
+    pendingKeyIssuedAt: new Date(now.getTime() - 10_000),
+    pendingKeyExpiresAt: new Date(now.getTime() + 60_000),
+  };
+
+  const wrongKey = core.evaluateProof({ session, wave: 3, key: 87654322, now });
+  assert.equal(wrongKey.status, 400);
+  assert.match(wrongKey.message, /does not match the next wave/);
+
+  const expiredSession = { ...session, pendingKeyExpiresAt: now };
+  const expired = core.evaluateProof({
+    session: expiredSession,
+    wave: 3,
+    key: 87654321,
+    now,
+  });
+  assert.equal(expired.status, 409);
+  assert.match(expired.message, /next wave key has expired/);
+
+  const expiredWrongKey = core.evaluateProof({
+    session: expiredSession,
+    wave: 3,
+    key: 87654322,
+    now,
+  });
+  assert.equal(expiredWrongKey.status, 409);
+  assert.match(expiredWrongKey.message, /expired/);
+  assert.doesNotMatch(expiredWrongKey.message, /does not match/);
+});
+
 test("closed sessions, stale waves, wrong keys and expired keys are rejected", () => {
   const closed = { ...activeSession(), status: sessionCore.STATUS_CLOSED };
   assert.equal(core.evaluateProof({ session: closed, wave: 2, key: 12345678, now }).status, 409);
@@ -405,6 +470,7 @@ test("accept and duplicate log one structured line and never leak evidence", asy
   const { session, sessionId, studentId, signature, req } = await controllerFixture();
   const originals = {
     findById: CheckInSession.findById,
+    findOneAndUpdate: CheckInSession.findOneAndUpdate,
     enrollmentExists: Enrollment.exists,
     pendingExists: DeviceBindingRequest.exists,
     proofFindOne: CheckInProof.findOne,
@@ -416,6 +482,9 @@ test("accept and duplicate log one structured line and never leak evidence", asy
   try {
     console.info = (...args) => logs.push(args.join(" "));
     CheckInSession.findById = () => ({ select: async () => session });
+    CheckInSession.findOneAndUpdate = (filter, update) => ({
+      select: async () => ({ ...session, ...(update?.$set || {}) }),
+    });
     Enrollment.exists = async () => ({ _id: "enrollment" });
     DeviceBindingRequest.exists = async () => null;
     CheckInProof.findOne = async () => null;
@@ -477,6 +546,7 @@ test("accept and duplicate log one structured line and never leak evidence", asy
   } finally {
     console.info = originalInfo;
     CheckInSession.findById = originals.findById;
+    CheckInSession.findOneAndUpdate = originals.findOneAndUpdate;
     Enrollment.exists = originals.enrollmentExists;
     DeviceBindingRequest.exists = originals.pendingExists;
     CheckInProof.findOne = originals.proofFindOne;

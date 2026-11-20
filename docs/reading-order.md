@@ -130,14 +130,14 @@ Run these before any deployed session. They are the cheapest way to catch a brok
 
 ```bash
 cd attendance-backend
-npm test                                  # last recorded: 255/255
-npm test -- --test-isolation=none         # last recorded: 255/255
+npm test                                  # last recorded: 262/262
+npm test -- --test-isolation=none         # last recorded: 262/262
 
 cd ../attendance-frontend
 npm run test:proof                        # 15
 npm run test:acoustic                     # 51
-npm run test:checkin                      # 7
-npm run test:studentcheckin               # 9
+npm run test:checkin                      # 10
+npm run test:studentcheckin               # 12
 npm run test:auth                         # 2
 npm run test:rosterimport                 # 6
 npm run test:timetableimport              # 6
@@ -218,8 +218,8 @@ at once.
 | 2 | `routes/checkInSessionRoute.js`, `attendanceRoute.js`, `googleAuthRoute.js`, `adminRoute.js` | The URL surface and where the proof endpoint lives |
 | 3 | `middleware/auth.js`, `originGuard.js`, `adminStepUp.js` | Session, CSRF/origin and passkey boundaries |
 | 4 | `models/` — user, enrollment, class → check-in session → proof → attendance record/query → audit/passkey | The data relationships |
-| 5 | `controllers/checkInSessionController.js` + `utils/checkInSession.js` | Wave keys, the two-minute TTL and evidence-gated advance |
-| 6 | `controllers/checkInProofController.js` + `utils/checkInProof.js` | Canonical message, signature check, duplicate handling and expiry |
+| 5 | `controllers/checkInSessionController.js` + `utils/checkInSession.js` | Round keys, the two-minute TTL, pending-key mint/promotion and the evidence-gated manual fallback |
+| 6 | `controllers/checkInProofController.js` + `utils/checkInProof.js` | Current/pending acceptance, canonical message, signature check, duplicate handling, expiry and the returned next signal |
 | 7 | `controllers/attendanceController.js` + `utils/attendance.js` | Register, close-before-finalise and auto-absent rows |
 | 8 | `controllers/googleAuthController.js` + `utils/deviceBinding.js` + `utils/signInPolicy.js` | Device review, `tokenVersion` and account-level status |
 | 9 | `controllers/adminController.js` + `utils/auditChain.js` + `utils/adminStepUp.js` | Step-up, audit chain and destructive actions |
@@ -231,17 +231,17 @@ at once.
 | --- | --- | --- |
 | 1 | `src/index.js`, `src/App.js`, `src/hooks/useRoleSession.js` | Boot, routes and role/session handling |
 | 2 | `src/components/login/` | Google sign-in and the development personas |
-| 3 | `src/components/teacher/checkInSessions.jsx` + `checkInSessionView.js` | Teacher TX, wave key display and evidence cards |
-| 4 | `src/components/student/studentCheckIn.jsx` + `studentCheckInView.js` + `src/acoustic/useCheckInAudio.js` | Student join, consent, listen and submit |
+| 3 | `src/components/teacher/checkInSessions.jsx` + `checkInSessionView.js` | One-tap start, relay console, key/pending display, nudge and evidence cards |
+| 4 | `src/components/student/studentCheckIn.jsx` + `studentCheckInView.js` + `src/acoustic/useCheckInAudio.js` + `useSignalTransmitter.js` | Student join, consent, listen, submit, relay the next signal and listen again |
 | 5 | `src/acoustic/fsk.js` → `transmitPlan.js` → `receiver.js` → `proofTransport.js` | The tone codec and the signed proof payload |
 | 6 | `src/components/teacher/SessionAttendanceModal.jsx` | Register, evidence and wave-timeline tabs |
 | 7 | `src/components/admin/AdminPanel.jsx` | Users, sessions, audit, security and settings |
 | 8 | `src/components/{attendance,queries,exports,sessions}/` | Analytics, queries, exports and session history |
 | 9 | The `*.node-tests.js` files next to the modules you just read | The smallest executable examples of each rule |
 
-**Checkpoint:** you can name the file that mints a wave key, the file that verifies a proof
-signature, the file that finalises a register and the file that decides whether a device is
-approved.
+**Checkpoint:** you can name the file that mints or promotes a pending round key, the file that
+verifies a proof signature and returns the next signal, the file that finalises a register and
+the file that decides whether a device is approved.
 
 ## 7. Go deeper only when you need it
 

@@ -86,6 +86,26 @@ const checkInSessionSchema = new mongoose.Schema(
       type: Date,
       required: true,
     },
+    // Cascade relay state. After the current wave earns evidence the server
+    // mints the next wave/key here and returns it only to students that proved
+    // the current wave. A proof for this pending pair promotes it to current.
+    // The pending key keeps its own lifetime; promotion never extends it.
+    pendingWave: {
+      type: Number,
+      default: null,
+    },
+    pendingKey: {
+      type: Number,
+      default: null,
+    },
+    pendingKeyIssuedAt: {
+      type: Date,
+      default: null,
+    },
+    pendingKeyExpiresAt: {
+      type: Date,
+      default: null,
+    },
     // Wave 0 has no history. Advancing appends the wave/key that just ended.
     keyHistory: {
       type: [keyHistorySchema],

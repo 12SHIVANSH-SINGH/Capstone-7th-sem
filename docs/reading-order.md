@@ -57,12 +57,14 @@ This step matters more than the feature list. Read the status sections before yo
   sweep decoded 10/10 at 1 m, 9/10 at 2 m, 9/10 at 3 m, **4/10 at 5 m** and **1/10 at 10 m**.
   Reverse direction and the muted control are unmeasured.
 - Structured timetable parsing (A2b), OCR (A3) and Gemini extraction (A4) are **not built**.
-- The live Render commit still needs the owner's dashboard check (gate **G2**), and the
-  restore drill depends on credentials and tools the owner must confirm (gate **G5**).
+- The owner confirmed Render showed `7148994` at handoff. The 2026-11-21 register fixes are
+  newer, so deploy them and re-check gate **G2**. The restore drill depends on credentials and
+  tools the owner must confirm (gate **G5**).
 
 ## 3. Run it locally (1–2 hours)
 
-Follow [`getting-started.md`](getting-started.md) from §1 to §8 in order. Do not skip the
+On a new Mac, follow [`new-device-handoff.md`](new-device-handoff.md) first. Then follow
+[`getting-started.md`](getting-started.md) from §1 to §8 in order. Do not skip the
 configuration step; the backend reads a gitignored `attendance-backend/config/config.env`.
 
 The minimum shape is:

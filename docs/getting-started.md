@@ -1,9 +1,10 @@
 # Getting started
 
 Run the whole stack on one laptop: MongoDB, the Express API and the React app. This is
-the canonical local guide; production setup is in [deployment.md](deployment.md), every
-page/API path is in [routes.md](routes.md), and the deployed multi-device run is in
-[testing-plan.md](testing-plan.md).
+the canonical local guide; moving to a new Mac starts with
+[new-device-handoff.md](new-device-handoff.md), production setup is in
+[deployment.md](deployment.md), every page/API path is in [routes.md](routes.md), and the
+deployed multi-device run is in [testing-plan.md](testing-plan.md).
 
 ## 1. Prerequisites
 
@@ -260,6 +261,7 @@ cd ../attendance-frontend
 npm run test:proof                       # 15
 npm run test:acoustic                    # 51
 npm run test:checkin                     # 10
+npm run test:attendance                  # 7
 npm run test:studentcheckin              # 12
 npm run test:auth                        # 2
 npm run test:rosterimport                # 6
@@ -268,7 +270,7 @@ CI=true REACT_APP_API_URL=/api/v1 npm run build
 ```
 
 The current expected counts are **backend 262/262** in both default and
-`--test-isolation=none` modes, and **frontend 102/102** across the seven frontend suites. The
+`--test-isolation=none` modes, and **frontend 109/109** across the eight frontend suites. The
 production build writes `attendance-frontend/build/`; the backend serves it automatically
 when that folder exists.
 
@@ -285,6 +287,7 @@ mechanics only, not real college layout accuracy.
 
 ## 11. Next steps
 
+- Moving to a new Mac: [new-device-handoff.md](new-device-handoff.md).
 - Every page and API path: [routes.md](routes.md).
 - Architecture and flows: [how-it-works.md](how-it-works.md).
 - Production deployment: [deployment.md](deployment.md).

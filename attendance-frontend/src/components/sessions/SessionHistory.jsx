@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import axios from "axios";
 import {
   FiAlertTriangle,
@@ -32,6 +32,8 @@ const messageFor = (error, fallback) =>
 const SessionHistory = () => {
   const { user, loading, logout } = useRoleSession(["teacher", "superadmin"]);
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedSessionId = searchParams.get("session") || "";
   const role = user?.role || "teacher";
   const isAdmin = role === "superadmin";
 
@@ -125,6 +127,15 @@ const SessionHistory = () => {
     if (!user || tab !== "audit") return;
     loadAudit();
   }, [user, tab, loadAudit]);
+
+  // The teacher dashboard links directly to one session. Open its register
+  // once the history has loaded, then remove the query string on close so a
+  // later refresh does not reopen a register the teacher already dismissed.
+  useEffect(() => {
+    if (!requestedSessionId || sessions.length === 0) return;
+    const match = sessions.find((session) => session.id === requestedSessionId);
+    if (match) setRegisterSession(match);
+  }, [requestedSessionId, sessions]);
 
   const totals = useMemo(() => {
     const finalised = sessions.filter((session) => session.attendanceFinalized).length;
@@ -416,7 +427,13 @@ const SessionHistory = () => {
         open={Boolean(registerSession)}
         session={registerSession}
         mode={isAdmin ? "admin" : "teacher"}
-        onClose={() => setRegisterSession(null)}
+        onClose={() => {
+          setRegisterSession(null);
+          if (!requestedSessionId) return;
+          const next = new URLSearchParams(searchParams.toString());
+          next.delete("session");
+          setSearchParams(next, { replace: true });
+        }}
         onChanged={() => { loadSessions(); if (tab === "audit") loadAudit(); }}
       />
     </AppShell>

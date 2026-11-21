@@ -21,7 +21,7 @@ than the JSON error envelope or the React shell. API responses, including that d
 | **Staff** | Teacher or super-admin. |
 | **Super-admin** | `role: "superadmin"` only. Granted by `SUPER_ADMIN_EMAILS`. |
 | **Super-admin + step-up** | Super-admin **and** a fresh WebAuthn assertion. Without it the route returns **428** `step_up_required`. |
-| **Dev-only** | Mounted only when `NODE_ENV=development|test` **and** `DEV_AUTH_ENABLED=true`. Absent in production. |
+| **Dev-only** | Mounted only when `NODE_ENV` is `development` or `test` **and** `DEV_AUTH_ENABLED=true`. Absent in production. |
 
 A missing or expired session returns **401**. A valid session with the wrong role or
 class ownership returns **403**. A valid super-admin session without a recent passkey
@@ -43,7 +43,7 @@ then checks `/islogin`; the access column describes where the page sends you.
 | `/teacher-dashboard` | Teacher | Teacher home: class/student counts, device-review queue, quick actions. Non-teachers are redirected. |
 | `/teacher/classes` | Teacher | Rooms, classes, CSV/paste roster preview/save, text-based PDF roster extraction and the device approval queue. |
 | `/teacher/check-in` | Teacher | Start a session and play round 0 in one tap, show the live two-minute key and pending next signal, stop/play sound, nudge with a fresh pending signal, use an evidence-gated manual advance fallback, inspect live evidence and history, and close the session. |
-| `/teacher/sessions` | Staff | Closed-session history, registers, attendance edits and the teacher audit log. A super-admin sees every teacher's sessions and can open any register. |
+| `/teacher/sessions` | Staff | Closed-session history, registers, attendance edits and the teacher audit log. A super-admin sees every teacher's sessions and can open any register. `?session=<id>` opens that session's register directly; closing it removes the query string. |
 | `/attendance` | Signed in | Analytics. A student sees their own percentages and sessions; a teacher sees class overviews and per-student detail; a super-admin can switch across classes. |
 | `/queries` | Signed in | Students raise and track 24-hour queries; teachers review, approve, reject and reopen; a super-admin sees every query. |
 | `/exports` | Staff | Branded PDF/Excel downloads for registers, queries, sessions, users and the audit log. Admin-only user/audit exports appear for a super-admin. |

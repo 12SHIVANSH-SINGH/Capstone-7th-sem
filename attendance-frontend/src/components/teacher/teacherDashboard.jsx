@@ -268,7 +268,11 @@ const TeacherDashboard = () => {
                                             </td>
                                             <td>
                                                 <div className="data-table__actions">
-                                                    <Button variant="soft" size="sm" onClick={() => navigate("/teacher/sessions")}>
+                                                    <Button
+                                                        variant="soft"
+                                                        size="sm"
+                                                        onClick={() => navigate(`/teacher/sessions?session=${encodeURIComponent(session.id)}`)}
+                                                    >
                                                         Register
                                                     </Button>
                                                     <Button variant="ghost" size="sm" onClick={() => navigate("/queries")}>

@@ -4,19 +4,21 @@
 
 Written for the working tree inspected on **6 November 2026** (`HEAD` reported by `git log -1 --oneline` as `003f900`, "deepseek flash 4.1 max"). A reconciliation on **10 November 2026** found `HEAD`, `origin/main` and `origin/HEAD` at `433d522`, a `.gitleaksignore`-only commit over `8d2e873`; the product code described here is unchanged. The repository's older status documents may name a different commit; when this book and the code disagree, the code wins. No commit, push, tag, merge or deploy was performed while writing it.
 
-> **Update — 20 November 2026 (after this snapshot).** The working tree now contains an
-> **uncommitted phone-to-phone relay cascade**. A valid proof for the current round mints a
-> server-side pending next key and returns it only to the proving phone; a valid proof for the
-> pending round atomically promotes it and mints the following key. Accepted or duplicate
-> proving phones play the returned signal, then listen again; the teacher starts and plays
-> round 0 in one tap and keeps an evidence-gated manual advance plus a fresh-pending nudge as
-> fallbacks. Closed sessions expose neither key nor pending state. This book's cascade
+> **Update — 21 November 2026 (after this snapshot).** The phone-to-phone relay cascade is
+> **committed in `b1e31f6`** and included in the owner-confirmed Render deployment
+> **`7148994`**. A valid proof for the current round mints a server-side pending next key and
+> returns it only to the proving phone; a valid proof for the pending round atomically promotes
+> it and mints the following key. Accepted or duplicate proving phones play the returned
+> signal, then listen again; the teacher starts and plays round 0 in one tap and keeps an
+> evidence-gated manual advance plus a fresh-pending nudge as fallbacks. Closed sessions expose
+> neither key nor pending state. The 2026-11-21 register fixes (proof-load errors, note-only
+> edits and the dashboard deep link) are newer and still need deploy. This book's cascade
 > sections below describe the earlier teacher-driven build. Treat `agent.md`, `plan.md`,
 > `progress.md`, `docs/how-it-works.md` and the code as current; where this book disagrees,
-> those win. The evidence-only rule, the unmeasured physical gate and the deployment caveat
-> still apply, and the cascade has **not** been measured in a physical classroom. Test counts
-> in this book are the 6 November snapshot; the current local gate is backend **262/262** in
-> both modes and frontend **102/102**.
+> those win. The evidence-only rule and the unmeasured physical gate still apply, and the
+> cascade has **not** been measured in a physical classroom. Test counts in this book are the
+> 6 November snapshot; the current local gate is backend **262/262** in both modes and frontend
+> **109/109**.
 
 ---
 
@@ -42,8 +44,8 @@ It is written in plain language first, with the formula or code condition immedi
 
 - It is **not** a claim that the physical layer has passed. The owner has treated Layer 1 as passed **for build planning only**. The last recorded distance sweep decoded 10/10 at 1 m, 9/10 at 2 m, 9/10 at 3 m, **4/10 at 5 m** and **1/10 at 10 m**. Reverse direction and the muted control were not measured. Do not describe the acoustic gate as measured-passed.
 - It is **not** a claim that real college PDFs parse accurately. Roster PDF extraction and timetable PDF extraction are tested with generated fixtures. No representative college timetable or roster PDFs have been supplied, and scanned OCR is not built.
-- It is **not** a claim that the live Render deployment matches the working tree. At this snapshot the repository was `433d522`; the current working tree is `80dc2e1` plus the uncommitted cascade. The exact deployed version was not verified; gate **G2** in [`docs/testing-plan.md`](../testing-plan.md) checks it before signed testing.
-- It is **not** a promise that automatic attendance, scoring or the ID round exist. They do not. The multi-hop relay cascade is built locally but uncommitted and unmeasured; see the 20 November update above.
+- It is **not** a claim that the live Render deployment matches every later working-tree change. At this snapshot the repository was `433d522`; the cascade is now committed in `b1e31f6` and the owner confirmed Render showed `7148994`, but the 2026-11-21 register fixes are newer. Gate **G2** in [`docs/testing-plan.md`](../testing-plan.md) must be re-checked after the next deploy.
+- It is **not** a promise that automatic attendance, scoring or the ID round exist. They do not. The multi-hop relay cascade is committed and locally tested but unmeasured; see the 21 November update above.
 
 ## The one-sentence version
 
@@ -77,12 +79,12 @@ Each technical chapter follows the same pattern:
 
 > **A note on line numbers.** Code line numbers move whenever a file changes. This book names files, functions, constants and exact conditions instead of quoting line numbers. That makes it stable and still precise enough to find the code.
 
-## Status snapshot (updated 20 November 2026)
+## Status snapshot (updated 21 November 2026)
 
 | Item | State |
 | --- | --- |
 | Backend test suite | **262/262** under `npm test` and under `npm test -- --test-isolation=none` |
-| Frontend helper tests | **102/102** total across proof, acoustic, check-in view, auth, roster import and timetable import suites |
+| Frontend helper tests | **109/109** total across proof, acoustic, check-in view, attendance draft, auth, roster import and timetable import suites |
 | Production build | Green with `CI=true REACT_APP_API_URL=/api/v1 npm run build` |
 | Acoustic lab, FSK codec, TX/RX pages | Built and tested; link works at 1 m but degrades at 5–10 m |
 | Signed proof transport | Built and tested; stores evidence only |
@@ -311,7 +313,7 @@ Those numbers matter because they create the central engineering tension:
 - 100 phones cannot all transmit at once without collisions.
 - The system must still work through a normal web browser, with no app install.
 
-The answer in the plan is a **cascade**: the teacher's phone plays key K0; phones that hear K0 prove it and retransmit K1; more phones hear K1; and so on. The current working tree implements this relay locally with server-minted pending keys, but it is uncommitted and has **not** been measured in a physical classroom. Owner-reported runs are planning evidence, not measurements.
+The answer in the plan is a **cascade**: the teacher's phone plays key K0; phones that hear K0 prove it and retransmit K1; more phones hear K1; and so on. The current code implements this relay with server-minted pending keys and it is committed and locally tested, but it has **not** been measured in a physical classroom. Owner-reported runs are planning evidence, not measurements.
 
 ## 2. The four actors and what each one sees
 
@@ -459,7 +461,7 @@ The system also forbids these shortcuts:
 
 ### Not built
 
-- A measured physical cascade rehearsal (the relay is built locally but uncommitted and unmeasured).
+- A measured physical cascade rehearsal (the relay is committed and locally tested, but unmeasured in a classroom).
 - Automatic scoring or automatic attendance.
 - The ID round (neighbour hearing reports).
 - Structured timetable row parsing, class matching and slot preview/save (A2b).
@@ -8078,7 +8080,7 @@ The gate in `plan.md` requires five things before any code sends a roster or tim
 4. **The owner's written acceptance and date.** A decision recorded in the repository, not a verbal assumption.
 5. **The fallback when a student or teacher opts out.** If a student refuses, the manual path must still work, and their data must not be sent.
 
-That text does not exist yet. Until it does, A4 is unbuilt and raw rosters remain server-side.
+A draft of all five elements now exists in `plan.md` §12. The owner-acceptance block is still unsigned, so A4 is unbuilt and raw rosters remain server-side.
 
 ### Why the order is OCR before LLM
 
@@ -9013,19 +9015,20 @@ The frontend has no Jest component suite. The tested logic is extracted into pur
 
 The test files use the suffix `*.node-tests.js`, not `*.test.js`, so Create React App's Jest runner does not pick them up. The npm scripts name each file explicitly.
 
-### The seven suites
+### The eight suites
 
 | Script | File | Count | What it covers |
 | --- | --- | --- | --- |
 | `test:proof` | `src/acoustic/proof.node-tests.js` | 15 | Proof message format, malformed fields, shared bounds, P-256 signing, signature length, missing key/WebCrypto, submit body, server error surfacing, non-JSON response, missing API URL, 204, null body, unreadable body, network failure |
 | `test:acoustic` | `fsk`, `lab`, `worklet`, `link`, `pcm-worklet` | 51 | Frame structure, value↔digits, random round trips, 48 kHz and 44.1 kHz decoding, leading silence, noise, echo, false positives, checksum, detection margins, probe list, sample-rate gate, verdict boundaries, sweep summary, tone plan/fades, medians, baseline gate, peak hold, meter clamping, mic errors, 19.5 kHz alias test, report formatting, run IDs, links, TX/RX plans and reports, PCM buffer |
 | `test:checkin` | `checkInSessionView.node-tests.js` | 10 | Active-session selection, labels, live key state, fresh-pending nudge, round evidence, pending lifetime, countdown formatting, history durations |
+| `test:attendance` | `sessionAttendanceView.node-tests.js` | 7 | Status-only and note-only register edits, combined edits, reverted notes, clearing a note, malformed rows and null normalisation |
 | `test:studentcheckin` | `studentCheckInView.node-tests.js` | 12 | Session selection, Join gate order, decoded-key bounds, evidence view without key, idempotent retry, malformed response, live listening rules, relay keys, countdown/time formatting |
 | `test:auth` | `auth.node-tests.js` | 2 | Role-to-dashboard routing |
 | `test:rosterimport` | `rosterImport.node-tests.js` | 6 | PDF detection by MIME/extension, extraction summary plurals, no-email warning, scanned-PDF message, server-message fallback |
 | `test:timetableimport` | `timetableImport.node-tests.js` | 6 | PDF detection, page/line summary without claiming a slot, missing counts, scanned message, password/size errors, fallback |
 
-Total: **102/102**.
+Total: **109/109**.
 
 ### What the acoustic tests actually do
 
@@ -9208,7 +9211,7 @@ These steps are the short local smoke. The full deployed run — 4 phones, 3–4
 
 A safe sentence:
 
-> The backend suite passes 262/262 in both isolation modes, the frontend helper suites pass 102/102, and the production build is green. Those tests cover the algorithms, route wiring, validation and security contracts. The acoustic range, real college PDFs, live deployment and physical phone rehearsal remain open and are listed as such.
+> The backend suite passes 262/262 in both isolation modes, the frontend helper suites pass 109/109, and the production build is green. Those tests cover the algorithms, route wiring, validation and security contracts. The acoustic range, real college PDFs, live deployment and physical phone rehearsal remain open and are listed as such.
 
 An unsafe sentence:
 
@@ -9804,7 +9807,7 @@ Some free tiers require a card, train on submitted data, or have unclear retenti
 | Automatic attendance | The evidence does not prove presence; a human decision is required |
 | Confidence scoring | No calibrated probability; a score would imply precision the physics does not support |
 | ID round | A future challenge-response layer; not needed for evidence-only |
-| Physical cascade rehearsal | The relay is built locally but uncommitted; no measured classroom run exists |
+| Physical cascade rehearsal | The relay is committed and locally tested; no measured classroom run exists |
 | Native mobile app | The web app is sufficient; a native app would need a new device-key story |
 | Structured timetable import | Blocked on representative PDFs |
 | Local OCR | Blocked on representative scans and accuracy/runtime measurement |
@@ -10200,7 +10203,7 @@ The scripts are tested with stubs, not a real Atlas restore. Until a drill is re
 
 ### Deployment verification
 
-The repository's `HEAD`, `origin/main` and `origin/HEAD` are now `80dc2e1`; the phone-to-phone cascade is uncommitted in the working tree. The committed tree includes the A2a timetable text preview. The live Render service answered `/api/v1/health` and `/api/v1/health/ready`, and its `main.14c6a1a8.js` bundle contained the A2a UI strings. The exact deployed commit was not compared with the Render dashboard, so that comparison is a hard gate (**G2** in [`docs/testing-plan.md`](../testing-plan.md)) before signed testing:
+The repository's `HEAD`, `origin/main` and `origin/HEAD` are now `7148994`; the phone-to-phone cascade is committed in `b1e31f6` and the owner confirmed the Render dashboard showed `7148994`. The 2026-11-21 register fixes are newer and still need deploy, so the dashboard comparison remains a hard gate (**G2** in [`docs/testing-plan.md`](../testing-plan.md)) before signed testing:
 
 - a deploy may be from a different commit than the book describes;
 - a fix may be in the working tree but not deployed;
@@ -10252,7 +10255,7 @@ This is the current, honest list. Each item names the gate or the missing eviden
 
 | Item | Gate |
 | --- | --- |
-| A4 Gemini extraction | Student notice, data-field list, retention/training risk, written owner acceptance with a date, opt-out fallback. None exists yet |
+| A4 Gemini extraction | Student notice, data-field list, retention/training risk and opt-out fallback are drafted in `plan.md` §12; the dated owner acceptance (D4) is still unsigned |
 
 ### Physical and rehearsal work
 
@@ -11508,11 +11511,13 @@ The suite uses Node's built-in runner and needs no live MongoDB. See chapters 97
 | `src/index.css` | Global tokens/base styles |
 | `src/components/student/studentCheckInView.node-tests.js` | 12 helper tests |
 | `src/components/teacher/checkInSessionView.node-tests.js` | 10 helper tests |
+| `src/components/teacher/sessionAttendanceView.js` | Register status/note draft helpers |
+| `src/components/teacher/sessionAttendanceView.node-tests.js` | 7 helper tests |
 | `src/utils/auth.node-tests.js` | 2 routing tests |
 | `src/utils/rosterImport.node-tests.js` | 6 helper tests |
 | `src/utils/timetableImport.node-tests.js` | 6 helper tests |
 
-The acoustic test files are listed in the acoustic table. Total frontend helper tests: **102/102**.
+The acoustic test files are listed in the acoustic table. Total frontend helper tests: **109/109**.
 
 ### Frontend public and PWA files
 
@@ -12352,11 +12357,11 @@ OCR is CPU-heavy and accuracy depends on scan quality, fonts, skew and table lin
 
 **43. Why is Gemini not used?**
 
-A raw roster contains names and college emails. Sending it to a hosted model is a privacy decision that needs a student notice, a data-field list, retention/training risk acceptance, a written owner decision and an opt-out fallback. None exists yet, so the code does not send rosters.
+A raw roster contains names and college emails. Sending it to a hosted model is a privacy decision that needs a student notice, a data-field list, retention/training risk acceptance, a written owner decision and an opt-out fallback. Those are drafted in `plan.md` §12, but the dated owner acceptance is still unsigned, so the code does not send rosters.
 
 **44. What does the test suite prove?**
 
-It proves the pure algorithms, route wiring, validation, security contracts, evidence-only views and startup refusal. Backend 262/262 in both isolation modes; frontend helpers 102/102; production build green. It does not prove physical range, real college PDFs, a live MongoDB, a real Google login, the deployed version or a classroom pilot.
+It proves the pure algorithms, route wiring, validation, security contracts, evidence-only views and startup refusal. Backend 262/262 in both isolation modes; frontend helpers 109/109; production build green. It does not prove physical range, real college PDFs, a live MongoDB, a real Google login, the deployed version or a classroom pilot.
 
 **45. Why run the backend suite with `--test-isolation=none`?**
 
@@ -12426,7 +12431,7 @@ That answer is stronger than "it works" because it cannot be embarrassed by the 
 - "The system records evidence; the teacher decides attendance."
 - "The recorded sweep decoded 33 of 50 frames; 1–3 m was strong, 5–10 m was weak."
 - "Layer 1 is a build-planning assumption, not a measured pass."
-- "The backend suite passes 262/262 in both isolation modes; the frontend helpers pass 102/102; the production build is green."
+- "The backend suite passes 262/262 in both isolation modes; the frontend helpers pass 109/109; the production build is green."
 - "The tests cover algorithms, route wiring, validation and security contracts, not physical range or real college PDFs."
 - "A new device waits for teacher approval."
 - "The audit chain is tamper-evident, not tamper-proof."

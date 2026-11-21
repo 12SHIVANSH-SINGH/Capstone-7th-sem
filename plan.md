@@ -170,22 +170,26 @@ teacher-confirmed attendance instead.
 queries, analytics, exports, notifications, timetable, PWA and a production-capable
 super-admin console. Roster PDF text extraction with an editable preview is built, and
 timetable PDF text extraction with a read-only preview is built (A2a). The phone-to-phone relay
-cascade is built and locally tested but is **uncommitted** and not physically rehearsed.
-Structured timetable row parsing, local OCR and Gemini extraction are not built. The product is
-still **evidence-only for acoustic proof**: the app does not automatically score attendance or
-run the ID round. The attendance decision belongs to the teacher and is audited. The click-level
-execution script for the deployed 4-phone/3–4-laptop run is
-[`docs/testing-plan.md`](docs/testing-plan.md).
+cascade is **committed and locally tested**; the owner reports Render shows `7148994`. The
+2026-11-21 register fixes are in the working tree and still need commit, deploy and a fresh G2
+check. The cascade has not been physically rehearsed. Structured timetable row parsing, local
+OCR and Gemini extraction are not built. The product is still **evidence-only for acoustic
+proof**: the app does not automatically score attendance or run the ID round. The attendance
+decision belongs to the teacher and is audited. The click-level execution script for the
+deployed 4-phone/3–4-laptop run is [`docs/testing-plan.md`](docs/testing-plan.md).
 
-**Next work, in order:**
+**Completion path for the one-week push (2026-11-21):**
 
 | Order | Slice | Scope | Pass test |
 | --- | --- | --- | --- |
-| 1 (physical) | 1.10 range diagnosis | Lower the band and/or tune TX settings; rerun 1 m, 5 m, 10 m, then reverse and muted control | ≥95% decoded at 1 m/5 m/10 m both directions; 0 decodes in the muted control |
-| 2 (rehearsal) | 2.6 phone-to-phone cascade rehearsal | 10–20 phones for 5–6 minutes; verify automatic relay, teacher fallback and zero-proof recovery; measure waves, timing and range | Every phone reaches a wave through the relay without a per-wave reload; a fresh pending key is promoted; timing measured; no false-accept claim without scoring |
-| 3 (owner) | Deploy and verify | Configure Render, deploy the current tree, compare the Render dashboard commit with the reviewed `HEAD`, verify real Google sign-in and `/admin` | Health/readiness, test-plan G2 commit match, Google sign-in, no demo or dev routes in production |
-| 4 (test) | Deployed manual test run | Execute [`docs/testing-plan.md`](docs/testing-plan.md): AC → FL → AD → PDF → DP/RS with 4 phones and 3–4 laptops | Preflight gates G0–G7 pass; every suite records PASS/FAIL/BLOCKED with evidence; no open P0/P1 defect |
-| 5 (gated) | 3.x scoring, ID round, review queue | Only after the physical gate is genuinely measured | Layer 3 gate |
+| 1 | Register fixes and handoff docs | Proof-load error, note-only edits, dashboard Register deep link, new-Mac handoff and status reconciliation | New attendance tests pass; production build green; docs match the code |
+| 2 (owner) | Commit, deploy and verify | Commit the working tree, push, redeploy, compare the Render dashboard with the reviewed `HEAD`, verify real Google sign-in and `/admin` | Health/readiness, test-plan G2 commit match, Google sign-in, no demo or dev routes in production |
+| 3 (physical) | 1.10 range diagnosis | Lower the band and/or tune TX settings; rerun 1 m, 5 m, 10 m, then reverse and muted control | ≥95% decoded at 1 m/5 m/10 m both directions; 0 decodes in the muted control |
+| 4 (rehearsal) | 2.6 phone-to-phone cascade rehearsal | 10–20 phones for 5–6 minutes; verify automatic relay, teacher fallback and zero-proof recovery; measure waves, timing and range | Every phone reaches a wave through the relay without a per-wave reload; a fresh pending key is promoted; timing measured; no false-accept claim without scoring |
+| 5 (test) | Deployed manual test run | Execute [`docs/testing-plan.md`](docs/testing-plan.md): AC → FL → AD → PDF → DP/RS with 4 phones and 3–4 laptops | Preflight gates G0–G7 pass; every suite records PASS/FAIL/BLOCKED with evidence; no open P0/P1 defect |
+| 6 (gated) | A2b/A3/A4 ingestion | Structured timetable import, local OCR, optional Gemini extraction | A2b uses real timetable PDFs and teacher confirmation; A3 measures OCR accuracy/runtime; A4 has the signed consent/risk text |
+| 7 (delivery) | Capstone submission pack | Report, slides, demo script and evidence appendix | Every claim points at a recorded test or measurement |
+| 8 (gated) | 3.x scoring, ID round, review queue | Only after the physical gate is genuinely measured | Layer 3 gate |
 
 ## 9. Risks and honest limits
 
@@ -204,8 +208,9 @@ execution script for the deployed 4-phone/3–4-laptop run is
 
 ## 10. Open items
 
-- Confirm the live Render commit against the Render dashboard (test-plan gate G2); a
-  reachable service is not proof that the deployed commit is current.
+- Re-check the live Render commit after the 2026-11-21 fixes are deployed (test-plan gate
+  G2). The owner confirmed the dashboard showed `7148994`; a reachable service is not proof
+  that a later working tree is current.
 - Run the signed real-student Google flow on Render (`docs/testing-plan.md`, suite FL); the
   local smokes used a JWT cookie and, for the student shell, fake audio.
 - Confirm Render free-plan behaviour during a live 5–6 minute check-in.
@@ -221,7 +226,8 @@ execution script for the deployed 4-phone/3–4-laptop run is
 
 **Status (2026-11-06):** implemented and tested locally. The P1 slice passed at backend
 **227/227** in both test modes and frontend **84/84**; after the roster and timetable PDF
-text-preview and cascade slices the current gate is backend **262/262** and frontend **102/102**. The
+text-preview, cascade and register-fix slices the current gate is backend **262/262** and
+frontend **109/109**. The
 production build is green, and a
 Chrome virtual-authenticator run passed the full enrollment → 428 → step-up →
 settings-save → chain-verify path.
@@ -256,18 +262,100 @@ runs the existing validation preview and confirms the save.
 | A3 Local OCR | **Not built** | Render scanned pages locally and run a free in-process OCR engine. The OCR output still goes through the same editable preview. | No paid service or card. OCR accuracy and runtime must be measured on sample scans before it is offered. |
 | A4 Optional Gemini extraction | **Gated** | A last-resort structured extractor for documents that text extraction and OCR cannot structure. Raw rosters may leave the server only after the consent and risk text below exists. | The Gemini free tier may use content to improve products and may involve human review. No AI path is coded until the owner accepts that risk in this file. |
 
-### Gemini consent and risk acceptance gate (not yet satisfied)
+### A2b/A3 sample request (blocking)
 
-Before any code sends a roster or timetable to Gemini, this section must contain:
+Parser and OCR work needs real inputs. Please supply, from the college's actual process:
 
-1. the exact student-facing notice and where it is shown;
-2. the data fields that may leave the server;
-3. the retention/training risk of the chosen free tier;
-4. the owner's written acceptance and date; and
-5. the fallback when a student or teacher opts out.
+1. **Two to four timetable PDFs** for the department, semester and section used in the
+   capstone, including at least one with lab slots, merged cells or a non-grid layout.
+2. **One scanned or phone-photo timetable** (or a PDF export of a scan) for the A3 accuracy
+   and runtime measurement.
+3. For each file, a one-line note saying whether it has a text layer or is image-only, and
+   which course code/section it belongs to.
 
-That text does **not** exist yet. Until it does, A4 stays unbuilt and raw rosters remain
-server-side.
+Put the files in the gitignored `test-artifacts/timetable-samples/` directory (or another
+private folder) and never commit a real student document. Course codes, rooms, teachers and
+times are enough; student names can be redacted. Do not construct a synthetic "college
+layout" and call it validated. A2b will be built only against
+these samples, will match existing owned classes, will show every proposed slot for teacher
+confirmation, and will flag unmatched rows for manual class creation. It will never create a
+class or overwrite a slot silently.
+
+### Gemini consent and risk acceptance gate (draft — owner acceptance required)
+
+**Status: DRAFT, not accepted.** This text exists so the owner can review and accept it. A4
+stays unbuilt and raw rosters stay server-side until the owner fills in the acceptance block
+below with a date and commits it. Drafted 2026-11-21.
+
+#### D1. Student-facing notice (exact text)
+
+> **How uploaded class documents are read**
+>
+> A teacher may upload a class roster or timetable PDF. The app first tries to read the
+> document on the server. If that fails and the teacher chooses the optional AI reader, the
+> document text may be sent to Google's Gemini API. That text can include student names, roll
+> numbers, college email addresses, course codes, rooms and class times. The free Gemini tier
+> may retain the content, use it to improve Google products, and allow human review. Do not
+> upload a document unless everyone named in it has been told this. If you object, tell the
+> teacher before the upload; the class will be entered manually or read with local OCR
+> instead. The AI reader never saves a roster, creates a class, overwrites a slot or marks
+> attendance. The teacher reviews every extracted value before saving.
+
+**Where it is shown:**
+
+1. In the pre-pilot written notice sent to every student in the test class, before any upload.
+2. On the student **Help** page under a “Document privacy” heading, linked from the existing
+   check-in retention notice.
+3. In the teacher import dialog, as an unchecked “I have told the class and accept the Gemini
+   free-tier risk” checkbox required once per upload before the AI button enables.
+
+#### D2. Data that may leave the server
+
+Only the bytes or extracted text of the one document the teacher selected, plus the minimum
+class context needed to interpret it (class name, course code, section and department).
+
+The document may contain student names, roll numbers and college email addresses, and
+timetable course codes, rooms, teachers and times. Nothing else is sent: no passwords, JWTs,
+device public keys, acoustic proofs, attendance decisions, queries, location evidence,
+Google subject identifiers or other database records. The app does not send the rest of the
+class roster, other classes, or any student's attendance history.
+
+#### D3. Retention, training and review risk
+
+The chosen path is the **Gemini API free tier** because the project may not use a paid service
+or a tier that requires a payment card. Under Google's terms for the free tier, submitted
+content may be stored and used to provide, improve and develop Google products, and may be
+reviewed by humans. The project cannot guarantee deletion or confidential treatment of
+uploaded content. The owner must re-read the current Google terms on the acceptance date;
+if the free tier then requires a card, trains on content in a way the owner does not accept,
+or no longer offers the needed model, A4 stays unbuilt.
+
+Mitigations: AI is off by default and opt-in per document; only one document is sent; the
+teacher sees a preview and confirms every value; the normal text-layer path and A3 local OCR
+remain available; the app never sends a document automatically.
+
+#### D4. Owner acceptance (must be completed before A4 code)
+
+> I have read D1–D3. I accept that a document containing student names, roll numbers and
+> college email addresses may be sent to the Gemini API free tier, where it may be retained,
+> used to improve Google products and reviewed by humans. I will give the student notice
+> before the first upload, keep the AI reader opt-in per document, and keep the manual and
+> local-OCR fallbacks available.
+>
+> Owner: Shivansh Singh
+> Date: ____________________
+> Accepted in commit: ____________________
+
+#### D5. Opt-out and fallback
+
+- The teacher can always use manual entry, A1/A2a text extraction or A3 local OCR. Those paths
+  never depend on Gemini.
+- If any student objects, the teacher must remove that student's row before an AI upload or
+  use a non-AI path for the whole document. The app cannot verify consent per row, so the
+  teacher is responsible for redaction.
+- A declined AI checkbox leaves the AI action disabled; it does not block the rest of the
+  import flow.
+- No A4 code is written until D4 contains a date and the owner commits this file.
 
 ## 13. Out of scope (for now)
 

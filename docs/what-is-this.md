@@ -48,12 +48,11 @@ the signed proof is submitted.
 | Full flow on real phones | ⏳ attendance is teacher-confirmed and the local browser flow works end to end; a real-phone/Google phone-to-phone cascade rehearsal, measured acoustic range, automatic scoring and the ID round are still pending |
 
 This is a demo-ready capstone prototype — not yet used for real attendance. The repository's
-`HEAD`, `origin/main` and `origin/HEAD` are `80dc2e1`, which includes the
-attendance/query/admin layer, the P0/P1 security hardening and the committed A2a timetable PDF
-text preview. The phone-to-phone cascade changes are **uncommitted in the working tree**. The
-live service was last observed serving A2a UI strings, but its exact deployed commit has not
-been checked in the Render dashboard. The click-level deployed test run is
-[`testing-plan.md`](testing-plan.md).
+`HEAD`, `origin/main` and `origin/HEAD` are `7148994`, which includes the phone-to-phone cascade
+and the Mongoose security patch. The owner reports the Render dashboard shows the same commit.
+The 2026-11-21 register fixes are newer and still need commit, deploy and a fresh G2 check. The
+click-level deployed test run is [`testing-plan.md`](testing-plan.md); moving to a new Mac
+starts with [`new-device-handoff.md`](new-device-handoff.md).
 
 ## Learn more
 

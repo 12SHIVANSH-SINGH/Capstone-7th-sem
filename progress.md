@@ -3,16 +3,21 @@
 Update this at the end of every session. If it disagrees with the real code, the code wins:
 fix this file and tell the owner.
 
-Last updated: **2026-11-20** (session 30: phone-to-phone cascade — server pending keys,
-atomic promotion, automatic student relay and one-click teacher start; backend **262/262**
-and frontend **102/102**; the physical cascade rehearsal is still pending).
+Last updated: **2026-11-21** (session 31: register proof-load, note-only edit and dashboard
+deep-link fixes; backend **262/262**, frontend **109/109**, production build green; the
+physical cascade rehearsal is still pending).
 
 ## Status
 
 - **Current layer:** Layer 1 is treated as **passed by owner assumption for build planning
   only**. It is **not measured-passed**. The 2026-10-25 sweep still fails at 5 m and 10 m;
   reverse direction and muted control are unmeasured.
-- **Current slice:** security P0 and P1 are built and tested locally. P0 covers strict CSP,
+- **Current slice:** the 2026-11-21 register fixes are built and tested. `SessionAttendanceModal`
+  now shows a retryable error when proof evidence fails to load, saves note-only edits without
+  dropping them, and preserves an existing note when only the status changes. The teacher
+  dashboard's recent-session **Register** button now opens `/teacher/sessions?session=<id>` and
+  `SessionHistory` opens that exact register. The new `test:attendance` suite covers the draft
+  and note logic. Security P0 and P1 remain built and tested locally. P0 covers strict CSP,
   first-party cookies, session revocation, impersonation hardening, teacher-approved device
   binding, encrypted backup scripts and supply-chain scanning. P1 adds WebAuthn/passkey
   step-up for destructive admin actions, an audit hash chain with verification, export auditing
@@ -23,14 +28,15 @@ and frontend **102/102**; the physical cascade rehearsal is still pending).
   A2a never parses rows, matches classes, creates a class or writes a slot. Structured
   timetable import (A2b), local OCR (A3) and consent-gated Gemini extraction (A4) are not
   built. Scoring, automatic attendance decisions and the ID round are not built.
-- **Phone-to-phone cascade:** built locally and **uncommitted**. A valid proof for the current
-  round mints a server-side pending next key and returns it to the proving phone; a valid proof
-  for the pending round atomically promotes that key and mints the following one. Every
-  accepted or duplicate proving phone relays the returned signal three times, then listens
-  again. The teacher screen starts and plays round 0 in one tap, stops old audio when the
-  server advances, and keeps an evidence-gated manual Advance plus a fresh-pending Nudge as
-  fallbacks. Zero-proof expiry recovery is close and start fresh. No physical cascade
-  rehearsal has been run; owner-reported classroom attempts are planning evidence only.
+- **Phone-to-phone cascade:** committed in **`b1e31f6`** and included in the owner-confirmed
+  Render deploy **`7148994`**. A valid proof for the current round mints a server-side pending
+  next key and returns it to the proving phone; a valid proof for the pending round atomically
+  promotes that key and mints the following one. Every accepted or duplicate proving phone
+  relays the returned signal three times, then listens again. The teacher screen starts and
+  plays round 0 in one tap, stops old audio when the server advances, and keeps an
+  evidence-gated manual Advance plus a fresh-pending Nudge as fallbacks. Zero-proof expiry
+  recovery is close and start fresh. No physical cascade rehearsal has been run;
+  owner-reported classroom attempts are planning evidence only.
 - **Deployed test plan:** [`docs/testing-plan.md`](docs/testing-plan.md) is the click-level
   execution script for the 4-phone/3–4-laptop run. It covers acoustic range and controls, the
   signed attendance/query flow on Render with real college accounts, device/passkey/admin
@@ -64,25 +70,26 @@ and frontend **102/102**; the physical cascade rehearsal is still pending).
 - **Device binding:** a student's first browser and every changed browser now enter the
   teacher device-review queue; only dev/test personas auto-approve. Replacing an approved
   device bumps `tokenVersion`, so the old session cannot submit proofs.
-- **Repository state:** local `HEAD`, `origin/main` and `origin/HEAD` are all **`80dc2e1`**
-  (“doc push”), on top of `433d522`. The A1 roster PDF slice, A2a timetable text preview,
-  P0/P1 security, PWA and dark-mode work are committed and pushed. The phone-to-phone cascade
-  changes are **uncommitted in the working tree** and have not been pushed. The live service
-  was last observed serving A2a strings; the exact deployed commit was **not compared with
-  the Render dashboard**, so G2 of the test plan remains open. No push, tag, merge or deploy
-  was performed in this session.
-- **Next action:** execute [`docs/testing-plan.md`](docs/testing-plan.md) in order. First pass
-  G0–G7, especially G2 (owner compares the Render dashboard commit with `80dc2e1` plus the
-  uncommitted cascade if it is published) and G5 (Atlas URI, passphrase,
-  `mongodump`/`mongorestore` and scratch-database permission). If G2 fails, stop signed
-  testing. If G5 fails, mark the restore suite **BLOCKED** and do not claim restore coverage.
-  Then run AC → FL → AD → PDF → DP/RS; FL now exercises the automatic cascade, a fresh-pending
-  promotion, the manual fallback and zero-proof recovery. Only after that, and only when
-  representative timetable PDFs exist, build **A2b structured timetable parsing**: match rows
-  to existing owned classes, show a slot preview, require teacher confirmation and flag
-  unmatched rows for manual class creation. Do not invent timetable layouts. Local OCR (A3)
-  follows. Production needs
-  `SUPER_ADMIN_EMAILS=12shivanshsingha@gmail.com`,
+- **Repository state:** local `HEAD`, `origin/main` and `origin/HEAD` are **`7148994`**
+  (“security scan lapse”), which includes the committed phone-to-phone cascade (`b1e31f6`),
+  its tests and docs, and the Mongoose `8.24.10` security patch. The owner reports the Render
+  dashboard shows `7148994`. The 2026-11-21 register fixes and `test:attendance` are in the
+  working tree; commit, push, redeploy and re-run G2 before signed testing. No push, tag,
+  merge or deploy was performed in this session.
+- **Next action:** commit and deploy the 2026-11-21 fixes, then execute
+  [`docs/testing-plan.md`](docs/testing-plan.md) in order. First pass G0–G7, especially G2
+  (compare the Render dashboard commit with the reviewed `HEAD` after the new deploy) and G5
+  (Atlas URI, passphrase, `mongodump`/`mongorestore` and scratch-database permission). If G2
+  fails, stop signed testing. If G5 fails, mark the restore suite **BLOCKED** and do not
+  claim restore coverage. Then run AC → FL → AD → PDF → DP/RS; FL exercises the automatic
+  cascade, a fresh-pending promotion, the manual fallback and zero-proof recovery. Then
+  measure the physical cascade and range. Only after that, and only when representative
+  timetable PDFs exist, build **A2b structured timetable parsing**: match rows to existing
+  owned classes, show a slot preview, require teacher confirmation and flag unmatched rows
+  for manual class creation. Do not invent timetable layouts. Local OCR (A3) follows, then
+  optional Gemini extraction (A4) only after the owner dates and signs the draft consent/risk
+  text in `plan.md` §12.
+  Production needs `SUPER_ADMIN_EMAILS=12shivanshsingha@gmail.com`,
   `SUPER_ADMIN_SESSION_HOURS=12`, an HTTPS `WEBAUTHN_ORIGINS` (or `RENDER_EXTERNAL_URL`), and
   an empty/unset `REACT_APP_GOOGLE_HOSTED_DOMAIN`. The address must not appear in
   `TEACHER_EMAILS` or any `TEST_*` list. After the first deploy, sign in as the super-admin,
@@ -102,6 +109,7 @@ and frontend **102/102**; the physical cascade rehearsal is still pending).
 | Server-minted pending-key cascade, atomic promotion, automatic student relay and manual advance fallback | ✅ built and locally tested; physical rehearsal pending |
 | Teacher evidence view and session history | ✅ built and tested |
 | Teacher-confirmed register, finalisation, edits and audit | ✅ built and browser-smoke-tested |
+| Register proof-load error, note-only edits and dashboard Register deep link | ✅ fixed and unit-tested 2026-11-21; deployed verification pending |
 | 24-hour student queries with optional location evidence | ✅ built and browser-smoke-tested |
 | Analytics, trend/term totals and query counts | ✅ built and browser-smoke-tested |
 | PDF/Excel exports for registers, queries, sessions, users, audit | ✅ built and browser-smoke-tested |
@@ -123,11 +131,12 @@ and frontend **102/102**; the physical cascade rehearsal is still pending).
 | Proof transport | **15/15** |
 | Acoustic (codec, lab, worklets, TX/RX link) | **51/51** |
 | Teacher check-in view | **10/10** |
+| Register draft/note helpers | **7/7** |
 | Student check-in view | **12/12** |
 | Auth routing | **2/2** |
 | Roster PDF import helpers | **6/6** |
 | Timetable PDF import helpers | **6/6** |
-| Frontend total | **102/102** |
+| Frontend total | **109/109** |
 | Synthetic PDF fixture generator | ✅ `roster-text-layer.pdf` and `timetable-text-layer.pdf` extract text; `no-text-layer.pdf` reports no text layer |
 | Production build | ✅ compiles successfully (`CI=true REACT_APP_API_URL=/api/v1 npm run build`) |
 | Browser smoke (dev) | **65/65** |
@@ -203,9 +212,10 @@ build planning only; never call the physical gate measured-passed.
   run has measured how many phones reach each round or how long relay takes. Owner-reported
   classroom attempts are accepted for planning only and are not measured evidence. The
   "lowest wave heard" join rule is still not built.
-- **Known UI audit items (not fixed in this slice):** `SessionAttendanceModal` still has
-  proof-loading and note-edit issues, and the dashboard Register deep link does not open the
-  intended session register directly.
+- **Register UI defects are fixed (2026-11-21):** proof-load failures now show a retryable
+  error instead of “No signed proofs,” note-only edits are saved, status-only edits preserve
+  the existing note, and the dashboard Register link opens the exact session register. These
+  fixes still need a commit, deploy and browser check on Render.
 - **Scoring and ID round:** not built and still gated.
 - **Device-binding retention:** bindings persist indefinitely while proof evidence is TTL'd
   after about one day. Decide whether bindings should follow the same retention.
@@ -236,15 +246,18 @@ build planning only; never call the physical gate measured-passed.
   structured timetable import, local OCR and consent-gated Gemini extraction are still not
   built. No real sample PDFs have been supplied yet, so college-layout accuracy and
   structured timetable parsing remain blocked/unvalidated.
-- **Gemini consent gate:** raw rosters may go to the free tier only after a student notice and
-  a written risk acceptance in `plan.md`; that text must exist before the AI path is coded.
+- **Gemini consent gate:** `plan.md` §12 now carries a draft student notice, data-field list,
+  free-tier retention/training risk, opt-out fallback and a dated owner-acceptance block (D4).
+  D4 is unsigned, so A4 remains unbuilt and raw rosters stay server-side.
 
 ## Recent session history
 
 | Date | What changed | Result |
 | --- | --- | --- |
-| 2026-11-20 | Phone-to-phone cascade: pending-key fields and atomic promotion on the proof path, `next` in accepted/duplicate responses, lifetime preservation, closed-session key redaction, one-click teacher start with round-0 playback, fresh-pending Nudge and evidence-gated manual advance fallback, automatic student relay with persisted per-session consent, and the reusable `useSignalTransmitter` hook. Docs reconciled to the new flow. | Backend **262/262** in both modes; frontend **102/102**; production build green. Physical cascade rehearsal not run. Changes are uncommitted; no push. |
-| 2026-11-20 | Cleared the backend high-severity audit failure by upgrading mongoose **8.24.5 → 8.24.10** (patched line, same major). The remaining ExcelJS→uuid moderate advisory is accepted because ExcelJS uses UUID v4, not the affected v3/v5/v6 caller-buffer API; `npm audit fix --force` would downgrade ExcelJS to 3.4.0 and was not used. | `npm audit --omit=dev --audit-level=high` exits **0**; backend **262/262** in both modes. Uncommitted; no push. |
+| 2026-11-21 | Fixed the three known register defects: proof-load failures now show a retryable error, note-only edits save and status-only edits preserve the existing note, and the dashboard **Register** button deep-links to the exact session. Added `sessionAttendanceView` helpers and `test:attendance`; added the new-Mac handoff, drafted the A4 consent/risk gate and the A2b/A3 sample request, and reconciled status docs. | Full gate re-run: backend **262/262** in both modes; all eight frontend suites **109/109** (proof 15, acoustic 51, check-in 10, attendance 7, student check-in 12, auth 2, roster 6, timetable 6); production build green. Full deploy/browser check still pending. |
+| 2026-11-20 | Committed and published the phone-to-phone cascade in **`b1e31f6`**, then the Mongoose security patch in **`7148994`**. The owner reports the Render dashboard shows `7148994`. | Backend **262/262** in both modes; frontend **102/102**; production build green. Physical cascade rehearsal not run. |
+| 2026-11-20 | Phone-to-phone cascade: pending-key fields and atomic promotion on the proof path, `next` in accepted/duplicate responses, lifetime preservation, closed-session key redaction, one-click teacher start with round-0 playback, fresh-pending Nudge and evidence-gated manual advance fallback, automatic student relay with persisted per-session consent, and the reusable `useSignalTransmitter` hook. Docs reconciled to the new flow. | Backend **262/262** in both modes; frontend **102/102**; production build green. Committed in `b1e31f6`. |
+| 2026-11-20 | Cleared the backend high-severity audit failure by upgrading mongoose **8.24.5 → 8.24.10** (patched line, same major). The remaining ExcelJS→uuid moderate advisory is accepted because ExcelJS uses UUID v4, not the affected v3/v5/v6 caller-buffer API; `npm audit fix --force` would downgrade ExcelJS to 3.4.0 and was not used. | `npm audit --omit=dev --audit-level=high` exits **0**; backend **262/262** in both modes. Committed in `7148994`; owner deployed it. |
 | 2026-11-11 | Added `docs/reading-order.md`: a plain-language path from the idea and honest limits, through local setup and the deployed test sequence, to a file-by-file code-reading order. Linked it from the root README and docs index. | Documentation only; no product code changed. Structural checks passed (diff whitespace, fenced blocks, table columns, relative links). |
 | 2026-11-10 | Reconciled every current-state commit reference to `433d522`, the `.gitleaksignore`-only commit over docs commit `8d2e873`; completed the click-level accuracy pass on FL wave sequencing, AD step-up paths, PDF preview controls, AC receiver transfer and the zero-proof key-expiry recovery. | Documentation only; no product code changed. Structural checks passed (diff whitespace, fenced blocks, table columns, relative links). G2 (live commit) and G5 (restore prerequisites) remain hard gates. |
 | 2026-11-09 | Wrote `docs/testing-plan.md` for the deployed 4-phone/3–4-laptop run, added a synthetic text-layer/no-text PDF fixture generator, and reconciled stale `32a2078`/“A2a uncommitted” claims across the status docs. The live service answered health/readiness and its bundle contained A2a strings; the exact Render commit was not compared with the dashboard. | Documentation/tooling only; generator verified both text-layer PDFs and the no-text rejection. No product tests were changed. G2 (live commit) and G5 (restore prerequisites) remain hard gates before signed testing. |
@@ -287,6 +300,7 @@ cd attendance-backend && npm test -- --test-isolation=none
 cd attendance-frontend && npm run test:proof
 cd attendance-frontend && npm run test:acoustic
 cd attendance-frontend && npm run test:checkin
+cd attendance-frontend && npm run test:attendance
 cd attendance-frontend && npm run test:studentcheckin
 cd attendance-frontend && npm run test:auth
 cd attendance-frontend && npm run test:rosterimport

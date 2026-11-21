@@ -13,7 +13,7 @@ Capstone project · NIT Jamshedpur
 
 </div>
 
-**Live prototype:** [https://bio-attend.onrender.com](https://bio-attend.onrender.com) — the repository's `HEAD`, `origin/main` and `origin/HEAD` are **`80dc2e1`**, which includes the full attendance product, P0/P1 security hardening and the committed A2a timetable PDF text preview. The phone-to-phone cascade changes are **uncommitted** in the working tree. The live service was last observed serving A2a UI strings, but its exact deployed commit was **not verified against the Render dashboard**; the owner must confirm that before signed testing. The owner controls every push and deploy.
+**Live prototype:** [https://bio-attend.onrender.com](https://bio-attend.onrender.com) — the last owner-confirmed Render deployment is **`7148994`**, which includes the phone-to-phone relay cascade and the Mongoose security patch. The working tree now adds the three register/UI-defect fixes from 2026-11-21; commit and redeploy them before signed testing, then re-run gate G2. The owner controls every push and deploy. Moving to a new Mac? Start with **[docs/new-device-handoff.md](docs/new-device-handoff.md)**.
 
 > **Layer 1 gate status:** the owner has directed that Layer 1 be treated as **passed for build planning only**. This is an assumption, not a measurement. The 2026-10-25 sweep still fails at 5 m (4/10) and 10 m (1/10), and the reverse direction and muted control are unmeasured. Do not read this build as proof that the physical gate passed.
 
@@ -54,7 +54,7 @@ Automatic scoring and the ID round remain future work. The phone-to-phone relay 
 | Passkey step-up, audit hash chain, export limits, readiness, JWT rotation | ✅ built; browser E2E passed with a Chrome virtual authenticator |
 | Roster PDF extraction → editable preview | ✅ text-based PDFs only, verified with generated fixtures; real college PDFs and scanned OCR still unvalidated |
 | Timetable PDF text extraction → read-only preview | ✅ text-based PDFs only; no row parsing, class matching or slot creation; needs sample timetable PDFs for structured import |
-| Production deployment of this tree | ⏳ live service reachable and serves A2a UI strings; exact commit must be checked in the Render dashboard before signed testing |
+| Production deployment | ✅ owner-confirmed Render deploy **`7148994`**; the 2026-11-21 UI fixes still need commit and redeploy, then G2 must be re-checked |
 | Deployed manual test plan | 📋 [docs/testing-plan.md](docs/testing-plan.md) — 4 phones + 3–4 laptops, acoustic range, signed flow, admin security, PDF previews and conditional restore drill |
 | Real Google/phone phone-to-phone cascade rehearsal | ⏳ pending; the deployed test plan is the execution script |
 | Automatic scoring, ID round, mobile app | ⛔ not built / gated |
@@ -119,10 +119,12 @@ cd attendance-backend && npm test -- --test-isolation=none
 cd attendance-frontend && npm run test:proof          # 15 tests
 cd attendance-frontend && npm run test:acoustic       # 51 tests
 cd attendance-frontend && npm run test:checkin        # 10 tests
+cd attendance-frontend && npm run test:attendance     # 7 tests
 cd attendance-frontend && npm run test:studentcheckin # 12 tests
 cd attendance-frontend && npm run test:auth           # 2 tests
 cd attendance-frontend && npm run test:rosterimport   # 6 tests
 cd attendance-frontend && npm run test:timetableimport # 6 tests
+# frontend helper total: 109 tests
 cd attendance-frontend && CI=true REACT_APP_API_URL=/api/v1 npm run build
 
 # synthetic, text-layer PDFs for the manual preview tests
@@ -138,6 +140,7 @@ timetable preview modal has helper tests and a production build, but no browser 
 
 ## Documentation
 
+- 💻 **[New-device handoff](docs/new-device-handoff.md)** — move the project to a new Mac and continue.
 - 🚀 **[Getting started](docs/getting-started.md)** — run the whole stack.
 - 🗺️ **[Route reference](docs/routes.md)** — every page and API endpoint, with access rules and purpose.
 - 🧠 **[How it works](docs/how-it-works.md)** — the architecture and flows in plain words.

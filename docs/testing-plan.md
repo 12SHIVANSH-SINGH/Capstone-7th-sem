@@ -3,7 +3,7 @@
 **Plan version:** 1.0\
 **Written:** 2026-11-09 (reconciled 2026-11-10)\
 **Application:** [https://bio-attend.onrender.com](https://bio-attend.onrender.com)\
-**Repository state at writing:** `80dc2e1` on `main`; the phone-to-phone cascade is uncommitted in the working tree and must be reviewed, committed and published before FL can pass\
+**Repository state at handoff:** `7148994` on `main`; the phone-to-phone cascade is committed and the owner reports Render shows `7148994`. The 2026-11-21 register fixes are newer and must be committed, deployed and re-checked at G2 before FL can pass.\
 **Owner:** project owner (deploy, environment, accounts)\
 **Status:** ready to execute after the preflight gates in §3 pass
 
@@ -215,10 +215,10 @@ git rev-parse --short origin/main
 git status --short
 ```
 
-Expected at writing: both hashes print `80dc2e1`, and `git status --short` shows the
-uncommitted cascade slice. Record the actual hashes; do not assume they are still `80dc2e1`.
-For FL, the published commit must include the cascade changes; if it does not, stop and ask
-the owner to publish them.
+Expected at handoff: both hashes print `7148994` and `git status --short` is clean once the
+owner commits the 2026-11-21 register fixes. Record the actual hashes; do not assume they are
+still `7148994`. For FL, the published commit must include the cascade and the register fixes;
+if it does not, stop and ask the owner to publish them.
 
 Run the local gate:
 
@@ -230,6 +230,7 @@ cd ../attendance-frontend
 npm run test:proof
 npm run test:acoustic
 npm run test:checkin
+npm run test:attendance
 npm run test:studentcheckin
 npm run test:auth
 npm run test:rosterimport
@@ -240,7 +241,7 @@ CI=true REACT_APP_API_URL=/api/v1 \
   npm run build
 ```
 
-Expected at writing: backend **262/262** in both modes, frontend **102/102**, production build
+Expected at handoff: backend **262/262** in both modes, frontend **109/109**, production build
 compiles. Record the actual counts.
 
 Generate the synthetic PDFs (see §4.4):
@@ -265,6 +266,10 @@ the build compiles.
 
 This is the most important gate. The live site must be the reviewed commit, not an older
 deploy.
+
+At handoff the owner confirmed the dashboard showed **`7148994`**. The 2026-11-21 register
+fixes are newer; after those are committed and deployed, repeat this gate against the new
+hash.
 
 1. Open the Render dashboard for the `bio-attend` service.
 2. Open **Events** or **Deploys** and find the live deploy.
@@ -302,11 +307,11 @@ That is supporting evidence that A2a is deployed. It is **not proof** that the l
 the reviewed one. Only the Render dashboard commit comparison is proof.
 
 **PASS:** the Render dashboard commit equals the reviewed commit the owner published, and that
-commit includes the cascade slice FL exercises.
+commit includes the cascade and the 2026-11-21 register fixes FL exercises.
 
-**FAIL:** any mismatch, a missing cascade slice, or the dashboard cannot be checked. Stop signed
-testing; ask the owner to deploy the reviewed commit. Do not test an older deployment and call it
-current.
+**FAIL:** any mismatch, a missing cascade or register fix, or the dashboard cannot be checked.
+Stop signed testing; ask the owner to deploy the reviewed commit. Do not test an older
+deployment and call it current.
 
 ### G3 — Google OAuth and account access
 
@@ -713,16 +718,40 @@ evidence; duplicate or stale frames add no rows; the teacher sees per-round coun
 **PASS:** all rows are Pending; evidence is visible; no automatic attendance decision.  
 **FAIL:** any row is Present without a teacher action.
 
+#### FL-09b — Register deep link and proof-load failure
+
+1. On L1, open `/teacher/dashboard` and find Session A in the recent sessions table.
+2. Click that row's **Register** button.
+3. Verify the URL becomes `/teacher/sessions?session=<id>` and the exact Session A register
+   opens, not the unfiltered history page.
+4. Close the register and verify the `session` query string is removed; refresh and verify it
+   does not reopen.
+5. Open DevTools → **Network** → **Request blocking**, add `*proofs*`, and reopen Session A's
+   **Evidence** tab.
+6. Verify the register shows **Proof evidence unavailable** with a **Retry** button, not the
+   false empty state “No signed proofs were submitted”.
+7. Remove the blocking rule, click **Retry**, and verify the proof rows load.
+
+**PASS:** the dashboard opens the exact register; closing clears the deep link; a failed
+proof request is visible and retryable.
+
+**FAIL:** the dashboard opens generic history, the query string persists after close, or a
+failed request is reported as “No signed proofs”.
+
 #### FL-10 — Teacher marks Session A
 
 1. In the **Register** tab, set S1 to **Present**, S2 to **Present**, S3 to **Present**.
 2. Add a short decision note for S1, for example “Present in room; round 0/1 evidence.”
 3. Click **Save 3 changes**.
 4. Verify the statuses persist and the register summary updates to 3 present, 0 pending.
-5. Verify **Finalise attendance** is **not** offered while the session is still live. The
+5. Change only S1's decision note, leaving the status **Present**; click **Save 1 change** and
+   verify the new note persists. This is the note-only regression check.
+6. Change S1's status and leave the note untouched; save and verify the existing note is still
+   present. This is the status-only regression check.
+7. Verify **Finalise attendance** is **not** offered while the session is still live. The
    register shows the notice “The session is still live”. If the control is offered and
    finalisation succeeds while live, that is a **FAIL**.
-6. On L1, open `/teacher/sessions` → **Audit trail**; verify the teacher decision entries.
+8. On L1, open `/teacher/sessions` → **Audit trail**; verify the teacher decision entries.
 
 **PASS:** the teacher decision changes the rows; no finalise control appears while live; the
 decisions are audited.
@@ -880,7 +909,8 @@ or redact other classes' student data before keeping or sharing the query files.
 | FL-07 Teacher fallback | A | — | Nudge/Advance gated and one round only |  |  |  |
 | FL-08 Relay across rounds | A | S2, S3 | Late joiner; no reload; no duplicate rows |  |  |  |
 | FL-09 Register pending | A | S1–S3 | All Pending with evidence |  |  |  |
-| FL-10 Mark present (live) | A | S1–S3 | Present; no finalise while live |  |  |  |
+| FL-09b Register deep link and failure | A | — | Exact register; retryable proof error |  |  |  |
+| FL-10 Mark present (live) | A | S1–S3 | Present; note-only/status-only edits persist; no finalise while live |  |  |  |
 | FL-11 Close + finalise | A | — | Closed first; 100%; audited |  |  |  |
 | FL-12 Session B absent | B | S1–S3 | S3 absent; window open |  |  |  |
 | FL-13 Raise query | B | S3 | Pending query |  |  |  |
@@ -1703,11 +1733,11 @@ These are not failures of this test plan; they are boundaries of the current bui
 | --- | --- | --- |
 | A2b structured timetable parsing | **Not built** | The timetable PDF preview is text only; every slot is added manually |
 | A3 local OCR | **Not built** | Scanned/image-only PDFs are rejected; no OCR fallback |
-| A4 Gemini extraction | **Gated** | No raw roster/timetable leaves the server; no consent/risk text exists |
+| A4 Gemini extraction | **Gated** | No raw roster/timetable leaves the server; the consent/risk text is drafted in `plan.md`, but owner acceptance D4 is unsigned |
 | Real college PDF layout accuracy | **Unvalidated** | Synthetic PDFs test mechanics, not real layout; do not claim accuracy |
 | Physical Layer 1 gate | **Not measured-passed** | This plan measures it; it may fail at 5 m/10 m. Never describe it as passed before the numbers say so |
 | Reverse direction and muted control | **Unmeasured** | AC-07–AC-11 measure them; record actual results |
-| Exact live Render commit | **Owner must verify** | G2 is a hard gate |
+| Exact live Render commit | **Owner-confirmed at handoff; re-verify after the next deploy** | G2 is a hard gate |
 | Atlas restore drill | **Prerequisites unconfirmed** | RS is BLOCKED if G5 fails |
 | iOS/Safari | **Not covered** | Do not include iPhones in the acoustic or signed flow |
 | 24-hour query expiry | **Not waited** | The window opens correctly; expiry is covered by automated tests |

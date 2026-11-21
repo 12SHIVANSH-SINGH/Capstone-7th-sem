@@ -13,7 +13,7 @@ The server mints keys, records signed proof evidence and keeps an audited attend
 register. A **teacher confirms attendance**; a decoded tone is not an automatic verdict.
 Full detail is in `plan.md`; do not restate or redesign it here.
 
-## Current phase (2026-11-20, session 30)
+## Current phase (2026-11-21, session 31)
 
 - **Layer 1 is assumed passed by owner direction (2026-10-29) for build planning only.** This
   is **not** a measured pass. The 2026-10-25 sweep decoded 10/10 at 1 m, 9/10 at 2 m, 9/10 at
@@ -38,13 +38,13 @@ Full detail is in `plan.md`; do not restate or redesign it here.
   student present. The teacher opens the register, sees evidence/optional location and marks
   present/absent/excused; finalisation and every correction are audited. Scoring and the ID
   round remain unbuilt.
-- **Repository state (2026-11-20):** local `HEAD`, `origin/main` and `origin/HEAD` are all
-  **`80dc2e1`** (“doc push”), on top of `433d522`. The committed tree includes the A1 roster
-  PDF slice, A2a timetable text preview, P0/P1 security, PWA and dark-mode work. The
-  phone-to-phone cascade changes (backend pending-key state, relay UI, transmitter hook and
-  helper tests) are **uncommitted in the working tree**. The live service was last observed
-  serving A2a strings, but the exact deployed commit was **not verified against the Render
-  dashboard**; do not claim the deployment matches the repository without checking.
+- **Repository state (2026-11-21):** local `HEAD`, `origin/main` and `origin/HEAD` are all
+  **`7148994`** (“security scan lapse”), which includes the committed phone-to-phone cascade,
+  its tests and docs, and the Mongoose `8.24.10` security patch. The owner reports the Render
+  dashboard shows the same commit. The working tree now adds the 2026-11-21 register fixes
+  (proof-load errors are visible, note-only edits save, and the dashboard Register link opens
+  the exact session) plus the new `test:attendance` suite. Commit, push, redeploy and re-run
+  gate G2 before signed testing.
 - **Deployed test plan:** [`docs/testing-plan.md`](docs/testing-plan.md) is the execution
   script for the 4-phone/3–4-laptop run. It covers acoustic range and controls, the signed
   attendance/query flow on Render with real college accounts — including the automatic
@@ -66,20 +66,22 @@ Full detail is in `plan.md`; do not restate or redesign it here.
   page/line counts. It never parses rows, matches classes, creates a class or writes a slot.
   The teacher adds slots through the existing form. Tested with generated PDF fixtures, not
   real timetable PDFs.
-- **Next build slice (A2b), after the deployed test run:** structured timetable row parsing,
-  then local OCR, then optional Gemini extraction. **No sample timetable or roster PDFs have
-  been supplied yet**, so do not invent parser behaviour or claim extraction accuracy.
-  Structured timetable import must schedule existing classes only; unmatched rows are flagged
-  for manual class creation. Local OCR comes after text-layer extraction, and optional Gemini
-  extraction comes last.
-- **Gemini gate:** raw rosters may go to the free tier only after an explicit student notice
-  and a documented risk acceptance are written into `plan.md`. That text does not exist yet;
-  do not write the AI path before it does.
+- **Next work:** finish verification before adding ingestion. Commit/push/deploy the 2026-11-21
+  register fixes, run G0–G7 and AC → FL → AD → PDF → DP/RS, then measure the physical cascade
+  and range. Only then build **A2b** structured timetable import, **A3** local OCR and **A4**
+  optional Gemini extraction. A2b needs representative timetable PDFs; A4 needs the owner to
+  date and sign the accepted copy of the draft notice and risk text now in `plan.md` §12
+  (D1–D5). The capstone submission pack comes last. Moving to a new Mac:
+  [`docs/new-device-handoff.md`](docs/new-device-handoff.md).
+- **Gemini gate:** raw rosters may go to the free tier only after the exact student notice,
+  data-field list, retention/training risk, dated owner acceptance and opt-out fallback are
+  settled in `plan.md`. The draft exists, but D4 is unsigned; do not write the AI path yet.
 - **Still blocked:** automatic scoring, the ID round, the "lowest wave heard" join rule, the
-  mobile app, a verified live Render commit, the real Google/phone phone-to-phone cascade
-  rehearsal in the deployed plan, physical 5 m/10 m range diagnosis with reverse/muted
-  control, and the encrypted Atlas restore drill (URI, passphrase,
-  `mongodb-database-tools` and scratch-database permission are unconfirmed).
+  mobile app, the real Google/phone phone-to-phone cascade rehearsal in the deployed plan,
+  physical 5 m/10 m range diagnosis with reverse/muted control, representative timetable
+  PDFs, the owner's signed Gemini acceptance (D4), and the encrypted Atlas restore drill (URI, passphrase,
+  `mongodb-database-tools` and scratch-database permission are unconfirmed). The owner has
+  confirmed Render showed `7148994`; re-check G2 after the next deploy.
 
 ## Core working rule: small slices, one session at a time
 
@@ -141,11 +143,12 @@ cd attendance-backend && npm test -- --test-isolation=none     # 262/262
 cd attendance-frontend && npm run test:proof                    # 15/15
 cd attendance-frontend && npm run test:acoustic                 # 51/51
 cd attendance-frontend && npm run test:checkin                  # 10/10
+cd attendance-frontend && npm run test:attendance               # 7/7
 cd attendance-frontend && npm run test:studentcheckin           # 12/12
 cd attendance-frontend && npm run test:auth                     # 2/2
 cd attendance-frontend && npm run test:rosterimport             # 6/6
 cd attendance-frontend && npm run test:timetableimport          # 6/6
-# frontend helper total: 102/102
+# frontend helper total: 109/109
 ```
 
 Production build (same API path and empty hosted-domain hint as the deployed site):
@@ -176,7 +179,8 @@ checks. A pure unit test is not enough for those routes.
 - `docs/diagrams/` — `system-components.puml`, `check-in-flow.puml`,
   `proof-transport.puml`.
 - `plan.md` — what and why. `progress.md` — status and measurements.
-  `resume-prompt.md` — how to restart a session.
+  `resume-prompt.md` — how to restart a session. `docs/new-device-handoff.md` — how to move
+  the project to a new Mac and continue.
 
 ## Hard boundaries
 

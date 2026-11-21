@@ -24,6 +24,7 @@ import { classLabel, formatDateTime, formatDistance, percentLabel } from "../../
 import { describePasskeyError, withAdminStepUp } from "../../utils/adminStepUp";
 import EventTimeline from "../shared/EventTimeline";
 import LocationEvidence from "../shared/LocationEvidence";
+import { attendanceUpdates, changedRecordIds } from "./sessionAttendanceView";
 
 const requestConfig = { withCredentials: true };
 
@@ -56,7 +57,13 @@ const SessionAttendanceModal = ({ open, session, mode = "teacher", onClose, onCh
   const [finalizing, setFinalizing] = useState(false);
   const [confirmFinalize, setConfirmFinalize] = useState(false);
   const [selectedRecordId, setSelectedRecordId] = useState("");
-  const [proofs, setProofs] = useState({ loading: false, total: 0, byWave: [], proofs: [] });
+  const [proofs, setProofs] = useState({
+    loading: false,
+    error: "",
+    total: 0,
+    byWave: [],
+    proofs: [],
+  });
   const [deletingRecord, setDeletingRecord] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -102,12 +109,17 @@ const SessionAttendanceModal = ({ open, session, mode = "teacher", onClose, onCh
       );
       setProofs({
         loading: false,
+        error: "",
         total: Number(response.data?.total) || 0,
         byWave: Array.isArray(response.data?.byWave) ? response.data.byWave : [],
         proofs: Array.isArray(response.data?.proofs) ? response.data.proofs : [],
       });
     } catch (requestError) {
-      setProofs({ loading: false, total: 0, byWave: [], proofs: [] });
+      setProofs((current) => ({
+        ...current,
+        loading: false,
+        error: messageFor(requestError, "Could not load proof evidence for this session."),
+      }));
     }
   }, [isAdmin, sessionId]);
 
@@ -119,7 +131,7 @@ const SessionAttendanceModal = ({ open, session, mode = "teacher", onClose, onCh
     setDrafts({});
     setNotes({});
     setConfirmDelete(false);
-    setProofs({ loading: false, total: 0, byWave: [], proofs: [] });
+    setProofs({ loading: false, error: "", total: 0, byWave: [], proofs: [] });
     load();
     loadProofs();
   }, [open, load, loadProofs]);
@@ -142,7 +154,10 @@ const SessionAttendanceModal = ({ open, session, mode = "teacher", onClose, onCh
     () => records.find((record) => record.id === selectedRecordId) || records[0] || null,
     [records, selectedRecordId]
   );
-  const dirtyIds = Object.keys(drafts);
+  const changedIds = useMemo(
+    () => changedRecordIds(records, drafts, notes),
+    [records, drafts, notes]
+  );
   const sessionInfo = useMemo(() => data.session || session || {}, [data.session, session]);
 
   const setStatus = (record, status) => {
@@ -155,38 +170,33 @@ const SessionAttendanceModal = ({ open, session, mode = "teacher", onClose, onCh
   };
 
   const saveChanges = async () => {
-    if (!dirtyIds.length) return;
+    if (!changedIds.length) return;
+    const updates = attendanceUpdates(records, drafts, notes);
     setSaving(true);
     try {
       if (isAdmin) {
         await withAdminStepUp(() =>
           Promise.all(
-            dirtyIds.map((recordId) =>
+            updates.map(({ recordId, status, note }) =>
               axios.patch(
                 `${SERVER_URL}/admin/attendance/${recordId}`,
                 {
-                  status: drafts[recordId],
-                  note: notes[recordId] || "Super-admin override from the register.",
+                  status,
+                  note: note || "Super-admin override from the register.",
                 },
                 requestConfig
               )
             )
           )
         );
-        toast(`${dirtyIds.length} register row${dirtyIds.length === 1 ? "" : "s"} updated.`, "success");
+        toast(`${changedIds.length} register row${changedIds.length === 1 ? "" : "s"} updated.`, "success");
       } else {
         await axios.patch(
           `${SERVER_URL}/check-in-sessions/${sessionId}/attendance`,
-          {
-            records: dirtyIds.map((recordId) => ({
-              recordId,
-              status: drafts[recordId],
-              note: notes[recordId] || "",
-            })),
-          },
+          { records: updates },
           requestConfig
         );
-        toast(`${dirtyIds.length} register row${dirtyIds.length === 1 ? "" : "s"} saved.`, "success");
+        toast(`${changedIds.length} register row${changedIds.length === 1 ? "" : "s"} saved.`, "success");
       }
       await load({ quiet: true });
       await loadProofs();
@@ -292,9 +302,21 @@ const SessionAttendanceModal = ({ open, session, mode = "teacher", onClose, onCh
   }, [data.queries, proofs.proofs, sessionInfo]);
 
   const chosenStatus = (record) => drafts[record.id] || record.status;
-  const hasChanges = dirtyIds.length > 0;
+  const hasChanges = changedIds.length > 0;
   const canFinalize =
     !isAdmin && sessionInfo.status === "closed" && !sessionInfo.attendanceFinalized;
+  const proofErrorNotice = proofs.error ? (
+    <div className="notice notice--danger" role="alert">
+      <FiAlertTriangle className="notice__icon" aria-hidden="true" />
+      <div>
+        <strong>Proof evidence unavailable</strong>
+        <p>{proofs.error}</p>
+        <Button variant="secondary" size="sm" onClick={loadProofs} loading={proofs.loading}>
+          <FiRefreshCw aria-hidden="true" /> Retry
+        </Button>
+      </div>
+    </div>
+  ) : null;
 
   return (
     <Modal
@@ -312,7 +334,7 @@ const SessionAttendanceModal = ({ open, session, mode = "teacher", onClose, onCh
           <Button variant="secondary" onClick={onClose}>Close</Button>
           {hasChanges && (
             <Button onClick={saveChanges} loading={saving}>
-              <FiSave aria-hidden="true" /> Save {dirtyIds.length} change{dirtyIds.length === 1 ? "" : "s"}
+              <FiSave aria-hidden="true" /> Save {changedIds.length} change{changedIds.length === 1 ? "" : "s"}
             </Button>
           )}
           {canFinalize && !confirmFinalize && (
@@ -620,7 +642,9 @@ const SessionAttendanceModal = ({ open, session, mode = "teacher", onClose, onCh
                             denormalised counters.
                           </p>
                           <div style={{ marginTop: 10 }}>
-                            {proofs.loading ? (
+                            {proofErrorNotice ? (
+                              proofErrorNotice
+                            ) : proofs.loading ? (
                               <div className="loading-inline"><Spinner /> Loading proofs…</div>
                             ) : proofs.proofs.length === 0 ? (
                               <p className="empty-inline">No signed proofs were submitted for this session.</p>
@@ -661,6 +685,7 @@ const SessionAttendanceModal = ({ open, session, mode = "teacher", onClose, onCh
                 ))}
                 {isAdmin && <span className="chip chip--warning">Admin view · proofs unavailable</span>}
               </div>
+              {proofErrorNotice}
               <EventTimeline
                 events={timelineEvents}
                 empty="No session events were recorded."

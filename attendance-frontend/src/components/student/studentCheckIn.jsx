@@ -20,6 +20,7 @@ import { buildProofMessage, submitProof } from "../../acoustic/proofTransport";
 import { useCheckInAudio } from "../../acoustic/useCheckInAudio";
 import { useSignalTransmitter } from "../../acoustic/useSignalTransmitter";
 import { signDeviceMessage } from "../../utils/deviceKey";
+import { loadDeviceStatus } from "../../utils/deviceStatus";
 import { getCurrentLocation } from "../../utils/geolocation";
 import { classLabel, formatDateTime, relativeTime, givenName } from "../../utils/format";
 import AppShell from "../../ui/AppShell";
@@ -86,6 +87,7 @@ const StudentCheckIn = () => {
 
   const [user, setUser] = useState(null);
   const [deviceStatus, setDeviceStatus] = useState("checking");
+  const [devicePendingReview, setDevicePendingReview] = useState(false);
   const [sessions, setSessions] = useState([]);
   const [selectedId, setSelectedId] = useState("");
   const [loading, setLoading] = useState(true);
@@ -194,12 +196,10 @@ const StudentCheckIn = () => {
         }
         setUser(userResponse.data.user);
 
-        const bindingResponse = await axios.get(
-          `${SERVER_URL}/device-bindings/status`,
-          requestConfig
-        );
+        const binding = await loadDeviceStatus();
         if (cancelled) return;
-        setDeviceStatus(bindingResponse.data?.status || "unbound");
+        setDeviceStatus(binding.status);
+        setDevicePendingReview(binding.pendingReview);
 
         await loadSessions({ quiet: true });
         if (!cancelled) await refreshRecentSessions();
@@ -650,6 +650,8 @@ const StudentCheckIn = () => {
           detail: evidence
             ? evidence.duplicate
               ? `Round ${evidence.wave} was already recorded for this phone.`
+              : evidence.autoMarked
+              ? `Round ${evidence.wave} was signed and you are marked present for this session.`
               : `Round ${evidence.wave} was signed and recorded by the server.`
             : "The server has not received a signed proof yet.",
           state: evidence ? "done" : submitting ? "active" : "pending",
@@ -670,9 +672,12 @@ const StudentCheckIn = () => {
         {
           id: "register",
           label: "Teacher register",
-          detail:
-            "Attendance is finalised by your teacher after close. If you were present but unmarked, the query window opens for 24 hours.",
-          state: "pending",
+          detail: selectedSession.autoMarkPresent
+            ? evidence?.attendanceStatus === "present"
+              ? "You are marked present from signed evidence. Your teacher can still change the register."
+              : "Auto-present is on for this session. A valid signed proof marks you present; your teacher can still change the register."
+            : "Attendance is finalised by your teacher after close. If you were present but unmarked, the query window opens for 24 hours.",
+          state: evidence?.attendanceStatus === "present" ? "done" : "pending",
         },
       ]
     : [];
@@ -736,9 +741,14 @@ const StudentCheckIn = () => {
             expires after about {EVIDENCE_TTL_HOURS} hours.
           </li>
           <li>
-            <strong>This is not an attendance decision.</strong> Hearing a key records
-            evidence. Your teacher owns the register and decides attendance; if you were
-            present but missed the register, you can raise a query after the session closes.
+            <strong>
+              {selectedSession?.autoMarkPresent
+                ? "Auto-present is on for this session."
+                : "This is not an attendance decision."}
+            </strong>{" "}
+            {selectedSession?.autoMarkPresent
+              ? "A valid signed proof marks you present automatically. Your teacher can still change the register; if you were present but missed it, you can raise a query after the session closes."
+              : "Hearing a key records evidence. Your teacher owns the register and decides attendance; if you were present but missed the register, you can raise a query after the session closes."}
           </li>
         </ul>
 
@@ -752,10 +762,43 @@ const StudentCheckIn = () => {
           />
           <span>
             I understand this phone will use the microphone and speaker and that hearing a
-            key records evidence, not attendance. This choice lasts for this check-in.
+            key records signed evidence.{" "}
+            {selectedSession?.autoMarkPresent
+              ? "Auto-present is on for this session, so a valid proof will mark me present."
+              : "Attendance is still decided by my teacher."}{" "}
+            This choice lasts for this check-in.
           </span>
         </label>
       </Card>
+
+      {selectedSession?.autoMarkPresent && (
+        <div className="student-checkin__alert student-checkin__alert--soft" role="status">
+          <FiCheckCircle aria-hidden="true" />
+          <div>
+            <strong>Auto-present is on for this session.</strong>
+            <p>
+              Your first valid signed proof marks you present. Your teacher can still change
+              the register, and the query window remains available after the session closes.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {deviceStatus === "approved" && devicePendingReview && (
+        <div className="student-checkin__alert student-checkin__alert--soft" role="status">
+          <FiShield aria-hidden="true" />
+          <div>
+            <strong>Another browser is waiting for review.</strong>
+            <p>
+              This approved browser can still submit proof. A teacher must approve the other
+              browser before it can be used for attendance.
+            </p>
+          </div>
+          <Link className="ui-btn ui-btn--soft ui-btn--sm" to="/student-dashboard">
+            Device status
+          </Link>
+        </div>
+      )}
 
       {deviceStatus !== "approved" && (
         <div className="student-checkin__alert" role="alert">

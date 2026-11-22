@@ -18,9 +18,10 @@ covers five areas:
 | PDF previews and imports | **PDF** | Roster and timetable PDFs only ever fill a review surface; nothing is auto-saved and no slot is created by extraction |
 | Deployment and restore | **DP / RS** | The live deployment is the reviewed commit, production refuses test-only features, and the encrypted backup can be restored |
 
-The plan is deliberately **evidence-only**. A decoded tone records evidence; it never marks a
-student present. If any step makes attendance change without a teacher action, that step is a
-**FAIL**, even if the rest of the flow looks correct.
+The plan is **evidence-only by default**. A decoded tone records evidence; it never marks a
+student present unless the teacher explicitly enables auto-present for that one session. If
+any step makes attendance change without a teacher action or an audited per-session opt-in,
+that step is a **FAIL**, even if the rest of the flow looks correct.
 
 ---
 
@@ -738,6 +739,30 @@ proof request is visible and retryable.
 **FAIL:** the dashboard opens generic history, the query string persists after close, or a
 failed request is reported as “No signed proofs”.
 
+#### FL-09c — Register evidence workflow is draft-only
+
+Do this before FL-10 and **close the modal without saving**.
+
+1. Reopen Session A's register. Verify the **Auto-present from signed proofs** block says it is
+   off by default and the toggle is off.
+2. Verify the **Show** filter offers **Pending with evidence** and **Pending without evidence**
+   with counts. For Session A, expect three pending rows with evidence.
+3. Select **Pending with evidence**; verify only S1–S3 are shown. Select **Pending without
+   evidence**; expect the empty-filter message.
+4. Return to **All rows**, click **Accept 3 with evidence**, and verify the three dropdowns now
+   draft **Present**, the footer offers **Save 3 changes**, and the filter follows the drafts.
+   Do **not** click Save.
+5. Expand S1's row with the chevron. Verify the signed-proof timeline, wave numbers, location
+   evidence and GPS distance when captured, plus **Open full evidence** and **Accept present**.
+6. Click the **PDF** and **XLSX** buttons in the register toolbar. Open both files and verify
+   S1–S3 are still **Pending** because the download uses saved state, not drafts.
+7. Close the register without saving. Reopen it and verify S1–S3 are still Pending.
+
+**PASS:** bulk accept and one-click accept are drafts; filters follow drafts; exports use saved
+state; the evidence-only default is unchanged.  
+**FAIL:** the proof or bulk action saves attendance without the teacher clicking Save, or the
+export contains an unsaved draft status.
+
 #### FL-10 — Teacher marks Session A
 
 1. In the **Register** tab, set S1 to **Present**, S2 to **Present**, S3 to **Present**.
@@ -869,6 +894,18 @@ or redact other classes' student data before keeping or sharing the query files.
 
 **PASS:** all six files open and match the on-screen register; each download is audited.
 
+#### FL-17b — Quick session export from the register
+
+1. Open Session B's register from `/teacher/sessions`.
+2. Click **PDF** and **XLSX** in the register toolbar.
+3. Open both files. Verify the saved statuses, decision notes, proof counts, waves, last proof
+   time, GPS distance when both points were captured, query status and the auto-present policy
+   value are present.
+4. Verify an unsaved draft (if created for the check and then abandoned) is not in either file.
+5. On L2, open `/admin` → **Audit** as A1 and verify two `export.session.*` entries.
+
+**PASS:** quick downloads match the on-screen saved register and are audited.
+
 #### FL-18 — Notifications
 
 1. On P4, open `/notifications`.
@@ -899,6 +936,29 @@ or redact other classes' student data before keeping or sharing the query files.
 
 **PASS:** sessions end cleanly; protected pages redirect to `/login`.
 
+#### FL-21 — Per-session auto-present opt-in (optional, new Session C)
+
+Run this only after the default evidence-only flow above passes. It changes attendance from a
+proof, so it must be an explicit teacher action for this one session.
+
+1. On L1, start a new check-in for `TST101` (Session C). Keep the register open.
+2. Before any student proof, switch **Auto-present from signed proofs** on. Verify the policy
+   block changes state and the session audit shows `session.auto_present.updated`.
+3. On P2, open `/student/check-in`, consent and join round 0. Verify the student notice says
+   auto-present is on for this session.
+4. Let P2 submit one valid proof. Verify the student sees **marked present**, and the register
+   row becomes **Present** with source **Evidence**, the auto-present decision note and the
+   teacher as the attributed actor.
+5. Change that row to **Absent** and click **Save 1 change**. Verify the teacher decision wins
+   and remains after a refresh.
+6. Close Session C. Verify the auto-present toggle is no longer writable. Reopen the register
+   and verify finalisation still turns any remaining pending row absent.
+
+**PASS:** no proof marks anyone present while the toggle is off; the explicit opt-in is
+audited; only a still-pending row is auto-marked; the teacher can override it.  
+**FAIL:** auto-present applies without the toggle, writes over a teacher decision, or cannot be
+audited.
+
 #### FL recording table
 
 | Test | Session | Student(s) | Expected | Observed | Result | Evidence |
@@ -910,6 +970,7 @@ or redact other classes' student data before keeping or sharing the query files.
 | FL-08 Relay across rounds | A | S2, S3 | Late joiner; no reload; no duplicate rows |  |  |  |
 | FL-09 Register pending | A | S1–S3 | All Pending with evidence |  |  |  |
 | FL-09b Register deep link and failure | A | — | Exact register; retryable proof error |  |  |  |
+| FL-09c Register evidence workflow | A | S1–S3 | Bulk/one-click are drafts; filter follows drafts; export uses saved state |  |  |  |
 | FL-10 Mark present (live) | A | S1–S3 | Present; note-only/status-only edits persist; no finalise while live |  |  |  |
 | FL-11 Close + finalise | A | — | Closed first; 100%; audited |  |  |  |
 | FL-12 Session B absent | B | S1–S3 | S3 absent; window open |  |  |  |
@@ -917,6 +978,8 @@ or redact other classes' student data before keeping or sharing the query files.
 | FL-14 Approve query | B | S3 | Present; audited |  |  |  |
 | FL-15 Student sees correction | B | S3 | Approved in all views |  |  |  |
 | FL-17 Exports | A/B | — | Files match register |  |  |  |
+| FL-17b Quick session export | B | — | Register PDF/XLSX match saved state and are audited |  |  |  |
+| FL-21 Auto-present opt-in (optional) | C | S1/S2 | Off by default; explicit opt-in audited; teacher override wins |  |  |  |
 | FL-19 Timetable | — | — | No session created |  |  |  |
 
 ### 4.3 Suite AD — device approval, admin security and passkey
@@ -949,37 +1012,30 @@ none.
 **PASS:** the first binding waits for teacher approval; approval unlocks the device without
 signing the student out.
 
-#### AD-02 — Rejected device stays blocked
+#### AD-02 — Approved device survives a pending change and a rejection
 
-1. On P3, sign in as S2 again and verify the existing device is approved. This re-establishes
-   the old-device session that must survive a rejected change.
+1. On P3, sign in as S2 again and verify the existing device is approved. Keep this session
+   open; it is the approved device that must survive.
 2. On L4 (or a second incognito profile on L3), sign in as S2. Because S2 already has an
-   approved device, this is a pending device change.
-3. On L1, find S2's request in **Device approval queue**.
-4. Click **Reject**.
-5. On L4/L3, refresh `/student-dashboard` and `/student/check-in`; record exactly what the
-   device state says.
-   - If it shows **review** / not approved, the rejected browser is clearly blocked.
-   - If it shows **approved** because S2 still has the old approved device on P3, record a
-     **P2 UI defect**: the status check is account-level, not browser-level. It is not a
-     device-approval bypass if the proof signature is still rejected.
-6. Prove the rejection with a disposable live session:
-   - On L1, start a check-in for `TST101` with **Start and play round 0**. On P1, confirm
-     round 0 is playing.
-   - On P3 and L4/L3, open `/student/check-in`, tick consent and tap **Join check-in** for
-     round 0. If the rejected browser blocks joining, record that block and continue with P3.
-   - If the automatic playback has ended, tap **Play this round** on P1 while the key is fresh.
-   - On L4/L3, verify it does **not** show **Evidence recorded**. If it joined, open DevTools
-     → Network, confirm the proof request returns **403**, and capture the visible error.
-   - On P3, verify **Evidence recorded** and **Attendance: Not decided**.
-   - On L1, verify the evidence card shows one proof for S2 on round 0.
-   - Close the disposable check-in without finalising it.
-7. On P3, refresh; verify the previously approved device still reports approved and its
-   session was not revoked.
+   approved device, this is a pending device change. Do not approve it.
+3. On L1, find S2's request in **Device approval queue** but do not decide yet.
+4. On L1, start a disposable check-in for `TST101` with **Start and play round 0**. On P1,
+   confirm round 0 is playing.
+5. On P3, open `/student/check-in`, tick consent and tap **Join check-in**. Verify the approved
+   phone shows **Evidence recorded** and **Attendance: Not decided**, even though another
+   browser is waiting for review. If it is blocked, that is a **FAIL**: a stale queue row must
+   not lock out the approved device.
+6. On L1, reject S2's request.
+7. On L4/L3, refresh `/student-dashboard` and `/student/check-in`. Verify the browser is not
+   approved and cannot record evidence. If the UI still allows Join, capture the proof request
+   returning **403** in DevTools → Network.
+8. On P3, refresh; verify the approved device still reports approved and still records
+   evidence. Close the disposable check-in without finalising it.
 
-**PASS:** rejection leaves the existing approved device working; the rejected browser creates
-no evidence.  
-**FAIL:** the rejected browser creates evidence, or the old device is revoked or blocked.
+**PASS:** an approved device keeps working while another browser waits, and after that request
+is rejected; the rejected browser creates no evidence.  
+**FAIL:** the approved device is blocked by the pending request, or the rejected browser
+creates evidence.
 
 #### AD-03 — Replaced device revokes the old and the new session
 
@@ -1222,7 +1278,7 @@ behaviour is covered by automated tests; record it as **NOT RUN** manually.
 | Test | Expected | Observed | Result | Evidence |
 | --- | --- | --- | --- | --- |
 | AD-01 First binding review | Pending → approved, same session |  |  |  |
-| AD-02 Rejected device | No evidence; old device intact |  |  |  |
+| AD-02 Pending change and rejection | No evidence on rejected browser; approved device keeps working |  |  |  |
 | AD-03 Replaced device | Both old and new sessions 401 |  |  |  |
 | AD-04 No dev/demo | 404/hidden |  |  |  |
 | AD-05 Passkey registration | Credential listed |  |  |  |

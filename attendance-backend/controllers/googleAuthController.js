@@ -302,11 +302,46 @@ exports.claimDeviceBinding = catchAsyncError(async (req, res, next) => {
   res.status(202).json({ success: true, status: "review", requestId: request._id });
 });
 
-exports.getDeviceBindingStatus = catchAsyncError(async (req, res) => {
-  const pendingRequest = await DeviceBindingRequest.findOne({ student: req.user._id, status: "pending" }).sort({ updatedAt: -1 });
+exports.getDeviceBindingStatus = catchAsyncError(async (req, res, next) => {
+  const requestedFingerprint = String(req.query?.fingerprint || "").trim().toLowerCase();
+  const pendingRequests = await DeviceBindingRequest.find({
+    student: req.user._id,
+    status: "pending",
+  })
+    .select("fingerprint")
+    .lean();
+  const approvedFingerprint = String(req.user.deviceBinding?.fingerprint || "").toLowerCase();
+
+  // The browser can identify itself by the SHA-256 fingerprint of its public
+  // key. That matters when a student has an approved device and also a pending
+  // request from another browser: the approved device must keep working, while
+  // the new browser must wait. Without a fingerprint the endpoint keeps the
+  // old student-wide answer for compatibility.
+  if (requestedFingerprint) {
+    if (!/^[a-f0-9]{64}$/.test(requestedFingerprint)) {
+      return next(new ErrorHandler("A valid device fingerprint is required", 400));
+    }
+    const approved = Boolean(approvedFingerprint) && approvedFingerprint === requestedFingerprint;
+    const currentPending = pendingRequests.some(
+      (request) => String(request.fingerprint || "").toLowerCase() === requestedFingerprint
+    );
+    const otherPending = pendingRequests.some(
+      (request) => String(request.fingerprint || "").toLowerCase() !== requestedFingerprint
+    );
+    return res.status(200).json({
+      success: true,
+      status: approved ? "approved" : currentPending ? "review" : "unbound",
+      pendingReview: otherPending,
+      currentDeviceApproved: approved,
+    });
+  }
+
+  const pendingRequest = pendingRequests[0] || null;
   res.status(200).json({
     success: true,
-    status: pendingRequest ? "review" : req.user.deviceBinding?.fingerprint ? "approved" : "unbound",
+    status: pendingRequest ? "review" : approvedFingerprint ? "approved" : "unbound",
+    pendingReview: Boolean(pendingRequest),
+    currentDeviceApproved: !pendingRequest && Boolean(approvedFingerprint),
   });
 });
 

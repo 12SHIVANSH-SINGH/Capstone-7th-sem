@@ -171,6 +171,12 @@ const evidenceFromResponse = (response, session) => {
     recordedAt: proof.recordedAt || null,
     duplicate: Boolean(response.duplicate || proof.duplicate),
     attendanceDecided: response.attendanceDecided === true,
+    attendanceStatus: ["pending", "present", "absent", "excused"].includes(
+      response.attendanceStatus
+    )
+      ? response.attendanceStatus
+      : "pending",
+    autoMarked: response.autoMarked === true,
   };
 };
 

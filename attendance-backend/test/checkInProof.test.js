@@ -430,42 +430,6 @@ const controllerFixture = async () => {
   return { session, sessionId, studentId, signature, req };
 };
 
-test("the controller rejects a proof while a device change is pending", async () => {
-  const { session, req } = await controllerFixture();
-  const originals = {
-    findById: CheckInSession.findById,
-    enrollmentExists: Enrollment.exists,
-    pendingExists: DeviceBindingRequest.exists,
-    proofFindOne: CheckInProof.findOne,
-    proofCreate: CheckInProof.create,
-  };
-  const created = [];
-  try {
-    CheckInSession.findById = () => ({ select: async () => session });
-    Enrollment.exists = async () => ({ _id: "enrollment" });
-    DeviceBindingRequest.exists = async () => ({ _id: "pending-request" });
-    CheckInProof.findOne = async () => null;
-    CheckInProof.create = async (doc) => {
-      created.push(doc);
-      return doc;
-    };
-
-    const result = await invokeController(controller.submitProof, req);
-    assert.equal(result.status, 403);
-    assert.equal(
-      result.error.message,
-      "A device change is awaiting teacher review. This browser cannot submit proofs until it is approved."
-    );
-    assert.equal(created.length, 0);
-  } finally {
-    CheckInSession.findById = originals.findById;
-    Enrollment.exists = originals.enrollmentExists;
-    DeviceBindingRequest.exists = originals.pendingExists;
-    CheckInProof.findOne = originals.proofFindOne;
-    CheckInProof.create = originals.proofCreate;
-  }
-});
-
 test("accept and duplicate log one structured line and never leak evidence", async () => {
   const { session, sessionId, studentId, signature, req } = await controllerFixture();
   const originals = {

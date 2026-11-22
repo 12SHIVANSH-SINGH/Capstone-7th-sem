@@ -79,8 +79,8 @@ then checks `/islogin`; the access column describes where the page sends you.
 
 | Method | Path | Access | Purpose |
 | --- | --- | --- | --- |
-| POST | `/device-bindings/claim` | Signed in | Register the browser's P-256 public key. First and changed devices both become a review request; only dev/test personas auto-approve. |
-| GET | `/device-bindings/status` | Signed in | Current binding state for the signed-in account. |
+| POST | `/device-bindings/claim` | Signed in | Register the browser's P-256 public key. First and changed devices both become a review request; only dev/test personas auto-approve. A pending request never blocks the already-approved browser. |
+| GET | `/device-bindings/status` | Signed in | Current browser binding state. Send the `fingerprint` query parameter so an approved phone stays `approved` while a different browser waits in `review`; the legacy no-fingerprint call returns the student-wide answer. |
 | GET | `/device-reviews` | Teacher | Pending first-binding and changed-device requests visible to teachers. |
 | POST | `/device-reviews/:reviewId` | Teacher | Approve or reject a device request. |
 
@@ -105,12 +105,13 @@ then checks `/islogin`; the access column describes where the page sends you.
 | POST | `/classes/:classId/check-in-sessions` | Teacher | Start a session at wave 0 and mint the first two-minute key. One active session per class. |
 | GET | `/classes/:classId/check-in-sessions/active` | Student | Read the live session for one class the student is enrolled in; returns no key. |
 | GET | `/student/check-in-sessions/active` | Student | Discover all live sessions across the student's active enrollments; returns no key. |
-| POST | `/check-in-sessions/:sessionId/proofs` | Student, 60/min | Submit a signed session/wave/key proof as **evidence only**. Accepts the current or pending round; a valid or duplicate proof can return the server-minted `next` relay signal. Idempotent per student/wave; pending device changes are blocked. |
+| POST | `/check-in-sessions/:sessionId/proofs` | Student, 60/min | Submit a signed session/wave/key proof. Accepts the current or pending round; a valid or duplicate proof can return the server-minted `next` relay signal. Idempotent per student/wave. By default the proof is evidence only; when the teacher has explicitly enabled auto-present for this session, the first accepted proof marks a still-pending row present with source `evidence`, and the decision is audited. |
 | GET | `/check-in-sessions/:sessionId/proofs` | Teacher | Read-only evidence rows and per-wave counts. No key, signature, protocol version or fingerprint; `attendanceDecided: false`. |
 | GET | `/check-in-sessions/:sessionId/queries` | Teacher | Queries attached to one session. |
 | GET | `/check-in-sessions/:sessionId` | Teacher | Read session state, current key and pending signal for the owner and key-free wave history. A closed session returns neither key nor pending state. |
 | POST | `/check-in-sessions/:sessionId/advance` | Teacher | Manual fallback: advance only after the current wave has accepted evidence. Promote a fresh pending key with its original expiry, or archive the old key in bounded history and mint a fresh one. |
 | POST | `/check-in-sessions/:sessionId/close` | Teacher | Close the session and stop accepting proofs. Idempotent. |
+| PATCH | `/check-in-sessions/:sessionId/attendance-settings` | Teacher | Toggle per-session auto-present while the check-in is live and not finalised. Requires an explicit boolean. Writes `session.auto_present.updated` with before/after values. |
 | POST | `/check-in-sessions/:sessionId/location` | Student | Attach an optional one-shot check-in location to the student's session attempt. A denied permission never blocks a proof. |
 
 ### Attendance register, analytics and audit
@@ -171,8 +172,8 @@ workbooks require **Super-admin**.
 | GET | `/exports/attendance.xlsx` | Staff | Class register workbook with summary, percentages and raw rows. |
 | GET | `/exports/queries.pdf` | Staff | Query evidence report as PDF. |
 | GET | `/exports/queries.xlsx` | Staff | Query report as Excel. |
-| GET | `/exports/sessions/:sessionId.pdf` | Staff | One session sheet as PDF. |
-| GET | `/exports/sessions/:sessionId.xlsx` | Staff | One session sheet as Excel. |
+| GET | `/exports/sessions/:sessionId.pdf` | Staff | One session register as a landscape PDF with saved statuses, sources, notes, proof counts, waves, last proof time, GPS distance when captured and query status. |
+| GET | `/exports/sessions/:sessionId.xlsx` | Staff | One session workbook: summary sheet plus roster rows with saved statuses, notes, proofs, waves, first/last proof time, distance, query status and decision metadata. |
 | GET | `/admin/export/users.xlsx` | Super-admin | User directory workbook. |
 | GET | `/admin/export/audit.xlsx` | Super-admin | Audit log workbook. |
 

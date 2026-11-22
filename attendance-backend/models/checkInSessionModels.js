@@ -142,6 +142,22 @@ const checkInSessionSchema = new mongoose.Schema(
       ref: "User",
       default: null,
     },
+    // Off by default. When a teacher explicitly opts in for this session, the
+    // first accepted proof marks the student present. The teacher can still
+    // change the row, and every automatic decision is audited.
+    autoMarkPresent: { type: Boolean, default: false },
+    autoMarkPresentAt: { type: Date, default: null },
+    autoMarkPresentBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    autoMarkPresentByEmail: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      default: "",
+    },
     // Set when the session closes; computed from the configured query window.
     queryWindowEndsAt: { type: Date, default: null },
     isDemo: { type: Boolean, default: false, index: true },

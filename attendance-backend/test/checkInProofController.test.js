@@ -315,7 +315,7 @@ testWithEnv("201 records the signed proof without deciding attendance or leaking
     email: "student@nitjsr.ac.in",
     status: "active",
   });
-  assert.match(state.sessionSelect, /courseClass status wave key keyIssuedAt keyExpiresAt/);
+  assert.match(state.sessionSelect, /courseClass .*status wave key keyIssuedAt keyExpiresAt/);
   assert.match(state.sessionSelect, /pendingWave pendingKey/);
 });
 
@@ -503,7 +503,7 @@ testWithEnv("403 refuses missing or unapproved device bindings", async () => {
   assert.equal(state.created.length, 0);
 });
 
-testWithEnv("403 refuses an approved browser while a device change is pending", async () => {
+testWithEnv("an approved browser keeps working while another device waits for review", async () => {
   const user = makeUser();
   const session = makeSession();
   installBase({ user, session, pending: { _id: new ObjectId(), status: "pending" } });
@@ -520,10 +520,12 @@ testWithEnv("403 refuses an approved browser while a device change is pending", 
     body: { wave: session.wave, key: session.key, signature },
   });
 
-  assert.equal(result.status, 403);
-  assert.match(result.body.message, /awaiting teacher review/i);
-  assert.deepEqual(state.deviceQueries, [{ student: user._id, status: "pending" }]);
-  assert.equal(state.created.length, 0);
+  assert.equal(result.status, 201);
+  assert.equal(result.body.recorded, true);
+  // The proof controller must not consult pending requests at all: only the
+  // approved binding can sign, so the old phone is the trusted device.
+  assert.deepEqual(state.deviceQueries, []);
+  assert.equal(state.created.length, 1);
 });
 
 testWithEnv("403 refuses a signature made by another device or for another student", async () => {

@@ -1,4 +1,5 @@
 import { signProofMessage } from "../acoustic/proofTransport";
+import { fingerprintPublicKeyJwk } from "./deviceFingerprint";
 
 const DATABASE_NAME = "attendance-device-keys";
 const STORE_NAME = "keys";
@@ -29,6 +30,24 @@ const saveKey = async (deviceKey) => {
     request.onerror = () => reject(request.error);
   });
 };
+
+export const getDevicePublicKey = async () => {
+  if (!window.indexedDB) return null;
+  try {
+    const existingKey = await readKey();
+    return existingKey?.publicKeyJwk || null;
+  } catch (error) {
+    return null;
+  }
+};
+
+/**
+ * Browser-side mirror of the server fingerprint. It hashes exactly the public
+ * P-256 fields in a fixed order, so the server can tell whether the current
+ * browser is the approved device or a new one waiting for review.
+ */
+export const fingerprintDevicePublicKey = (publicKeyJwk) =>
+  fingerprintPublicKeyJwk(publicKeyJwk);
 
 export const getOrCreateDevicePublicKey = async () => {
   if (!window.crypto?.subtle || !window.indexedDB) {

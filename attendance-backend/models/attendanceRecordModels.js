@@ -3,7 +3,7 @@ const mongoose = require("mongoose");
 // Who made the final call for one student in one session. `pending` means the
 // session snapshot exists but the teacher has not decided (or finalised) yet.
 const ATTENDANCE_STATUSES = ["pending", "present", "absent", "excused"];
-const ATTENDANCE_SOURCES = ["pending", "manual", "query", "override", "demo", "auto"];
+const ATTENDANCE_SOURCES = ["pending", "manual", "query", "override", "demo", "auto", "evidence"];
 
 const locationSchema = new mongoose.Schema(
   {

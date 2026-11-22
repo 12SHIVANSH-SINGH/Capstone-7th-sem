@@ -3,7 +3,10 @@ import axios from "axios";
 import {
   FiAlertTriangle,
   FiCheckCircle,
+  FiChevronDown,
+  FiChevronRight,
   FiClock,
+  FiDownload,
   FiMapPin,
   FiRefreshCw,
   FiSave,
@@ -24,7 +27,19 @@ import { classLabel, formatDateTime, formatDistance, percentLabel } from "../../
 import { describePasskeyError, withAdminStepUp } from "../../utils/adminStepUp";
 import EventTimeline from "../shared/EventTimeline";
 import LocationEvidence from "../shared/LocationEvidence";
-import { attendanceUpdates, changedRecordIds } from "./sessionAttendanceView";
+import {
+  attendanceUpdates,
+  changedRecordIds,
+  chosenStatus,
+  evidenceBackedPendingIds,
+  evidenceCount,
+  filterRecords,
+  isEvidenceBackedPending,
+  markEvidenceBackedPresent,
+  pendingEvidenceBreakdown,
+  sourceLabel,
+} from "./sessionAttendanceView";
+import "./sessionAttendance.css";
 
 const requestConfig = { withCredentials: true };
 
@@ -66,6 +81,10 @@ const SessionAttendanceModal = ({ open, session, mode = "teacher", onClose, onCh
   });
   const [deletingRecord, setDeletingRecord] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [evidenceFilter, setEvidenceFilter] = useState("all");
+  const [expandedRecordId, setExpandedRecordId] = useState("");
+  const [autoMarkSaving, setAutoMarkSaving] = useState(false);
+  const [exporting, setExporting] = useState("");
 
   const isAdmin = mode === "admin";
   const sessionId = session?.id || "";
@@ -131,6 +150,8 @@ const SessionAttendanceModal = ({ open, session, mode = "teacher", onClose, onCh
     setDrafts({});
     setNotes({});
     setConfirmDelete(false);
+    setEvidenceFilter("all");
+    setExpandedRecordId("");
     setProofs({ loading: false, error: "", total: 0, byWave: [], proofs: [] });
     load();
     loadProofs();
@@ -159,6 +180,22 @@ const SessionAttendanceModal = ({ open, session, mode = "teacher", onClose, onCh
     [records, drafts, notes]
   );
   const sessionInfo = useMemo(() => data.session || session || {}, [data.session, session]);
+  const evidenceBreakdown = useMemo(
+    () => pendingEvidenceBreakdown(records, drafts),
+    [records, drafts]
+  );
+  const visibleRecords = useMemo(
+    () => filterRecords(records, drafts, evidenceFilter),
+    [records, drafts, evidenceFilter]
+  );
+  const visibleEvidenceIds = useMemo(
+    () => evidenceBackedPendingIds(visibleRecords, drafts),
+    [visibleRecords, drafts]
+  );
+  const expandedRecord = useMemo(
+    () => records.find((record) => record.id === expandedRecordId) || null,
+    [records, expandedRecordId]
+  );
 
   const setStatus = (record, status) => {
     setDrafts((current) => {
@@ -167,6 +204,85 @@ const SessionAttendanceModal = ({ open, session, mode = "teacher", onClose, onCh
       else next[record.id] = status;
       return next;
     });
+  };
+
+  const acceptEvidence = (record) => {
+    setDrafts((current) => {
+      const next = { ...current };
+      if (record.status === "present") delete next[record.id];
+      else next[record.id] = "present";
+      return next;
+    });
+  };
+
+  const markAllEvidence = (list = visibleRecords) => {
+    const ids = evidenceBackedPendingIds(list, drafts);
+    if (!ids.length) return;
+    setDrafts((current) => markEvidenceBackedPresent(list, current));
+    toast(
+      `${ids.length} evidence-backed row${ids.length === 1 ? "" : "s"} set to Present. Save to apply.`,
+      "success"
+    );
+  };
+
+  const toggleAutoMark = async (enabled) => {
+    if (!sessionId || autoMarkSaving) return;
+    setAutoMarkSaving(true);
+    try {
+      const response = await axios.patch(
+        `${SERVER_URL}/check-in-sessions/${sessionId}/attendance-settings`,
+        { autoMarkPresent: enabled },
+        requestConfig
+      );
+      setData((current) => ({
+        ...current,
+        session: {
+          ...current.session,
+          ...(response.data?.session || {}),
+          autoMarkPresent: enabled,
+        },
+      }));
+      toast(
+        enabled ? "Auto-present enabled for this session." : "Auto-present disabled.",
+        "success"
+      );
+      onChanged?.();
+    } catch (requestError) {
+      toast(
+        messageFor(requestError, "Could not change auto-present for this session."),
+        "error"
+      );
+    } finally {
+      setAutoMarkSaving(false);
+    }
+  };
+
+  const downloadSessionExport = async (format) => {
+    if (!sessionId || exporting) return;
+    setExporting(format);
+    try {
+      const response = await fetch(`${SERVER_URL}/exports/sessions/${sessionId}.${format}`, {
+        credentials: "include",
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.message || "Export failed.");
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `bio-attend-session-${sessionId}.${format}`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      toast(`${format.toUpperCase()} exported.`, "success");
+    } catch (requestError) {
+      toast(messageFor(requestError, "Export failed."), "error");
+    } finally {
+      setExporting("");
+    }
   };
 
   const saveChanges = async () => {
@@ -301,7 +417,6 @@ const SessionAttendanceModal = ({ open, session, mode = "teacher", onClose, onCh
     return events.sort((left, right) => new Date(left.at) - new Date(right.at));
   }, [data.queries, proofs.proofs, sessionInfo]);
 
-  const chosenStatus = (record) => drafts[record.id] || record.status;
   const hasChanges = changedIds.length > 0;
   const canFinalize =
     !isAdmin && sessionInfo.status === "closed" && !sessionInfo.attendanceFinalized;
@@ -405,6 +520,24 @@ const SessionAttendanceModal = ({ open, session, mode = "teacher", onClose, onCh
                   register with a query during the review window. This action is written to the
                   audit log.
                 </p>
+                <div className="chip-row" style={{ marginTop: 8 }}>
+                  <span className="chip chip--success">
+                    {evidenceBreakdown.pendingWithEvidenceCount} pending with evidence
+                  </span>
+                  <span className="chip">
+                    {evidenceBreakdown.pendingWithoutEvidenceCount} pending without evidence
+                  </span>
+                </div>
+                {evidenceBreakdown.pendingWithEvidenceCount > 0 && (
+                  <p style={{ marginTop: 8 }}>
+                    <strong>
+                      {evidenceBreakdown.pendingWithEvidenceCount} student
+                      {evidenceBreakdown.pendingWithEvidenceCount === 1 ? " has" : "s have"}{" "}
+                      signed evidence but are still pending.
+                    </strong>{" "}
+                    Accept them before finalising if the evidence supports it.
+                  </p>
+                )}
               </div>
             </div>
           )}
@@ -431,17 +564,130 @@ const SessionAttendanceModal = ({ open, session, mode = "teacher", onClose, onCh
 
           {tab === "register" && (
             <>
+              {!isAdmin && (
+                <div
+                  className={`register-policy ${sessionInfo.autoMarkPresent ? "register-policy--on" : ""}`}
+                >
+                  <div className="register-policy__copy">
+                    <strong>Auto-present from signed proofs</strong>
+                    <p>
+                      Off by default. When on, the first accepted proof marks a still-pending
+                      student present with source <em>Evidence</em>. You can always change the
+                      row, and every automatic decision is audited.
+                    </p>
+                    {sessionInfo.autoMarkPresent &&
+                      (sessionInfo.autoMarkPresentByEmail || sessionInfo.autoMarkPresentAt) && (
+                        <p className="register-policy__meta">
+                          Enabled
+                          {sessionInfo.autoMarkPresentByEmail
+                            ? ` by ${sessionInfo.autoMarkPresentByEmail}`
+                            : ""}
+                          {sessionInfo.autoMarkPresentAt
+                            ? ` · ${formatDateTime(sessionInfo.autoMarkPresentAt)}`
+                            : ""}
+                        </p>
+                      )}
+                  </div>
+                  {sessionInfo.status === "active" && !sessionInfo.attendanceFinalized ? (
+                    <label className="register-policy__switch">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(sessionInfo.autoMarkPresent)}
+                        onChange={(event) => toggleAutoMark(event.target.checked)}
+                        disabled={autoMarkSaving || loading}
+                      />
+                      <span>
+                        {autoMarkSaving
+                          ? "Saving…"
+                          : sessionInfo.autoMarkPresent
+                          ? "On for this session"
+                          : "Off"}
+                      </span>
+                    </label>
+                  ) : (
+                    <Badge variant={sessionInfo.autoMarkPresent ? "warning" : "neutral"}>
+                      {sessionInfo.autoMarkPresent ? "Was on" : "Off"}
+                    </Badge>
+                  )}
+                </div>
+              )}
+
+              <div className="register-toolbar">
+                <div className="register-toolbar__group">
+                  <label className="register-toolbar__label" htmlFor="register-evidence-filter">
+                    Show
+                  </label>
+                  <select
+                    id="register-evidence-filter"
+                    className="ui-input register-toolbar__select"
+                    value={evidenceFilter}
+                    onChange={(event) => setEvidenceFilter(event.target.value)}
+                  >
+                    <option value="all">All {records.length} rows</option>
+                    <option value="pending-evidence">
+                      Pending with evidence ({evidenceBreakdown.pendingWithEvidenceCount})
+                    </option>
+                    <option value="pending-no-evidence">
+                      Pending without evidence ({evidenceBreakdown.pendingWithoutEvidenceCount})
+                    </option>
+                  </select>
+                  <Button
+                    variant="soft"
+                    size="sm"
+                    onClick={() => markAllEvidence()}
+                    disabled={!visibleEvidenceIds.length}
+                  >
+                    <FiCheckCircle aria-hidden="true" /> Accept{" "}
+                    {visibleEvidenceIds.length
+                      ? `${visibleEvidenceIds.length} with evidence`
+                      : "evidence-backed"}
+                  </Button>
+                </div>
+                <div className="register-toolbar__group">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => downloadSessionExport("pdf")}
+                    loading={exporting === "pdf"}
+                    disabled={Boolean(exporting) && exporting !== "pdf"}
+                  >
+                    <FiDownload aria-hidden="true" /> PDF
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => downloadSessionExport("xlsx")}
+                    loading={exporting === "xlsx"}
+                    disabled={Boolean(exporting) && exporting !== "xlsx"}
+                  >
+                    <FiDownload aria-hidden="true" /> XLSX
+                  </Button>
+                </div>
+              </div>
+
               {records.length === 0 ? (
                 <EmptyState
                   icon={<FiUsers />}
                   title="No roster rows"
                   text="The roster was empty when this session started. Add students to the class before the next session."
                 />
+              ) : visibleRecords.length === 0 ? (
+                <p className="empty-inline">
+                  No rows match this filter.{" "}
+                  <button
+                    type="button"
+                    className="ui-link-btn"
+                    onClick={() => setEvidenceFilter("all")}
+                  >
+                    Show all {records.length} rows
+                  </button>
+                </p>
               ) : (
                 <div className="data-table-wrap">
-                  <table className="data-table">
+                  <table className="data-table register-table">
                     <thead>
                       <tr>
+                        <th className="register-table__toggle" aria-label="Expand evidence" />
                         <th>Student</th>
                         <th>Status</th>
                         <th>Evidence</th>
@@ -451,84 +697,226 @@ const SessionAttendanceModal = ({ open, session, mode = "teacher", onClose, onCh
                       </tr>
                     </thead>
                     <tbody>
-                      {records.map((record) => (
-                        <tr key={record.id}>
-                          <td>
-                            <button
-                              type="button"
-                              className="ui-link-btn"
-                              onClick={() => {
-                                setSelectedRecordId(record.id);
-                                setTab("evidence");
-                              }}
-                            >
-                              {record.studentName || record.studentEmail}
-                            </button>
-                            <div className="data-table__sub">
-                              {record.rollNumber || "No roll"} · {record.studentEmail}
-                            </div>
-                          </td>
-                          <td>
-                            <select
-                              className="ui-input"
-                              aria-label={`Attendance status for ${record.studentEmail}`}
-                              value={chosenStatus(record)}
-                              onChange={(event) => setStatus(record, event.target.value)}
-                            >
-                              <option value="pending">Pending</option>
-                              <option value="present">Present</option>
-                              <option value="absent">Absent</option>
-                              <option value="excused">Excused</option>
-                            </select>
-                            {drafts[record.id] && (
-                              <div className="data-table__sub">Unsaved change</div>
+                      {visibleRecords.map((record) => {
+                        const expanded = expandedRecordId === record.id;
+                        const proofCount = evidenceCount(record);
+                        const waves = record.evidence?.waves || [];
+                        const studentProofs = proofs.proofs.filter(
+                          (proof) => proof.studentEmail === record.studentEmail
+                        );
+                        return (
+                          <React.Fragment key={record.id}>
+                            <tr className={expanded ? "register-row--open" : ""}>
+                              <td className="register-table__toggle">
+                                <button
+                                  type="button"
+                                  className="ui-link-btn register-table__expand"
+                                  aria-expanded={expanded}
+                                  aria-label={`${expanded ? "Hide" : "Show"} evidence detail for ${
+                                    record.studentName || record.studentEmail
+                                  }`}
+                                  onClick={() =>
+                                    setExpandedRecordId((current) =>
+                                      current === record.id ? "" : record.id
+                                    )
+                                  }
+                                >
+                                  {expanded ? (
+                                    <FiChevronDown aria-hidden="true" />
+                                  ) : (
+                                    <FiChevronRight aria-hidden="true" />
+                                  )}
+                                </button>
+                              </td>
+                              <td>
+                                <button
+                                  type="button"
+                                  className="ui-link-btn"
+                                  onClick={() => {
+                                    setSelectedRecordId(record.id);
+                                    setTab("evidence");
+                                  }}
+                                >
+                                  {record.studentName || record.studentEmail}
+                                </button>
+                                <div className="data-table__sub">
+                                  {record.rollNumber || "No roll"} · {record.studentEmail}
+                                </div>
+                              </td>
+                              <td>
+                                <select
+                                  className="ui-input"
+                                  aria-label={`Attendance status for ${record.studentEmail}`}
+                                  value={chosenStatus(record)}
+                                  onChange={(event) => setStatus(record, event.target.value)}
+                                >
+                                  <option value="pending">Pending</option>
+                                  <option value="present">Present</option>
+                                  <option value="absent">Absent</option>
+                                  <option value="excused">Excused</option>
+                                </select>
+                                {drafts[record.id] && (
+                                  <div className="data-table__sub">Unsaved change</div>
+                                )}
+                              </td>
+                              <td>
+                                <div className="chip-row">
+                                  <span
+                                    className={`chip ${
+                                      proofCount > 0 ? "chip--success" : ""
+                                    }`}
+                                  >
+                                    {proofCount} proof{proofCount === 1 ? "" : "s"}
+                                  </span>
+                                  <span className="chip">{sourceLabel(record.source)}</span>
+                                </div>
+                                {proofCount > 0 && (
+                                  <div className="data-table__sub">
+                                    {waves.length
+                                      ? `Wave${waves.length === 1 ? "" : "s"} ${waves.join(", ")}`
+                                      : "Signed proof recorded"}
+                                    {record.evidence?.lastProofAt
+                                      ? ` · last ${formatDateTime(record.evidence.lastProofAt)}`
+                                      : ""}
+                                  </div>
+                                )}
+                                {isEvidenceBackedPending(record, drafts) && (
+                                  <Button
+                                    variant="soft"
+                                    size="sm"
+                                    className="register-table__accept"
+                                    onClick={() => acceptEvidence(record)}
+                                  >
+                                    <FiCheckCircle aria-hidden="true" /> Accept present
+                                  </Button>
+                                )}
+                              </td>
+                              <td>
+                                {record.attemptDistanceMeters !== null &&
+                                record.attemptDistanceMeters !== undefined ? (
+                                  <span className="query-window">
+                                    {formatDistance(record.attemptDistanceMeters)}
+                                  </span>
+                                ) : record.attemptLocation ? (
+                                  <span className="query-window">Captured</span>
+                                ) : (
+                                  <span className="query-window">Not shared</span>
+                                )}
+                              </td>
+                              <td>
+                                {record.query ? (
+                                  <Badge variant="warning">Query</Badge>
+                                ) : (
+                                  <span className="query-window">—</span>
+                                )}
+                              </td>
+                              <td>
+                                <input
+                                  className="ui-input"
+                                  value={notes[record.id] ?? record.decisionNote ?? ""}
+                                  onChange={(event) =>
+                                    setNotes((current) => ({
+                                      ...current,
+                                      [record.id]: event.target.value,
+                                    }))
+                                  }
+                                  placeholder="Decision note"
+                                  maxLength={500}
+                                  aria-label={`Decision note for ${record.studentEmail}`}
+                                />
+                              </td>
+                            </tr>
+                            {expanded && (
+                              <tr className="register-detail">
+                                <td colSpan={7}>
+                                  <div className="register-detail__grid">
+                                    <div>
+                                      <p className="page-section-title">Signed proof timeline</p>
+                                      <p className="page-section-sub">
+                                        One proof per student per wave. Signed evidence expires
+                                        after about 24 hours; the register keeps the counters.
+                                      </p>
+                                      <div style={{ marginTop: 10 }}>
+                                        {isAdmin ? (
+                                          <p className="empty-inline">
+                                            The proof timeline is available to the owning teacher.
+                                          </p>
+                                        ) : proofs.loading ? (
+                                          <div className="loading-inline">
+                                            <Spinner /> Loading proofs…
+                                          </div>
+                                        ) : proofs.error ? (
+                                          <p className="empty-inline">{proofs.error}</p>
+                                        ) : (
+                                          <EventTimeline
+                                            compact
+                                            events={studentProofs.map((proof) => ({
+                                              id: proof.id,
+                                              at: proof.recordedAt,
+                                              title: `Wave ${proof.wave} proof`,
+                                              detail:
+                                                "The bound device signed the decoded key.",
+                                              tone: "success",
+                                            }))}
+                                            empty="This student did not submit a signed proof."
+                                          />
+                                        )}
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <p className="page-section-title">Location evidence</p>
+                                      <p className="page-section-sub">
+                                        GPS distance appears only when both the student attempt
+                                        and teacher start were captured.
+                                      </p>
+                                      <div style={{ marginTop: 10 }}>
+                                        <LocationEvidence
+                                          teacherLocation={
+                                            record.teacherLocation ||
+                                            sessionInfo.teacherLocation
+                                          }
+                                          attemptLocation={record.attemptLocation}
+                                          distanceMeters={record.attemptDistanceMeters}
+                                          radiusMeters={sessionInfo.geofenceRadiusMeters}
+                                        />
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="register-detail__actions">
+                                    <Button
+                                      variant="soft"
+                                      size="sm"
+                                      onClick={() => {
+                                        setSelectedRecordId(record.id);
+                                        setTab("evidence");
+                                      }}
+                                    >
+                                      Open full evidence
+                                    </Button>
+                                    {isEvidenceBackedPending(record, drafts) && (
+                                      <Button
+                                        size="sm"
+                                        onClick={() => acceptEvidence(record)}
+                                      >
+                                        <FiCheckCircle aria-hidden="true" /> Accept present
+                                      </Button>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
                             )}
-                          </td>
-                          <td>
-                            <div className="chip-row">
-                              <span className="chip">
-                                {record.evidence?.proofCount || 0} proof{(record.evidence?.proofCount || 0) === 1 ? "" : "s"}
-                              </span>
-                              <span className="chip">{record.source}</span>
-                            </div>
-                          </td>
-                          <td>
-                            {record.attemptDistanceMeters !== null && record.attemptDistanceMeters !== undefined ? (
-                              <span className="query-window">{formatDistance(record.attemptDistanceMeters)}</span>
-                            ) : record.attemptLocation ? (
-                              <span className="query-window">Captured</span>
-                            ) : (
-                              <span className="query-window">Not shared</span>
-                            )}
-                          </td>
-                          <td>
-                            {record.query ? (
-                              <Badge variant="warning">Query</Badge>
-                            ) : (
-                              <span className="query-window">—</span>
-                            )}
-                          </td>
-                          <td>
-                            <input
-                              className="ui-input"
-                              value={notes[record.id] ?? record.decisionNote ?? ""}
-                              onChange={(event) =>
-                                setNotes((current) => ({ ...current, [record.id]: event.target.value }))
-                              }
-                              placeholder="Decision note"
-                              maxLength={500}
-                              aria-label={`Decision note for ${record.studentEmail}`}
-                            />
-                          </td>
-                        </tr>
-                      ))}
+                          </React.Fragment>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
               )}
               <p className="checkin__note">
-                Attendance is a teacher decision. Acoustic proofs show that a phone heard a wave;
-                they do not mark anyone present automatically. Approved queries count as present.
+                Attendance is a teacher decision. By default, acoustic proofs are evidence and do
+                not mark anyone present. If you enable auto-present for this session, the first
+                accepted proof marks a still-pending student present and the change is audited.
+                Approved queries count as present.
               </p>
             </>
           )}

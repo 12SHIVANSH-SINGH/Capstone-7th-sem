@@ -48,9 +48,90 @@ const attendanceUpdates = (records, drafts, notes) => {
   });
 };
 
+const chosenStatus = (record, drafts) =>
+  hasOwn(drafts, record?.id) ? drafts[record.id] : record?.status;
+
+const evidenceCount = (record) => Number(record?.evidence?.proofCount) || 0;
+
+const isEvidenceBackedPending = (record, drafts) =>
+  chosenStatus(record, drafts) === "pending" && evidenceCount(record) > 0;
+
+const evidenceBackedPendingIds = (records, drafts) =>
+  (Array.isArray(records) ? records : [])
+    .filter((record) => isEvidenceBackedPending(record, drafts))
+    .map((record) => record.id);
+
+/**
+ * Set every currently-pending row with at least one proof to the Present
+ * draft. A teacher's existing draft is respected: if they already chose
+ * Absent or Excused for a row, the bulk action does not overwrite it.
+ */
+const markEvidenceBackedPresent = (records, drafts) => {
+  const next = { ...drafts };
+  for (const record of Array.isArray(records) ? records : []) {
+    if (!record?.id || !isEvidenceBackedPending(record, drafts)) continue;
+    if (record.status === "present") delete next[record.id];
+    else next[record.id] = "present";
+  }
+  return next;
+};
+
+const pendingEvidenceBreakdown = (records, drafts) => {
+  const pendingWithEvidence = [];
+  const pendingWithoutEvidence = [];
+  for (const record of Array.isArray(records) ? records : []) {
+    if (!record?.id || chosenStatus(record, drafts) !== "pending") continue;
+    if (evidenceCount(record) > 0) pendingWithEvidence.push(record);
+    else pendingWithoutEvidence.push(record);
+  }
+  return {
+    pendingWithEvidence,
+    pendingWithoutEvidence,
+    pendingWithEvidenceCount: pendingWithEvidence.length,
+    pendingWithoutEvidenceCount: pendingWithoutEvidence.length,
+  };
+};
+
+const EVIDENCE_FILTERS = ["all", "pending-evidence", "pending-no-evidence"];
+
+const filterRecords = (records, drafts, filter) => {
+  const list = Array.isArray(records) ? records : [];
+  if (filter === "pending-evidence") {
+    return list.filter((record) => isEvidenceBackedPending(record, drafts));
+  }
+  if (filter === "pending-no-evidence") {
+    return list.filter(
+      (record) => chosenStatus(record, drafts) === "pending" && evidenceCount(record) === 0
+    );
+  }
+  return list;
+};
+
+const SOURCE_LABELS = {
+  pending: "No decision",
+  manual: "Teacher",
+  query: "Query",
+  override: "Override",
+  auto: "Auto-absent",
+  evidence: "Evidence",
+  demo: "Demo",
+  browser: "Browser",
+};
+
+const sourceLabel = (source) => SOURCE_LABELS[source] || source || "No decision";
+
 module.exports = {
   changedRecordIds,
   attendanceUpdates,
   noteValueFor,
   hasNoteChange,
+  chosenStatus,
+  evidenceCount,
+  isEvidenceBackedPending,
+  evidenceBackedPendingIds,
+  markEvidenceBackedPresent,
+  pendingEvidenceBreakdown,
+  EVIDENCE_FILTERS,
+  filterRecords,
+  sourceLabel,
 };

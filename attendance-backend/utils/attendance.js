@@ -223,6 +223,29 @@ const attendanceRecordView = (record) => ({
   isDemo: Boolean(record.isDemo),
 });
 
+const AUTO_PRESENT_NOTE =
+  "Auto-marked present from a signed proof because the teacher enabled auto-present for this session.";
+
+/**
+ * Fields written when a teacher opts in to auto-present for one session. Kept
+ * here so the source name and the audit-friendly note cannot drift between the
+ * proof controller and the register UI.
+ */
+const autoPresentUpdate = ({
+  markedBy = null,
+  markedByEmail = "",
+  markedAt = new Date(),
+} = {}) => ({
+  $set: {
+    status: "present",
+    source: "evidence",
+    markedBy,
+    markedByEmail: String(markedByEmail || "").trim().toLowerCase(),
+    markedAt,
+    decisionNote: AUTO_PRESENT_NOTE,
+  },
+});
+
 const summariseRecords = (records = []) => {
   const summary = { total: records.length, present: 0, absent: 0, pending: 0, excused: 0 };
   for (const record of records) {
@@ -279,6 +302,8 @@ module.exports = {
   queryWindowEnd,
   expireStaleQueries,
   attendanceRecordView,
+  autoPresentUpdate,
+  AUTO_PRESENT_NOTE,
   summariseRecords,
   percentage,
   dateRange,

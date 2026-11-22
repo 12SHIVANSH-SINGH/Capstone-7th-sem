@@ -386,6 +386,58 @@ exports.advanceSession = catchAsyncError(async (req, res, next) => {
 });
 
 /**
+ * Per-session attendance policy. Auto-present is off by default and can only
+ * be changed while the check-in is live. Enabling it is audited because it is
+ * the one path where signed evidence writes a status without a teacher click.
+ */
+exports.updateAttendanceSettings = catchAsyncError(async (req, res, next) => {
+  const session = await getOwnedSession(req.params.sessionId, req.user._id, next);
+  if (!session) return;
+
+  if (typeof req.body?.autoMarkPresent !== "boolean") {
+    return next(new ErrorHandler("autoMarkPresent must be true or false", 400));
+  }
+  if (session.status !== STATUS_ACTIVE) {
+    return next(
+      new ErrorHandler("Auto-present can only be changed while the check-in is live.", 409)
+    );
+  }
+  if (session.attendanceFinalized) {
+    return next(new ErrorHandler("Attendance is already finalised.", 409));
+  }
+
+  const enabled = req.body.autoMarkPresent;
+  const before = Boolean(session.autoMarkPresent);
+  if (enabled !== before) {
+    session.autoMarkPresent = enabled;
+    session.autoMarkPresentAt = enabled ? new Date() : null;
+    session.autoMarkPresentBy = enabled ? req.user._id : null;
+    session.autoMarkPresentByEmail = enabled
+      ? String(req.user.email || "").trim().toLowerCase()
+      : "";
+    await session.save();
+
+    await writeAudit(req, {
+      action: "session.auto_present.updated",
+      entityType: "CheckInSession",
+      entityId: session._id,
+      summary: enabled
+        ? "Enabled auto-present from signed proofs for this session."
+        : "Disabled auto-present for this session.",
+      before: { autoMarkPresent: before },
+      after: { autoMarkPresent: enabled },
+      isDemo: session.isDemo,
+    });
+  }
+
+  const summaries = await attendanceSummaries([session._id]);
+  res.status(200).json({
+    success: true,
+    session: withSummary(session, summaries.get(String(session._id))),
+  });
+});
+
+/**
  * Read-only evidence for the teacher who owns the session. This is not a
  * roster roll-call and not a score: it lists which enrolled students submitted
  * which wave, so the teacher can see the transport working during a rehearsal.

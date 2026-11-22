@@ -115,8 +115,10 @@ The implemented design:
 1. Teacher taps Start once. The server creates K0 and the teacher's phone plays it repeatedly
    from the front.
 2. A student phone that decodes Kn submits its credential, Kn and a device signature.
-3. The server accepts either its current round or its pending round, records the evidence and
-   never marks attendance.
+3. The server accepts either its current round or its pending round and records the evidence.
+   By default it never marks attendance. The teacher may explicitly enable auto-present for a
+   session while it is live; then the first accepted proof marks a still-pending row present,
+   with source `evidence` and an audit entry. Manual decisions always win.
 4. If the proof is for the current round, the server mints a pending K(n+1) and returns it to
    that phone. The phone plays K(n+1) two or three times, then returns to listening.
 5. If the proof is for the pending round, the server atomically promotes that key, archives the
@@ -171,18 +173,19 @@ queries, analytics, exports, notifications, timetable, PWA and a production-capa
 super-admin console. Roster PDF text extraction with an editable preview is built, and
 timetable PDF text extraction with a read-only preview is built (A2a). The phone-to-phone relay
 cascade is **committed and locally tested**; the owner reports Render shows `7148994`. The
-2026-11-21 register fixes are in the working tree and still need commit, deploy and a fresh G2
-check. The cascade has not been physically rehearsed. Structured timetable row parsing, local
-OCR and Gemini extraction are not built. The product is still **evidence-only for acoustic
-proof**: the app does not automatically score attendance or run the ID round. The attendance
-decision belongs to the teacher and is audited. The click-level execution script for the
-deployed 4-phone/3–4-laptop run is [`docs/testing-plan.md`](docs/testing-plan.md).
+2026-11-22 register/device slice is in the working tree and still needs commit, deploy and a
+fresh G2 check. The cascade has not been physically rehearsed. Structured timetable row parsing,
+local OCR and Gemini extraction are not built. The product is still **evidence-only by default**:
+the app does not automatically score attendance or run the ID round. Auto-present is a
+per-session teacher opt-in, off unless the teacher turns it on; the usual attendance decision
+belongs to the teacher and is audited. The click-level execution script for the deployed
+4-phone/3–4-laptop run is [`docs/testing-plan.md`](docs/testing-plan.md).
 
 **Completion path for the one-week push (2026-11-21):**
 
 | Order | Slice | Scope | Pass test |
 | --- | --- | --- | --- |
-| 1 | Register fixes and handoff docs | Proof-load error, note-only edits, dashboard Register deep link, new-Mac handoff and status reconciliation | New attendance tests pass; production build green; docs match the code |
+| 1 | Register, evidence and device fixes | Proof-load error, note-only edits, dashboard Register deep link, per-session auto-present opt-in, evidence-backed bulk marking, expandable evidence rows, quick session exports, current-device status and the pending-review lockout fix, plus handoff docs | New attendance/device/settings tests pass; production build green; docs match the code |
 | 2 (owner) | Commit, deploy and verify | Commit the working tree, push, redeploy, compare the Render dashboard with the reviewed `HEAD`, verify real Google sign-in and `/admin` | Health/readiness, test-plan G2 commit match, Google sign-in, no demo or dev routes in production |
 | 3 (physical) | 1.10 range diagnosis | Lower the band and/or tune TX settings; rerun 1 m, 5 m, 10 m, then reverse and muted control | ≥95% decoded at 1 m/5 m/10 m both directions; 0 decodes in the muted control |
 | 4 (rehearsal) | 2.6 phone-to-phone cascade rehearsal | 10–20 phones for 5–6 minutes; verify automatic relay, teacher fallback and zero-proof recovery; measure waves, timing and range | Every phone reaches a wave through the relay without a per-wave reload; a fresh pending key is promoted; timing measured; no false-accept claim without scoring |
@@ -208,7 +211,7 @@ deployed 4-phone/3–4-laptop run is [`docs/testing-plan.md`](docs/testing-plan.
 
 ## 10. Open items
 
-- Re-check the live Render commit after the 2026-11-21 fixes are deployed (test-plan gate
+- Re-check the live Render commit after the 2026-11-22 fixes are deployed (test-plan gate
   G2). The owner confirmed the dashboard showed `7148994`; a reachable service is not proof
   that a later working tree is current.
 - Run the signed real-student Google flow on Render (`docs/testing-plan.md`, suite FL); the
@@ -300,6 +303,12 @@ below with a date and commits it. Drafted 2026-11-21.
 > teacher before the upload; the class will be entered manually or read with local OCR
 > instead. The AI reader never saves a roster, creates a class, overwrites a slot or marks
 > attendance. The teacher reviews every extracted value before saving.
+>
+> This notice is about document reading only. Acoustic check-in has its own consent notice: by
+> default a signed proof is evidence and the teacher decides attendance. If the teacher
+> explicitly enables auto-present for one check-in session, the first valid proof marks a
+> still-pending student present; the teacher can change it, and every automatic decision is
+> audited. Auto-present is off unless the teacher turns it on for that session.
 
 **Where it is shown:**
 

@@ -199,8 +199,56 @@ test("a new proof becomes an evidence view without exposing the key", () => {
     recordedAt: "2026-10-28T12:01:10.000Z",
     duplicate: false,
     attendanceDecided: false,
+    attendanceStatus: "pending",
+    autoMarked: false,
   });
   assert.equal("key" in evidence, false);
+});
+
+test("an auto-marked proof reports the present status without exposing the key", () => {
+  const evidence = view.evidenceFromResponse(
+    {
+      success: true,
+      recorded: true,
+      duplicate: false,
+      attendanceDecided: true,
+      attendanceStatus: "present",
+      autoMarked: true,
+      proof: {
+        id: "proof-1",
+        sessionId: "session-1",
+        wave: 1,
+        recordedAt: "2026-10-28T12:01:10.000Z",
+      },
+    },
+    session({ wave: 1 })
+  );
+
+  assert.equal(evidence.attendanceDecided, true);
+  assert.equal(evidence.attendanceStatus, "present");
+  assert.equal(evidence.autoMarked, true);
+  assert.equal("key" in evidence, false);
+});
+
+test("a proof response with an unknown status falls back to pending", () => {
+  const evidence = view.evidenceFromResponse(
+    {
+      success: true,
+      recorded: true,
+      duplicate: false,
+      attendanceStatus: "score-99",
+      proof: {
+        id: "proof-1",
+        sessionId: "session-1",
+        wave: 0,
+        recordedAt: "2026-10-28T12:01:10.000Z",
+      },
+    },
+    session()
+  );
+
+  assert.equal(evidence.attendanceStatus, "pending");
+  assert.equal(evidence.autoMarked, false);
 });
 
 test("an idempotent retry is marked as already recorded", () => {

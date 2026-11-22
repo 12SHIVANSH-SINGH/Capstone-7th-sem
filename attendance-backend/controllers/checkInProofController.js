@@ -5,9 +5,10 @@ const CheckInSession = require("../models/checkInSessionModels");
 const CheckInProof = require("../models/checkInProofModels");
 const AttendanceRecord = require("../models/attendanceRecordModels");
 const Enrollment = require("../models/enrollmentModels");
-const DeviceBindingRequest = require("../models/deviceBindingRequestModels");
 const { normaliseLocation } = require("../utils/location");
 const { isDbReady } = require("../utils/dbReady");
+const { writeAudit } = require("../utils/audit");
+const { autoPresentUpdate } = require("../utils/attendance");
 const {
   STATUS_ACTIVE,
   MAX_KEY_HISTORY,
@@ -26,7 +27,7 @@ const {
 } = require("../utils/checkInProof");
 
 const SESSION_SELECT =
-  "courseClass status wave key keyIssuedAt keyExpiresAt pendingWave pendingKey pendingKeyIssuedAt pendingKeyExpiresAt";
+  "courseClass teacher isDemo status wave key keyIssuedAt keyExpiresAt pendingWave pendingKey pendingKeyIssuedAt pendingKeyExpiresAt autoMarkPresent autoMarkPresentBy autoMarkPresentByEmail";
 
 const sessionNotFound = (next) =>
   next(new ErrorHandler("Check-in session not found", 404));
@@ -170,7 +171,7 @@ const promotePendingSignal = async (sessionId, session, now) => {
  * still need to promote the cascade because the first request could have
  * stopped between storing evidence and advancing the session.
  */
-const finishDuplicate = async (res, sessionId, proof, now) => {
+const finishDuplicate = async (res, sessionId, proof, now, { studentEmail } = {}) => {
   let current = await loadSession(sessionId);
   if (
     current &&
@@ -180,11 +181,28 @@ const finishDuplicate = async (res, sessionId, proof, now) => {
     current = await promotePendingSignal(sessionId, current, now);
   }
   const next = await ensurePendingSignal(sessionId, current, now);
+
+  // A duplicate does not auto-mark by itself, but the row may already have
+  // been decided by the teacher or by an earlier accepted proof. Report that
+  // status so the phone does not keep saying "pending" after a retry.
+  let attendanceStatus = "pending";
+  if (studentEmail && isDbReady()) {
+    const record = await AttendanceRecord.findOne({
+      session: sessionId,
+      studentEmail,
+    })
+      .select("status")
+      .lean();
+    attendanceStatus = record?.status || "pending";
+  }
+
   return res.status(200).json({
     success: true,
     recorded: true,
     duplicate: true,
-    attendanceDecided: false,
+    attendanceDecided: attendanceStatus !== "pending",
+    attendanceStatus,
+    autoMarked: false,
     proof: toProofView(proof, { duplicate: true }),
     next,
   });
@@ -194,9 +212,10 @@ const finishDuplicate = async (res, sessionId, proof, now) => {
  * Record one decoded wave from a student phone and return the server-minted
  * next relay signal.
  *
- * This endpoint still stops at evidence. It never marks attendance, never
- * assigns a score and never runs the ID round; those remain gated on the
- * Layer 1 result.
+ * The default remains evidence-only: no score, no ID round, and no attendance
+ * status. The one explicit exception is a teacher opting in to auto-present
+ * for this session, in which case the first accepted proof marks a still-
+ * pending row present. The teacher can always change that decision.
  */
 exports.submitProof = catchAsyncError(async (req, res, next) => {
   const parsed = validateProofPayload(req.body);
@@ -235,22 +254,11 @@ exports.submitProof = catchAsyncError(async (req, res, next) => {
     );
   }
 
-  // A pending change means the student is asking to move to another browser.
-  // The old binding is still approved, but accepting proofs from it would let
-  // the same account keep two devices live while review is outstanding.
-  const pendingChange = await DeviceBindingRequest.exists({
-    student: req.user._id,
-    status: "pending",
-  });
-  if (pendingChange) {
-    return next(
-      new ErrorHandler(
-        "A device change is awaiting teacher review. This browser cannot submit proofs until it is approved.",
-        403
-      )
-    );
-  }
-
+  // A pending request never blocks the already-approved browser. Only the
+  // approved binding can produce a valid signature, so the new browser cannot
+  // submit proof until a teacher approves it. The old phone keeps working while
+  // the request waits, which prevents a stale queue row from locking a student
+  // out of the whole class.
   let message;
   try {
     message = buildProofMessage({
@@ -284,7 +292,7 @@ exports.submitProof = catchAsyncError(async (req, res, next) => {
       wave,
       outcome: PROOF_OUTCOMES.DUPLICATE,
     });
-    return finishDuplicate(res, session._id, existing, now);
+    return finishDuplicate(res, session._id, existing, now, { studentEmail });
   }
 
   let proof;
@@ -317,7 +325,7 @@ exports.submitProof = catchAsyncError(async (req, res, next) => {
           wave,
           outcome: PROOF_OUTCOMES.DUPLICATE,
         });
-        return finishDuplicate(res, session._id, raced, now);
+        return finishDuplicate(res, session._id, raced, now, { studentEmail });
       }
       if (raced) {
         return next(new ErrorHandler("A different proof is already recorded for this wave.", 409));
@@ -347,6 +355,8 @@ exports.submitProof = catchAsyncError(async (req, res, next) => {
 
   // Keep the durable register in sync while the proof document is still
   // present. The proof itself expires after 24 hours; this counter survives.
+  let attendanceStatus = "pending";
+  let autoMarked = false;
   if (isDbReady()) {
     await AttendanceRecord.findOneAndUpdate(
       { session: session._id, studentEmail },
@@ -364,13 +374,68 @@ exports.submitProof = catchAsyncError(async (req, res, next) => {
     ).catch((error) => {
       console.error(`[attendance] proof counter update failed: ${error.message}`);
     });
+
+    // This is the only path where evidence writes a status without a teacher
+    // click. It is off by default and exists only when the teacher explicitly
+    // enabled auto-present for this session. Manual decisions always win: the
+    // update matches only a still-pending row.
+    if (session.autoMarkPresent) {
+      try {
+        const marked = await AttendanceRecord.findOneAndUpdate(
+          { session: session._id, studentEmail, status: "pending" },
+          autoPresentUpdate({
+            markedBy: session.autoMarkPresentBy || session.teacher,
+            markedByEmail: session.autoMarkPresentByEmail || "",
+            markedAt: now,
+          }),
+          { new: true }
+        )
+          .select("status")
+          .lean();
+
+        if (marked) {
+          autoMarked = true;
+          attendanceStatus = "present";
+          await writeAudit(req, {
+            action: "attendance.marked",
+            entityType: "CheckInSession",
+            entityId: session._id,
+            actor: {
+              _id: session.teacher,
+              email: session.autoMarkPresentByEmail || "",
+              role: "teacher",
+            },
+            summary: `Auto-marked ${studentEmail} present from signed proof.`,
+            metadata: { auto: true, wave, studentEmail },
+            isDemo: Boolean(session.isDemo),
+          });
+        }
+      } catch (error) {
+        // The proof is already durable. A failed auto-mark must not turn an
+        // accepted proof into an error; the teacher can still mark the row.
+        console.error(`[attendance] auto-present update failed: ${error.message}`);
+      }
+    }
+
+    if (!autoMarked) {
+      const record = await AttendanceRecord.findOne({
+        session: session._id,
+        studentEmail,
+      })
+        .select("status")
+        .lean()
+        .catch(() => null);
+      attendanceStatus = record?.status || "pending";
+    }
   }
 
   res.status(201).json({
     success: true,
     recorded: true,
     duplicate: false,
-    attendanceDecided: false,
+    attendanceDecided: autoMarked || attendanceStatus !== "pending",
+    attendanceStatus,
+    autoMarked,
     proof: toProofView(proof),
     next: nextSignal,
   });

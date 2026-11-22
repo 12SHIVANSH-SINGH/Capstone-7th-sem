@@ -12,6 +12,7 @@ const User = require("../models/userModels");
 const { getSettings } = require("../utils/settings");
 const { resolveTermRange, summariseRecords, percentage, expireStaleQueries } = require("../utils/attendance");
 const { toAuditView, writeAudit } = require("../utils/audit");
+const { distanceMeters, formatDistance } = require("../utils/location");
 
 const BRAND = { indigo: "#4f46e5", teal: "#0f766e", slate: "#334155", light: "#eef2ff" };
 
@@ -33,11 +34,16 @@ const safeFilename = (value) =>
     .replace(/^-|-$/g, "")
     .toLowerCase();
 
-const sendPdf = async (res, filename, build) => {
+const sendPdf = async (res, filename, build, { landscape = false } = {}) => {
   res.set("Content-Type", "application/pdf");
   res.set("Content-Disposition", `attachment; filename="${filename}.pdf"`);
   res.set("Cache-Control", "no-store");
-  const doc = new PDFDocument({ size: "A4", margin: 44, bufferPages: true });
+  const doc = new PDFDocument({
+    size: "A4",
+    layout: landscape ? "landscape" : "portrait",
+    margin: 44,
+    bufferPages: true,
+  });
   doc.pipe(res);
   build(doc);
   doc.end();
@@ -536,6 +542,12 @@ exports.sessionPdf = catchAsyncError(async (req, res, next) => {
   if (!session) return next(new ErrorHandler("Session not found", 404));
   const records = await AttendanceRecord.find({ session: session._id }).sort({ rollNumber: 1 });
   const summary = summariseRecords(records);
+  const attachedQueries = await AttendanceQuery.find({ session: session._id })
+    .select("_id status")
+    .lean();
+  const queryStatus = new Map(
+    attachedQueries.map((query) => [String(query._id), query.status])
+  );
 
   await sendPdf(res, safeFilename(`bio-attend-session-${session._id}`), (doc) => {
     heading(
@@ -546,30 +558,56 @@ exports.sessionPdf = catchAsyncError(async (req, res, next) => {
     keyValue(doc, "Room", session.room?.roomNo || session.classSnapshot?.roomNo || "—");
     keyValue(doc, "Status", session.status);
     keyValue(doc, "Finalised", session.attendanceFinalized ? "Yes" : "No");
+    keyValue(
+      doc,
+      "Auto-present",
+      session.autoMarkPresent
+        ? `On · enabled by ${session.autoMarkPresentByEmail || "teacher"}`
+        : "Off · evidence only"
+    );
     keyValue(doc, "Present", summary.present);
     keyValue(doc, "Absent", summary.absent);
     keyValue(doc, "Pending", summary.pending);
+    keyValue(doc, "Percentage", summary.percentage === null ? "—" : `${summary.percentage}%`);
+    keyValue(doc, "Queries", attachedQueries.length);
     doc.moveDown(0.8);
     table(
       doc,
       [
-        { label: "Roll", weight: 1.1 },
-        { label: "Student", weight: 2.3 },
+        { label: "Roll", weight: 1 },
+        { label: "Student", weight: 2.2 },
         { label: "Email", weight: 2.6 },
-        { label: "Status", weight: 1 },
-        { label: "Source", weight: 1 },
-        { label: "Proofs", weight: 0.8 },
+        { label: "Status", weight: 0.95 },
+        { label: "Source", weight: 0.95 },
+        { label: "Proofs", weight: 0.7 },
+        { label: "Waves", weight: 1 },
+        { label: "Last proof", weight: 1.6 },
+        { label: "Distance", weight: 1 },
+        { label: "Query", weight: 1.1 },
+        { label: "Note", weight: 2.4 },
       ],
-      records.map((record) => [
-        record.rollNumber || "—",
-        record.studentName || "—",
-        record.studentEmail,
-        record.status,
-        record.source,
-        record.evidence?.proofCount || 0,
-      ])
+      records.map((record) => {
+        const meters = distanceMeters(record.teacherLocation, record.attemptLocation);
+        return [
+          record.rollNumber || "—",
+          record.studentName || "—",
+          record.studentEmail,
+          record.status,
+          record.source,
+          record.evidence?.proofCount || 0,
+          Array.isArray(record.evidence?.waves) && record.evidence.waves.length
+            ? record.evidence.waves.join(", ")
+            : "—",
+          record.evidence?.lastProofAt
+            ? new Date(record.evidence.lastProofAt).toLocaleString()
+            : "—",
+          meters === null ? "—" : formatDistance(meters),
+          record.query ? queryStatus.get(String(record.query)) || "attached" : "—",
+          record.decisionNote || "—",
+        ];
+      })
     );
-  });
+  }, { landscape: true });
   await auditExport(req, "session.pdf", {
     format: "pdf",
     rows: records.length,
@@ -589,12 +627,18 @@ exports.sessionXlsx = catchAsyncError(async (req, res, next) => {
   if (!session) return next(new ErrorHandler("Session not found", 404));
   const records = await AttendanceRecord.find({ session: session._id }).sort({ rollNumber: 1 });
   const summary = summariseRecords(records);
+  const attachedQueries = await AttendanceQuery.find({ session: session._id })
+    .select("_id status")
+    .lean();
+  const queryStatus = new Map(
+    attachedQueries.map((query) => [String(query._id), query.status])
+  );
 
   const workbook = new ExcelJS.Workbook();
   const summarySheet = workbook.addWorksheet("Session");
   summarySheet.columns = [
     { header: "Field", key: "field", width: 24 },
-    { header: "Value", key: "value", width: 48 },
+    { header: "Value", key: "value", width: 58 },
   ];
   summarySheet.addRows([
     { field: "Class", value: `${session.classSnapshot?.courseCode || ""} — ${session.classSnapshot?.title || ""}` },
@@ -603,10 +647,17 @@ exports.sessionXlsx = catchAsyncError(async (req, res, next) => {
     { field: "Room", value: session.room?.roomNo || session.classSnapshot?.roomNo || "" },
     { field: "Status", value: session.status },
     { field: "Finalised", value: session.attendanceFinalized ? "Yes" : "No" },
+    {
+      field: "Auto-present",
+      value: session.autoMarkPresent
+        ? `On · enabled by ${session.autoMarkPresentByEmail || "teacher"}`
+        : "Off · evidence only",
+    },
     { field: "Present", value: summary.present },
     { field: "Absent", value: summary.absent },
     { field: "Pending", value: summary.pending },
     { field: "Percentage", value: summary.percentage ?? "" },
+    { field: "Queries attached", value: attachedQueries.length },
   ]);
   summarySheet.getRow(1).font = { bold: true };
 
@@ -618,7 +669,14 @@ exports.sessionXlsx = catchAsyncError(async (req, res, next) => {
     { header: "Status", key: "status", width: 10 },
     { header: "Source", key: "source", width: 10 },
     { header: "Proofs", key: "proofs", width: 9 },
+    { header: "Waves", key: "waves", width: 12 },
+    { header: "First proof", key: "firstProof", width: 22 },
+    { header: "Last proof", key: "lastProof", width: 22 },
+    { header: "Distance (m)", key: "distance", width: 13 },
+    { header: "Query", key: "query", width: 12 },
     { header: "Note", key: "note", width: 40 },
+    { header: "Marked by", key: "markedBy", width: 28 },
+    { header: "Marked at", key: "markedAt", width: 22 },
   ];
   for (const record of records) {
     roster.addRow({
@@ -628,7 +686,18 @@ exports.sessionXlsx = catchAsyncError(async (req, res, next) => {
       status: record.status,
       source: record.source,
       proofs: record.evidence?.proofCount || 0,
+      waves: Array.isArray(record.evidence?.waves) ? record.evidence.waves.join(", ") : "",
+      firstProof: record.evidence?.firstProofAt
+        ? new Date(record.evidence.firstProofAt).toLocaleString()
+        : "",
+      lastProof: record.evidence?.lastProofAt
+        ? new Date(record.evidence.lastProofAt).toLocaleString()
+        : "",
+      distance: distanceMeters(record.teacherLocation, record.attemptLocation) ?? "",
+      query: record.query ? queryStatus.get(String(record.query)) || "attached" : "",
       note: record.decisionNote,
+      markedBy: record.markedByEmail,
+      markedAt: record.markedAt ? new Date(record.markedAt).toLocaleString() : "",
     });
   }
   roster.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };

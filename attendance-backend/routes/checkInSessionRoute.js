@@ -7,6 +7,7 @@ const {
   getSession,
   closeSession,
   advanceSession,
+  updateAttendanceSettings,
   listSessionProofs,
   getActiveSessionForStudent,
   listActiveSessionsForStudent,
@@ -88,6 +89,12 @@ router.get(
 router.get("/check-in-sessions/:sessionId", noStore, teacherOnly, getSession);
 router.post("/check-in-sessions/:sessionId/advance", noStore, teacherOnly, advanceSession);
 router.post("/check-in-sessions/:sessionId/close", noStore, teacherOnly, closeSession);
+router.patch(
+  "/check-in-sessions/:sessionId/attendance-settings",
+  noStore,
+  teacherOnly,
+  updateAttendanceSettings
+);
 
 module.exports = router;
 // Exposed so tests can exercise the per-user limiter without sending 61 HTTP

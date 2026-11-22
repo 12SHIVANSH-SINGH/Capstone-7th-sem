@@ -307,6 +307,7 @@ const baseView = (session, now) => ({
   rosterCount: Number(session.rosterCount) || 0,
   attendanceFinalized: Boolean(session.attendanceFinalized),
   attendanceFinalizedAt: asIsoString(session.attendanceFinalizedAt),
+  autoMarkPresent: Boolean(session.autoMarkPresent),
   queryWindowEndsAt: asIsoString(session.queryWindowEndsAt),
   isDemo: Boolean(session.isDemo),
 });

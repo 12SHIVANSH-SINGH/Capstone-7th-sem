@@ -21,13 +21,13 @@ Capstone project · NIT Jamshedpur
 
 ## Why
 
-Roll calls and QR codes are easy to fake — a friend answers "present", or a QR code is photographed and shared. Bio Attend aims to prove *physical presence*: students' own phones hear a one-time key carried by sound, and each phone signs the evidence with a key bound to that browser. Attendance is still confirmed by a teacher; a decoded tone is never an automatic verdict.
+Roll calls and QR codes are easy to fake — a friend answers "present", or a QR code is photographed and shared. Bio Attend aims to prove *physical presence*: students' own phones hear a one-time key carried by sound, and each phone signs the evidence with a key bound to that browser. Attendance is still confirmed by a teacher by default; a decoded tone is never an automatic verdict unless the teacher explicitly opts in to auto-present for one session.
 
 ## How it works
 
 1. **Teacher starts a check-in** — the server mints a one-time key for that class and wave.
 2. **Phones listen once** — a student taps Join, accepts the retention notice and lets the browser listen for the current near-ultrasonic round. Nothing to install.
-3. **The server records signed evidence and mints the relay** — the phone decodes the round locally, signs session/wave/key with its bound P-256 device key, and submits the proof. The server stores evidence and returns the server-minted next signal to that phone, which plays it for nearby phones and listens again. Evidence never marks attendance.
+3. **The server records signed evidence and mints the relay** — the phone decodes the round locally, signs session/wave/key with its bound P-256 device key, and submits the proof. The server stores evidence and returns the server-minted next signal to that phone, which plays it for nearby phones and listens again. By default evidence never marks attendance. A teacher can explicitly enable auto-present for one live session; the first accepted proof then marks a still-pending row present, with an audit entry, and the teacher can override it.
 4. **The teacher confirms the register** — the teacher closes the session, marks present/absent/excused from the evidence and finalises the register; later corrections keep an audit trail. A student who was present but unmarked can raise a query for 24 hours after the session closes; an approved query counts as present.
 
 Automatic scoring and the ID round remain future work. The phone-to-phone relay cascade is built and locally tested but has not been measured in a physical classroom.

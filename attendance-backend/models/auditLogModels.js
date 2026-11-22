@@ -5,6 +5,7 @@ const AUDIT_ACTIONS = [
   "session.closed",
   "session.advanced",
   "session.attendance.finalized",
+  "session.auto_present.updated",
   "session.revoked_all",
   "attendance.marked",
   "attendance.override",

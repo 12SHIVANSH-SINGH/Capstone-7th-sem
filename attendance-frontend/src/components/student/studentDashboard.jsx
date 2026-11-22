@@ -16,6 +16,7 @@ import Card from "../../ui/Card";
 import { PageLoader } from "../../ui/Spinner";
 import { useToast } from "../../ui/Toast";
 import { classLabel, formatDateTime, percentLabel, relativeTime, givenName } from "../../utils/format";
+import { loadDeviceStatus } from "../../utils/deviceStatus";
 import { sessionLabel, sessionTitle } from "./studentCheckInView";
 import "./studentDashboard.css";
 
@@ -56,6 +57,7 @@ const StudentDashboard = () => {
     const toast = useToast();
     const [user, setUser] = useState(null);
     const [deviceStatus, setDeviceStatus] = useState(location.state?.deviceStatus || "checking");
+    const [devicePendingReview, setDevicePendingReview] = useState(false);
     const [liveSessions, setLiveSessions] = useState([]);
     const [attendance, setAttendance] = useState(null);
     const [recentSessions, setRecentSessions] = useState([]);
@@ -70,8 +72,9 @@ const StudentDashboard = () => {
                     return;
                 }
                 setUser(response.data.user);
-                const bindingResponse = await axios.get(`${SERVER_URL}/device-bindings/status`, { withCredentials: true });
-                setDeviceStatus(bindingResponse.data.status);
+                const binding = await loadDeviceStatus();
+                setDeviceStatus(binding.status);
+                setDevicePendingReview(binding.pendingReview);
                 try {
                     const sessionResponse = await axios.get(
                         `${SERVER_URL}/student/check-in-sessions/active`,
@@ -157,6 +160,12 @@ const StudentDashboard = () => {
                     </div>
                     <h2 className="device-card__title">{info.title}</h2>
                     <p className="device-card__text">{info.text}</p>
+                    {deviceStatus === "approved" && devicePendingReview && (
+                        <p className="device-card__text">
+                            <strong>Another browser is waiting for review.</strong> This approved
+                            browser still works for check-in.
+                        </p>
+                    )}
                     <div className="device-card__actions">
                         <Button onClick={() => navigate("/student/check-in")}>Open check-in</Button>
                         <Button variant="soft" onClick={() => navigate("/acoustic-lab")}>🔊 Test phone audio</Button>
@@ -176,7 +185,10 @@ const StudentDashboard = () => {
                         <>
                             <p className="device-card__text">
                                 Your teacher has an active wave for {sessionLabel(liveSessions[0])}. Open check-in
-                                before the two-minute key expires. Hearing the key records evidence, not attendance.
+                                before the two-minute key expires.{" "}
+                                {liveSessions[0].autoMarkPresent
+                                    ? "Auto-present is on for this session: your first valid proof marks you present, and your teacher can still change the register."
+                                    : "Hearing the key records evidence, not attendance."}
                             </p>
                             <div className="device-card__actions">
                                 <Button onClick={() => navigate("/student/check-in")}>Join check-in</Button>

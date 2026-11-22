@@ -3,31 +3,32 @@
 Update this at the end of every session. If it disagrees with the real code, the code wins:
 fix this file and tell the owner.
 
-Last updated: **2026-11-21** (session 31: register proof-load, note-only edit and dashboard
-deep-link fixes; backend **262/262**, frontend **109/109**, production build green; the
-physical cascade rehearsal is still pending).
+Last updated: **2026-11-22** (session 32: evidence-backed register workflow, per-session
+auto-present opt-in, current-device status and quick session exports; backend and frontend
+suites re-run in this session; the physical cascade rehearsal is still pending).
 
 ## Status
 
 - **Current layer:** Layer 1 is treated as **passed by owner assumption for build planning
   only**. It is **not measured-passed**. The 2026-10-25 sweep still fails at 5 m and 10 m;
   reverse direction and muted control are unmeasured.
-- **Current slice:** the 2026-11-21 register fixes are built and tested. `SessionAttendanceModal`
-  now shows a retryable error when proof evidence fails to load, saves note-only edits without
-  dropping them, and preserves an existing note when only the status changes. The teacher
-  dashboard's recent-session **Register** button now opens `/teacher/sessions?session=<id>` and
-  `SessionHistory` opens that exact register. The new `test:attendance` suite covers the draft
-  and note logic. Security P0 and P1 remain built and tested locally. P0 covers strict CSP,
-  first-party cookies, session revocation, impersonation hardening, teacher-approved device
-  binding, encrypted backup scripts and supply-chain scanning. P1 adds WebAuthn/passkey
-  step-up for destructive admin actions, an audit hash chain with verification, export auditing
-  and rate limits, `/health/ready`, JWT rotation and the settings-patch fix. The document
-  phase has started: **A1 roster PDF text extraction → editable preview** and **A2a timetable
-  PDF text extraction → read-only preview** are built and tested with generated fixtures.
-  Neither slice writes data: A1 fills the roster textarea for the existing preview/save, and
-  A2a never parses rows, matches classes, creates a class or writes a slot. Structured
-  timetable import (A2b), local OCR (A3) and consent-gated Gemini extraction (A4) are not
-  built. Scoring, automatic attendance decisions and the ID round are not built.
+- **Current slice:** the 2026-11-22 register/device slice is built and tested. The teacher
+  register now filters pending rows by evidence, one-click accepts a proof-backed row, bulk
+  accepts only visible evidence-backed pending rows as **drafts**, shows proof waves and the
+  last proof time in the row, and expands into a per-student proof/location detail without
+  leaving the register. The finalise warning breaks pending rows into evidence/no-evidence.
+  PDF/XLSX quick buttons download the saved session register with statuses, notes, proof
+  counts, waves, last proof time, GPS distance when captured and query status. Auto-present is
+  a per-session teacher opt-in, off by default, writable only while live, audited, and a manual
+  teacher decision always wins. Device status is now current-browser-aware: an approved phone
+  keeps working while another browser waits for review, and the old `403` that blocked the
+  approved browser is removed. The 2026-11-21 note-only, proof-load and deep-link fixes remain
+  in the same working tree. Security P0/P1 remain built and tested locally. The document phase
+  has started: **A1 roster PDF text extraction → editable preview** and **A2a timetable PDF
+  text extraction → read-only preview** are built and tested with generated fixtures. Neither
+  slice writes data. Structured timetable import (A2b), local OCR (A3) and consent-gated Gemini
+  extraction (A4) are not built. Scoring, automatic attendance decisions outside the explicit
+  opt-in and the ID round are not built.
 - **Phone-to-phone cascade:** committed in **`b1e31f6`** and included in the owner-confirmed
   Render deploy **`7148994`**. A valid proof for the current round mints a server-side pending
   next key and returns it to the proving phone; a valid proof for the pending round atomically
@@ -67,26 +68,30 @@ physical cascade rehearsal is still pending).
   returns 503 until MongoDB is connected. `JWT_SECRET_PREVIOUS` is verification-only during a
   rotation window; signing always uses `JWT_SECRET`. The settings patch filters `$setOnInsert`
   defaults against `$set` keys, fixing the Mongo path-conflict 500.
-- **Device binding:** a student's first browser and every changed browser now enter the
-  teacher device-review queue; only dev/test personas auto-approve. Replacing an approved
-  device bumps `tokenVersion`, so the old session cannot submit proofs.
-- **Repository state:** local `HEAD`, `origin/main` and `origin/HEAD` are **`7148994`**
-  (“security scan lapse”), which includes the committed phone-to-phone cascade (`b1e31f6`),
-  its tests and docs, and the Mongoose `8.24.10` security patch. The owner reports the Render
-  dashboard shows `7148994`. The 2026-11-21 register fixes and `test:attendance` are in the
-  working tree; commit, push, redeploy and re-run G2 before signed testing. No push, tag,
-  merge or deploy was performed in this session.
-- **Next action:** commit and deploy the 2026-11-21 fixes, then execute
+- **Device binding:** a student's first browser and every changed browser enter the teacher
+  device-review queue; only dev/test personas auto-approve. A pending request no longer blocks
+  the already-approved browser: status is answered per fingerprint, the old `403` is removed,
+  and the new browser stays unusable until approved. Replacing an approved device still bumps
+  `tokenVersion`.
+- **Repository state:** local `HEAD` is **`e6af7f9`** (`it-13`); `origin/main` is
+  **`7148994`** (“security scan lapse”), which includes the committed phone-to-phone cascade
+  (`b1e31f6`), its tests and docs, and the Mongoose `8.24.10` security patch. The owner reports
+  the Render dashboard shows `7148994`. The 2026-11-21 and 2026-11-22 slices are local and
+  uncommitted; commit, push, redeploy and re-run G2 before signed testing. No push, tag, merge
+  or deploy was performed in this session.
+- **Next action:** commit and deploy the 2026-11-22 slice, then execute
   [`docs/testing-plan.md`](docs/testing-plan.md) in order. First pass G0–G7, especially G2
   (compare the Render dashboard commit with the reviewed `HEAD` after the new deploy) and G5
   (Atlas URI, passphrase, `mongodump`/`mongorestore` and scratch-database permission). If G2
   fails, stop signed testing. If G5 fails, mark the restore suite **BLOCKED** and do not
   claim restore coverage. Then run AC → FL → AD → PDF → DP/RS; FL exercises the automatic
-  cascade, a fresh-pending promotion, the manual fallback and zero-proof recovery. Then
-  measure the physical cascade and range. Only after that, and only when representative
-  timetable PDFs exist, build **A2b structured timetable parsing**: match rows to existing
-  owned classes, show a slot preview, require teacher confirmation and flag unmatched rows
-  for manual class creation. Do not invent timetable layouts. Local OCR (A3) follows, then
+  cascade, a fresh-pending promotion, the manual fallback, zero-proof recovery, the
+  draft-only bulk/evidence workflow, quick exports and the optional explicit auto-present
+  session. Then measure the physical cascade and range. Only after that, and only when
+  representative timetable PDFs exist, build **A2b structured timetable parsing**: match rows
+  to existing owned classes, show a slot preview, require teacher confirmation and flag
+  unmatched rows for manual class creation. Do not invent timetable layouts. Local OCR (A3)
+  follows, then
   optional Gemini extraction (A4) only after the owner dates and signs the draft consent/risk
   text in `plan.md` §12.
   Production needs `SUPER_ADMIN_EMAILS=12shivanshsingha@gmail.com`,

@@ -83,3 +83,96 @@ test("note values normalise null and undefined to an empty string", () => {
   assert.equal(view.hasNoteChange(list[0], {}), false);
   assert.equal(view.hasNoteChange(list[0], { r1: "" }), false);
 });
+
+const evidenceRecords = () => [
+  {
+    id: "r1",
+    status: "pending",
+    evidence: { proofCount: 2, waves: [0, 1] },
+  },
+  {
+    id: "r2",
+    status: "pending",
+    evidence: { proofCount: 0, waves: [] },
+  },
+  {
+    id: "r3",
+    status: "present",
+    evidence: { proofCount: 3, waves: [0, 1, 2] },
+  },
+  {
+    id: "r4",
+    status: "pending",
+    evidence: { proofCount: 1, waves: [0] },
+  },
+];
+
+test("bulk accept drafts only the pending rows that have evidence", () => {
+  const list = evidenceRecords();
+  const drafts = {};
+
+  assert.deepEqual(view.evidenceBackedPendingIds(list, drafts), ["r1", "r4"]);
+  assert.deepEqual(view.markEvidenceBackedPresent(list, drafts), {
+    r1: "present",
+    r4: "present",
+  });
+  assert.deepEqual(view.changedRecordIds(list, view.markEvidenceBackedPresent(list, drafts), {}), [
+    "r1",
+    "r4",
+  ]);
+});
+
+test("bulk accept respects a teacher's existing draft on a row", () => {
+  const list = evidenceRecords();
+  const drafts = { r1: "absent" };
+
+  // r1 is no longer "pending" in the draft, so the bulk action leaves the
+  // teacher's deliberate choice alone. r4 is still pending and gets accepted.
+  assert.deepEqual(view.markEvidenceBackedPresent(list, drafts), {
+    r1: "absent",
+    r4: "present",
+  });
+});
+
+test("the evidence breakdown separates pending rows with and without proofs", () => {
+  const list = evidenceRecords();
+  const breakdown = view.pendingEvidenceBreakdown(list, {});
+
+  assert.deepEqual(
+    breakdown.pendingWithEvidence.map((record) => record.id),
+    ["r1", "r4"]
+  );
+  assert.deepEqual(
+    breakdown.pendingWithoutEvidence.map((record) => record.id),
+    ["r2"]
+  );
+  assert.equal(breakdown.pendingWithEvidenceCount, 2);
+  assert.equal(breakdown.pendingWithoutEvidenceCount, 1);
+});
+
+test("the evidence filter follows drafts as the teacher changes status", () => {
+  const list = evidenceRecords();
+
+  assert.deepEqual(
+    view.filterRecords(list, {}, "pending-evidence").map((record) => record.id),
+    ["r1", "r4"]
+  );
+  assert.deepEqual(
+    view.filterRecords(list, {}, "pending-no-evidence").map((record) => record.id),
+    ["r2"]
+  );
+  assert.deepEqual(
+    view.filterRecords(list, { r1: "present" }, "pending-evidence").map((record) => record.id),
+    ["r4"]
+  );
+  assert.equal(view.filterRecords(list, {}, "all").length, 4);
+});
+
+test("source labels replace the ambiguous pending chip", () => {
+  assert.equal(view.sourceLabel("pending"), "No decision");
+  assert.equal(view.sourceLabel("manual"), "Teacher");
+  assert.equal(view.sourceLabel("evidence"), "Evidence");
+  assert.equal(view.sourceLabel("auto"), "Auto-absent");
+  assert.equal(view.sourceLabel("unknown-source"), "unknown-source");
+  assert.equal(view.sourceLabel(undefined), "No decision");
+});

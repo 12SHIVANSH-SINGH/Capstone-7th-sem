@@ -10,10 +10,12 @@ else in every session**. Do not rely on memory of earlier sessions. Open
 A web app (Chrome on Android first) that produces evidence students were physically inside a
 20 m × 20 m classroom by passing short-lived keys between phones as near-ultrasonic tones.
 The server mints keys, records signed proof evidence and keeps an audited attendance
-register. A **teacher confirms attendance**; a decoded tone is not an automatic verdict.
-Full detail is in `plan.md`; do not restate or redesign it here.
+register. A **teacher confirms attendance by default**; a decoded tone is evidence, not an
+automatic verdict. The teacher may explicitly enable auto-present for one live session; that
+decision is audited and reversible. Full detail is in `plan.md`; do not restate or redesign it
+here.
 
-## Current phase (2026-11-21, session 31)
+## Current phase (2026-11-23, session 33)
 
 - **Layer 1 is assumed passed by owner direction (2026-10-29) for build planning only.** This
   is **not** a measured pass. The 2026-10-25 sweep decoded 10/10 at 1 m, 9/10 at 2 m, 9/10 at
@@ -25,26 +27,32 @@ Full detail is in `plan.md`; do not restate or redesign it here.
   discovery and shell, the server-minted phone-to-phone relay cascade, teacher-confirmed
   register, 24-hour queries, analytics, PDF/Excel exports, session history, notifications,
   timetable, profile/help, PWA/dark theme and a production-capable super-admin console. The
-  cascade is built and locally tested but has **not** been measured in a physical classroom;
-  owner-reported classroom attempts remain planning evidence, not measured results.
+  register now supports an evidence filter, one-click accept, draft-only bulk marking,
+  expandable proof/location detail and quick session PDF/XLSX exports. Auto-present is a
+  per-session opt-in, off by default. The cascade is built and locally tested but has **not**
+  been measured in a physical classroom; owner-reported classroom attempts remain planning
+  evidence, not measured results.
 - **P0 and P1 security are built and tested locally:** strict CSP, first-party cookies,
   `tokenVersion` session revocation, impersonation hardening, teacher-approved first device
   binding, WebAuthn/passkey step-up (5-minute `admin_step_up` cookie, **428** without it),
   SHA-256 audit hash chain plus verification, audited/rate-limited exports,
   `/health/ready`, verification-only `JWT_SECRET_PREVIOUS` rotation and the settings
   `$set`/`$setOnInsert` conflict fix.
-- **Acoustic proof remains evidence-only.** The proof endpoint does not mark attendance or
-  score. A valid proof earns the server-minted next relay signal, but it never marks a
-  student present. The teacher opens the register, sees evidence/optional location and marks
-  present/absent/excused; finalisation and every correction are audited. Scoring and the ID
-  round remain unbuilt.
-- **Repository state (2026-11-21):** local `HEAD`, `origin/main` and `origin/HEAD` are all
-  **`7148994`** (“security scan lapse”), which includes the committed phone-to-phone cascade,
-  its tests and docs, and the Mongoose `8.24.10` security patch. The owner reports the Render
-  dashboard shows the same commit. The working tree now adds the 2026-11-21 register fixes
-  (proof-load errors are visible, note-only edits save, and the dashboard Register link opens
-  the exact session) plus the new `test:attendance` suite. Commit, push, redeploy and re-run
-  gate G2 before signed testing.
+- **Acoustic proof remains evidence-only by default.** The proof endpoint does not score and
+  does not mark attendance unless the teacher explicitly enables auto-present for that live
+  session. In that opt-in case the first accepted proof marks a still-pending row present with
+  source `evidence`, writes an audit entry and can be overridden; a manual decision always
+  wins. A valid proof also earns the server-minted next relay signal. Every other session
+  keeps the teacher register as the only attendance decision. Scoring and the ID round remain
+  unbuilt.
+- **Repository state (2026-11-23):** local `HEAD`, `origin/main` and `origin/HEAD` are
+  **`d98bec1`** (`it-14`), containing the 2026-11-21 register fixes and the 2026-11-22
+  evidence/device/auto-present slice. The working tree has two production-build fixes
+  (`globalThis` → `window` in `deviceFingerprint.js`, and an unused register variable removed)
+  plus reconciled docs; these are **uncommitted**. The last owner-confirmed Render deploy is
+  **`7148994`**, so G2 is not yet satisfied. The build fix must be committed before deploying;
+  the committed frontend revision fails `CI=true` because of the `globalThis` lint error.
+  The owner controls the commit, push and deploy.
 - **Deployed test plan:** [`docs/testing-plan.md`](docs/testing-plan.md) is the execution
   script for the 4-phone/3–4-laptop run. It covers acoustic range and controls, the signed
   attendance/query flow on Render with real college accounts — including the automatic
@@ -66,9 +74,9 @@ Full detail is in `plan.md`; do not restate or redesign it here.
   page/line counts. It never parses rows, matches classes, creates a class or writes a slot.
   The teacher adds slots through the existing form. Tested with generated PDF fixtures, not
   real timetable PDFs.
-- **Next work:** finish verification before adding ingestion. Commit/push/deploy the 2026-11-21
-  register fixes, run G0–G7 and AC → FL → AD → PDF → DP/RS, then measure the physical cascade
-  and range. Only then build **A2b** structured timetable import, **A3** local OCR and **A4**
+- **Next work:** review and commit the two build fixes, then push, redeploy and prove the live
+  commit at G2. Run G0–G7 and AC → FL → AD → PDF → DP/RS, then measure the physical cascade and
+  range. Only then build **A2b** structured timetable import, **A3** local OCR and **A4**
   optional Gemini extraction. A2b needs representative timetable PDFs; A4 needs the owner to
   date and sign the accepted copy of the draft notice and risk text now in `plan.md` §12
   (D1–D5). The capstone submission pack comes last. Moving to a new Mac:
@@ -76,12 +84,13 @@ Full detail is in `plan.md`; do not restate or redesign it here.
 - **Gemini gate:** raw rosters may go to the free tier only after the exact student notice,
   data-field list, retention/training risk, dated owner acceptance and opt-out fallback are
   settled in `plan.md`. The draft exists, but D4 is unsigned; do not write the AI path yet.
-- **Still blocked:** automatic scoring, the ID round, the "lowest wave heard" join rule, the
-  mobile app, the real Google/phone phone-to-phone cascade rehearsal in the deployed plan,
-  physical 5 m/10 m range diagnosis with reverse/muted control, representative timetable
-  PDFs, the owner's signed Gemini acceptance (D4), and the encrypted Atlas restore drill (URI, passphrase,
-  `mongodb-database-tools` and scratch-database permission are unconfirmed). The owner has
-  confirmed Render showed `7148994`; re-check G2 after the next deploy.
+- **Still blocked:** committing/deploying the build fix and a fresh G2 check, automatic
+  scoring, the ID round, the "lowest wave heard" join rule, the mobile app, the real
+  Google/phone phone-to-phone cascade rehearsal in the deployed plan, physical 5 m/10 m range
+  diagnosis with reverse/muted control, representative timetable PDFs, the owner's signed
+  Gemini acceptance (D4), and the encrypted Atlas restore drill (URI, passphrase,
+  `mongodb-database-tools` and scratch-database permission are unconfirmed). The last
+  owner-confirmed Render deploy is `7148994`; do not treat local `d98bec1` as deployed.
 
 ## Core working rule: small slices, one session at a time
 
@@ -138,17 +147,18 @@ Full detail is in `plan.md`; do not restate or redesign it here.
 Current local gate (all must pass before asking the owner to deploy):
 
 ```bash
-cd attendance-backend && npm test                              # 262/262
-cd attendance-backend && npm test -- --test-isolation=none     # 262/262
+cd attendance-backend && npm test                              # 271/271
+cd attendance-backend && npm test -- --test-isolation=none     # 271/271
 cd attendance-frontend && npm run test:proof                    # 15/15
 cd attendance-frontend && npm run test:acoustic                 # 51/51
 cd attendance-frontend && npm run test:checkin                  # 10/10
-cd attendance-frontend && npm run test:attendance               # 7/7
-cd attendance-frontend && npm run test:studentcheckin           # 12/12
+cd attendance-frontend && npm run test:attendance               # 12/12
+cd attendance-frontend && npm run test:studentcheckin           # 14/14
 cd attendance-frontend && npm run test:auth                     # 2/2
+cd attendance-frontend && npm run test:device                   # 4/4
 cd attendance-frontend && npm run test:rosterimport             # 6/6
 cd attendance-frontend && npm run test:timetableimport          # 6/6
-# frontend helper total: 109/109
+# frontend helper total: 120/120
 ```
 
 Production build (same API path and empty hosted-domain hint as the deployed site):
@@ -184,15 +194,20 @@ checks. A pure unit test is not enough for those routes.
 
 ## Hard boundaries
 
-- **Acoustic proof is evidence, not attendance.** Do not add an automatic `present` flag,
-  score or ID-round decision to the proof path. The response keeps
-  `attendanceDecided: false`. Attendance lives in the separate teacher register.
+- **Acoustic proof is evidence, not attendance by default.** Do not add scoring, ID-round
+  decisions or a default automatic `present` flag. The one allowed automatic write is the
+  per-session `autoMarkPresent` opt-in: off by default, teacher-owned, writable only while the
+  session is live and unfinalised. It may update only a still-`pending` row, uses source
+  `evidence`, writes an audit entry, and a manual teacher decision always wins. The proof
+  response may report `attendanceStatus` and `autoMarked` so the student UI is truthful, but
+  the default evidence-only path must still leave the row pending.
 - **Wave advancement is server-driven on accepted proof, with a teacher-only, evidence-gated
   manual fallback.** A valid proof for the current round mints a pending next signal and
   returns it to that proving phone. A valid proof for the pending round atomically promotes
   it and mints the following pending signal. The teacher's manual Advance must refuse a
   closed session or a round with no accepted proof, and it must preserve the original expiry
-  of a fresh pending key. Never auto-mark attendance from an advance.
+  of a fresh pending key. Never auto-mark attendance from an advance, even when auto-present
+  is enabled; only an accepted proof may trigger that opt-in write.
 - **Keys and key history stay server-side; phones never invent keys.** Students receive the
   wave and expiry from discovery, and only the proving student receives the server-minted
   next signal in the proof response. A student may try the displayed wave and the next two
@@ -201,7 +216,13 @@ checks. A pure unit test is not enough for those routes.
   key-free `waveHistory`; a closed session returns neither current key nor pending. Evidence
   returns no key, signature, protocol version or device fingerprint.
 - **The proof endpoint stays student-only and roster-bound.** Only an enrolled, active
-  student with an approved device binding may submit. A pending device change blocks proofs.
+  student with an approved device binding may submit. A pending replacement request must not
+  lock out the already-approved browser; the new browser stays unable to prove until a teacher
+  approves it.
+- **Device status is per browser fingerprint.** Keep `getDeviceBindingStatus`
+  current-device-aware: it reports the requesting fingerprint's state and the review queue
+  separately. Never reintroduce a student-wide pending lockout or a `403` for the approved
+  browser while another browser waits.
 - **The device signature is bound to session, wave, key and student.** Do not shorten,
   reorder or version-drift the canonical message without updating both client and server and
   the cross-package tests.

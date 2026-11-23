@@ -2,11 +2,12 @@
 
 This is the production guide for Bio Attend. All account-level setup (GitHub, Render,
 MongoDB Atlas, Google Cloud) is done by the project owner. The repository is built and tested
-locally. At the 2026-11-21 handoff, `HEAD`, `origin/main` and `origin/HEAD` were `7148994`,
-which includes the committed phone-to-phone cascade and the Mongoose `8.24.10` security patch.
-The owner reports the Render dashboard shows the same commit. The 2026-11-21 register fixes
-are newer; commit, push, redeploy and re-run G2 before signed testing. The owner controls every
-push and deploy.
+locally. At the 2026-11-23 handoff, `HEAD`, `origin/main` and `origin/HEAD` are `d98bec1`,
+which includes the committed phone-to-phone cascade, the 2026-11-21 register fixes and the
+2026-11-22 evidence/device/auto-present slice. The last owner-confirmed Render deploy is
+`7148994`. The working tree has the production-build fix for the committed frontend plus
+reconciled docs; commit that fix before deploying, then redeploy and re-run G2 before signed
+testing. The owner controls every push and deploy.
 
 Recommended shape:
 
@@ -57,15 +58,16 @@ print **nothing**. `config.env` holds the database URL and JWT secret and must s
 ```bash
 cd attendance-backend
 npm test
-npm test -- --test-isolation=none         # 262/262 both modes
+npm test -- --test-isolation=none         # 271/271 both modes
 
 cd ../attendance-frontend
 npm run test:proof                        # 15
 npm run test:acoustic                     # 51
 npm run test:checkin                      # 10
-npm run test:attendance                   # 7
-npm run test:studentcheckin               # 12
+npm run test:attendance                   # 12
+npm run test:studentcheckin               # 14
 npm run test:auth                         # 2
+npm run test:device                       # 4
 npm run test:rosterimport                 # 6
 npm run test:timetableimport              # 6
 
@@ -75,7 +77,7 @@ CI=true REACT_APP_API_URL=/api/v1 \
   npm run build
 ```
 
-Expected frontend total: **109/109** across the eight suites. The build must pass; Render sets
+Expected frontend total: **120/120** across the nine suites. The build must pass; Render sets
 `CI=true`, so warnings are errors. Roster and timetable PDF extraction use PDF.js 6 and
 multer; the service must run Node 22.13+ or 24+ (the documented `NODE_VERSION=24` is fine).
 
@@ -442,13 +444,13 @@ third-party, which Safari and some Chrome modes block.
 ## 9. Deployment checklist
 
 - [ ] `config.env` is ignored; no secrets in `git ls-files`
-- [ ] Backend **262/262** (`npm test` and `npm test -- --test-isolation=none`)
-- [ ] Frontend **109/109** (proof 15, acoustic 51, teacher check-in 10, register attendance 7, student check-in 12, auth 2, roster import 6, timetable import 6)
+- [ ] Backend **271/271** (`npm test` and `npm test -- --test-isolation=none`)
+- [ ] Frontend **120/120** (proof 15, acoustic 51, teacher check-in 10, register attendance 12, student check-in 14, auth 2, device 4, roster import 6, timetable import 6)
 - [ ] `CI=true` production build passes locally
 - [ ] CSP browser audit shows zero violations on `/`, `/login`, a teacher page, analytics,
       help and `/admin`; Google button renders; service worker is active
 - [ ] Code pushed to GitHub `main`
-- [ ] Render dashboard live deploy commit matches the reviewed `HEAD` (`testing-plan.md` G2); the owner confirmed `7148994` at handoff, then re-check after the register-fix deploy
+- [ ] Render dashboard live deploy commit matches the reviewed `HEAD` (`testing-plan.md` G2); the owner confirmed `7148994` at handoff, then re-check after the `d98bec1` plus build-fix deploy
 - [ ] Atlas cluster, user and network access created; `DB_URI` includes `/attendance`
 - [ ] Render service created with the build/start commands and health path
 - [ ] All environment variables set; `DEV_AUTH_ENABLED` and `ALLOW_TEST_ROSTER_EMAILS` absent

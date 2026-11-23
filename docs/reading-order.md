@@ -51,15 +51,18 @@ This step matters more than the feature list. Read the status sections before yo
 
 **What you must know before testing:**
 
-- The acoustic result is **evidence**, not an automatic attendance decision. A decoded tone
-  never marks a student present by itself.
+- The acoustic result is **evidence**, not an automatic attendance decision by default. A
+  decoded tone never marks a student present by itself. The one exception is an explicit
+  teacher opt-in for a single live session; that decision is audited and the teacher can
+  override it.
 - Layer 1 is treated as passed **for build planning only**, not measured-passed. The last
   sweep decoded 10/10 at 1 m, 9/10 at 2 m, 9/10 at 3 m, **4/10 at 5 m** and **1/10 at 10 m**.
   Reverse direction and the muted control are unmeasured.
 - Structured timetable parsing (A2b), OCR (A3) and Gemini extraction (A4) are **not built**.
-- The owner confirmed Render showed `7148994` at handoff. The 2026-11-21 register fixes are
-  newer, so deploy them and re-check gate **G2**. The restore drill depends on credentials and
-  tools the owner must confirm (gate **G5**).
+- The owner confirmed Render showed `7148994` at handoff. `HEAD` and `origin/main` are now
+  `d98bec1`, but its production-build fix is uncommitted; commit and deploy it, then re-check
+  gate **G2**. The restore drill depends on credentials and tools the owner must confirm
+  (gate **G5**).
 
 ## 3. Run it locally (1–2 hours)
 
@@ -132,15 +135,17 @@ Run these before any deployed session. They are the cheapest way to catch a brok
 
 ```bash
 cd attendance-backend
-npm test                                  # last recorded: 262/262
-npm test -- --test-isolation=none         # last recorded: 262/262
+npm test                                  # last recorded: 271/271
+npm test -- --test-isolation=none         # last recorded: 271/271
 
 cd ../attendance-frontend
 npm run test:proof                        # 15
 npm run test:acoustic                     # 51
 npm run test:checkin                      # 10
-npm run test:studentcheckin               # 12
+npm run test:attendance                   # 12
+npm run test:studentcheckin               # 14
 npm run test:auth                         # 2
+npm run test:device                       # 4
 npm run test:rosterimport                 # 6
 npm run test:timetableimport              # 6
 CI=true REACT_APP_API_URL=/api/v1 npm run build
@@ -258,7 +263,8 @@ the file that decides whether a device is approved.
 1. Do not start with the very long complete guide. It is a reference, not the front door.
 2. Do not start with the deployed test plan. Read the gates first, or you will test the wrong
    build with the wrong accounts.
-3. A decoded tone is **evidence**, not attendance. The teacher decides the register.
+3. A decoded tone is **evidence**, not attendance by default. The teacher decides the
+   register; the only exception is an explicit, audited per-session auto-present opt-in.
 4. Do not call Layer 1 measured-passed. The 5 m and 10 m results still fail the target, and
    the reverse and muted controls are unmeasured.
 5. Do not use a real class or real student data for an experiment. The test plan requires a

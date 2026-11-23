@@ -192,10 +192,6 @@ const SessionAttendanceModal = ({ open, session, mode = "teacher", onClose, onCh
     () => evidenceBackedPendingIds(visibleRecords, drafts),
     [visibleRecords, drafts]
   );
-  const expandedRecord = useMemo(
-    () => records.find((record) => record.id === expandedRecordId) || null,
-    [records, expandedRecordId]
-  );
 
   const setStatus = (record, status) => {
     setDrafts((current) => {

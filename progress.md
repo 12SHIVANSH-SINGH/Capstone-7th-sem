@@ -3,9 +3,9 @@
 Update this at the end of every session. If it disagrees with the real code, the code wins:
 fix this file and tell the owner.
 
-Last updated: **2026-11-22** (session 32: evidence-backed register workflow, per-session
-auto-present opt-in, current-device status and quick session exports; backend and frontend
-suites re-run in this session; the physical cascade rehearsal is still pending).
+Last updated: **2026-11-23** (session 33: reconciled the status docs to committed
+`d98bec1`, added the production-build fix for the committed frontend, and re-ran the local
+gate; the physical cascade rehearsal is still pending).
 
 ## Status
 
@@ -22,8 +22,8 @@ suites re-run in this session; the physical cascade rehearsal is still pending).
   a per-session teacher opt-in, off by default, writable only while live, audited, and a manual
   teacher decision always wins. Device status is now current-browser-aware: an approved phone
   keeps working while another browser waits for review, and the old `403` that blocked the
-  approved browser is removed. The 2026-11-21 note-only, proof-load and deep-link fixes remain
-  in the same working tree. Security P0/P1 remain built and tested locally. The document phase
+  approved browser is removed. The 2026-11-21 note-only, proof-load and deep-link fixes are in
+  the same commit. Security P0/P1 remain built and tested locally. The document phase
   has started: **A1 roster PDF text extraction → editable preview** and **A2a timetable PDF
   text extraction → read-only preview** are built and tested with generated fixtures. Neither
   slice writes data. Structured timetable import (A2b), local OCR (A3) and consent-gated Gemini
@@ -73,13 +73,15 @@ suites re-run in this session; the physical cascade rehearsal is still pending).
   the already-approved browser: status is answered per fingerprint, the old `403` is removed,
   and the new browser stays unusable until approved. Replacing an approved device still bumps
   `tokenVersion`.
-- **Repository state:** local `HEAD` is **`e6af7f9`** (`it-13`); `origin/main` is
-  **`7148994`** (“security scan lapse”), which includes the committed phone-to-phone cascade
-  (`b1e31f6`), its tests and docs, and the Mongoose `8.24.10` security patch. The owner reports
-  the Render dashboard shows `7148994`. The 2026-11-21 and 2026-11-22 slices are local and
-  uncommitted; commit, push, redeploy and re-run G2 before signed testing. No push, tag, merge
-  or deploy was performed in this session.
-- **Next action:** commit and deploy the 2026-11-22 slice, then execute
+- **Repository state:** local `HEAD`, `origin/main` and `origin/HEAD` are **`d98bec1`**
+  (`it-14`), which contains the committed phone-to-phone cascade (`b1e31f6`), the 2026-11-21
+  register fixes and the 2026-11-22 evidence/device/auto-present slice. The last owner-confirmed
+  Render deploy is **`7148994`**. The working tree has two production-build fixes (`globalThis`
+  → `window` in `deviceFingerprint.js` and an unused register variable removed) plus reconciled
+  docs; they are **uncommitted**. The committed frontend fails `CI=true` on
+  the `globalThis` lint error, so commit the fix before deploying. No push, tag, merge or
+  deploy was performed in this session.
+- **Next action:** commit the build fix, push, redeploy and re-run G2, then execute
   [`docs/testing-plan.md`](docs/testing-plan.md) in order. First pass G0–G7, especially G2
   (compare the Render dashboard commit with the reviewed `HEAD` after the new deploy) and G5
   (Atlas URI, passphrase, `mongodump`/`mongorestore` and scratch-database permission). If G2
@@ -131,19 +133,20 @@ suites re-run in this session; the physical cascade rehearsal is still pending).
 
 | Gate | Result |
 | --- | --- |
-| Backend (`npm test`) | **262/262** |
-| Backend (`npm test -- --test-isolation=none`) | **262/262** |
+| Backend (`npm test`) | **271/271** |
+| Backend (`npm test -- --test-isolation=none`) | **271/271** |
 | Proof transport | **15/15** |
 | Acoustic (codec, lab, worklets, TX/RX link) | **51/51** |
 | Teacher check-in view | **10/10** |
-| Register draft/note helpers | **7/7** |
-| Student check-in view | **12/12** |
+| Register draft/evidence helpers | **12/12** |
+| Student check-in view | **14/14** |
 | Auth routing | **2/2** |
+| Device fingerprint parity | **4/4** |
 | Roster PDF import helpers | **6/6** |
 | Timetable PDF import helpers | **6/6** |
-| Frontend total | **109/109** |
+| Frontend total | **120/120** |
 | Synthetic PDF fixture generator | ✅ `roster-text-layer.pdf` and `timetable-text-layer.pdf` extract text; `no-text-layer.pdf` reports no text layer |
-| Production build | ✅ compiles successfully (`CI=true REACT_APP_API_URL=/api/v1 npm run build`) |
+| Production build | ✅ compiles successfully with the working-tree build fix (`CI=true REACT_APP_API_URL=/api/v1 … npm run build`) |
 | Browser smoke (dev) | **65/65** |
 | CSP production-build audit | **7/7 page loads**, zero CSP violations, Google button rendered, service worker active, dark theme applied |
 | WebAuthn browser E2E (Chrome virtual authenticator) | ✅ 428 before enrollment, passkey registration, five-minute step-up cookie, settings retry, audit chain **3/3** verified, zero console errors |
@@ -259,6 +262,8 @@ build planning only; never call the physical gate measured-passed.
 
 | Date | What changed | Result |
 | --- | --- | --- |
+| 2026-11-23 | Reconciled the status docs to `d98bec1`, fixed the committed frontend’s `globalThis` production-build error and removed an unused register variable, and clarified the auto-present exception in the agent and resume rules. No attendance behaviour changed in this pass. | Full local gate re-run: backend **271/271** in both modes; nine frontend suites **120/120**; production build compiled successfully. Changes remain in the working tree for owner review. |
+| 2026-11-22 | Added the evidence-backed teacher register workflow: filter pending rows by evidence, one-click accept, bulk accept only visible proof-backed pending rows as drafts, row proof/wave/last-proof summary, expandable proof/location detail, finalise breakdown and quick PDF/XLSX session downloads. Added a per-session auto-present opt-in, off by default, writable only while live, audited, with manual decisions always winning. Made device status current-browser-aware so an approved phone keeps working while another browser waits, removed the proof `403`, and enriched session exports with waves, distance, query status and decision metadata. | Full gate re-run: backend **271/271** in both modes; nine frontend suites **120/120** (proof 15, acoustic 51, check-in 10, attendance 12, student check-in 14, auth 2, device 4, roster 6, timetable 6); production build green. Deploy/browser check still pending. |
 | 2026-11-21 | Fixed the three known register defects: proof-load failures now show a retryable error, note-only edits save and status-only edits preserve the existing note, and the dashboard **Register** button deep-links to the exact session. Added `sessionAttendanceView` helpers and `test:attendance`; added the new-Mac handoff, drafted the A4 consent/risk gate and the A2b/A3 sample request, and reconciled status docs. | Full gate re-run: backend **262/262** in both modes; all eight frontend suites **109/109** (proof 15, acoustic 51, check-in 10, attendance 7, student check-in 12, auth 2, roster 6, timetable 6); production build green. Full deploy/browser check still pending. |
 | 2026-11-20 | Committed and published the phone-to-phone cascade in **`b1e31f6`**, then the Mongoose security patch in **`7148994`**. The owner reports the Render dashboard shows `7148994`. | Backend **262/262** in both modes; frontend **102/102**; production build green. Physical cascade rehearsal not run. |
 | 2026-11-20 | Phone-to-phone cascade: pending-key fields and atomic promotion on the proof path, `next` in accepted/duplicate responses, lifetime preservation, closed-session key redaction, one-click teacher start with round-0 playback, fresh-pending Nudge and evidence-gated manual advance fallback, automatic student relay with persisted per-session consent, and the reusable `useSignalTransmitter` hook. Docs reconciled to the new flow. | Backend **262/262** in both modes; frontend **102/102**; production build green. Committed in `b1e31f6`. |

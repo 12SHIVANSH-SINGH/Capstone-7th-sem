@@ -30,7 +30,7 @@ const canonicalPublicKey = (publicKeyJwk) => {
 
 const fingerprintPublicKeyJwk = async (
   publicKeyJwk,
-  subtle = typeof globalThis !== "undefined" ? globalThis.crypto?.subtle : undefined
+  subtle = typeof window !== "undefined" ? window.crypto?.subtle : undefined
 ) => {
   const canonical = canonicalPublicKey(publicKeyJwk);
   if (!canonical) {

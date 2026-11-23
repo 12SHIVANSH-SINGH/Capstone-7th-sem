@@ -12,9 +12,11 @@ A phone that hears a fresh sound is probably in the room, because sound does not
 over the internet. Bio Attend gives each check-in a short-lived key, carries that key
 between student phones as near-ultrasonic tones, and records which bound phone decoded it.
 The server stores signed evidence and shows it to the teacher. The **teacher confirms the
-register**; a decoded tone never marks attendance automatically. A student who was present
-but unmarked can raise a query for 24 hours after the session closes, and an approved query
-counts as present.
+register** by default; a decoded tone does not mark attendance automatically. A teacher may
+explicitly enable auto-present for one live session, in which case the first accepted proof
+marks a still-pending student present, the change is audited and the teacher can override it.
+A student who was present but unmarked can raise a query for 24 hours after the session
+closes, and an approved query counts as present.
 
 Nothing to install: it runs in the phone's browser. Raw audio never leaves the phone; only
 the signed proof is submitted.
@@ -27,7 +29,8 @@ the signed proof is submitted.
 - Each phone is bound to one student account; a changed device waits for teacher approval.
 - The server verifies the bound device's signature and roster enrollment.
 - A decoded key is still data and can be forwarded. That is why attendance stays
-  teacher-confirmed and why the ID round (neighbour verification) is still future work.
+  teacher-confirmed by default, why auto-present is only a per-session opt-in, and why the ID
+  round (neighbour verification) is still future work.
 
 ## Where the project stands (November 2026)
 
@@ -48,11 +51,12 @@ the signed proof is submitted.
 | Full flow on real phones | ⏳ attendance is teacher-confirmed and the local browser flow works end to end; a real-phone/Google phone-to-phone cascade rehearsal, measured acoustic range, automatic scoring and the ID round are still pending |
 
 This is a demo-ready capstone prototype — not yet used for real attendance. The repository's
-`HEAD`, `origin/main` and `origin/HEAD` are `7148994`, which includes the phone-to-phone cascade
-and the Mongoose security patch. The owner reports the Render dashboard shows the same commit.
-The 2026-11-21 register fixes are newer and still need commit, deploy and a fresh G2 check. The
-click-level deployed test run is [`testing-plan.md`](testing-plan.md); moving to a new Mac
-starts with [`new-device-handoff.md`](new-device-handoff.md).
+`HEAD`, `origin/main` and `origin/HEAD` are `d98bec1`, which includes the phone-to-phone
+cascade, the 2026-11-21 register fixes and the 2026-11-22 evidence/device slice. The last
+owner-confirmed Render deploy is `7148994`; the production-build fix is uncommitted, so
+commit it, deploy and re-check G2. The click-level deployed test run is
+[`testing-plan.md`](testing-plan.md); moving to a new Mac starts with
+[`new-device-handoff.md`](new-device-handoff.md).
 
 ## Learn more
 

@@ -4,9 +4,11 @@ This is the single-owner handoff for moving Bio Attend to a new Mac and continui
 capstone. It assumes the owner controls every commit, push and deploy. There is no second
 developer and no Windows machine in this handoff.
 
-**Snapshot:** 2026-11-21. Last owner-confirmed Render deployment: **`7148994`**. The working
-tree adds the 2026-11-21 register/UI-defect fixes and the new `test:attendance` suite; commit,
-push and redeploy them, then re-run gate **G2** before signed testing.
+**Snapshot:** 2026-11-23. Last owner-confirmed Render deployment: **`7148994`**. `HEAD` and
+`origin/main` are **`d98bec1`**, which adds the 2026-11-21 register/UI-defect fixes and the
+2026-11-22 evidence/device/export slice, including the per-session auto-present opt-in and the
+new `test:device` suite. The working tree has the production-build fix for the committed
+frontend; commit it, push, redeploy, then re-run gate **G2** before signed testing.
 
 ## 1. What Git carries and what it does not
 
@@ -69,9 +71,9 @@ git rev-parse --short HEAD
 git status --short
 ```
 
-At the handoff snapshot, `HEAD` is `7148994`; the working tree should be clean before you
-start. If the owner has already committed the UI fixes, record the new hash and update the
-status docs after verifying it.
+At the handoff snapshot, `HEAD` and `origin/main` are `d98bec1`; the working tree has the
+production-build fix. The tree should be clean after the owner commits it. Record the new
+hash and update the status docs after verifying it.
 
 Install dependencies separately; this is **not** an npm workspace:
 
@@ -173,6 +175,7 @@ npm run test:checkin
 npm run test:attendance
 npm run test:studentcheckin
 npm run test:auth
+npm run test:device
 npm run test:rosterimport
 npm run test:timetableimport
 
@@ -186,8 +189,8 @@ Expected at the handoff snapshot:
 
 | Gate | Expected |
 | --- | --- |
-| Backend, both modes | **262/262** |
-| Frontend helper total | **109/109** (proof 15, acoustic 51, check-in 10, attendance 7, student check-in 12, auth 2, roster 6, timetable 6) |
+| Backend, both modes | **271/271** |
+| Frontend helper total | **120/120** (proof 15, acoustic 51, check-in 10, attendance 12, student check-in 14, auth 2, device 4, roster 6, timetable 6) |
 | Production build | compiles successfully |
 
 The audio and check-in tests do not prove physical range. The 2026-10-25 sweep still fails at
@@ -221,9 +224,9 @@ curl -sS -D - -o /dev/null https://bio-attend.onrender.com/
 Expected: health **200**, readiness **200** with `"database": true`, and the security headers
 listed in [`testing-plan.md`](testing-plan.md) §G2.
 
-At handoff the owner confirmed Render shows **`7148994`**. The 2026-11-21 UI fixes are newer.
-Commit, push and deploy them, then repeat G2 and record the new hash in `progress.md` and
-[`testing-plan.md`](testing-plan.md).
+At handoff the owner confirmed Render shows **`7148994`**. `d98bec1` and its working-tree
+build fix are newer. Commit the fix, push and deploy, then repeat G2 and record the new hash in
+`progress.md` and [`testing-plan.md`](testing-plan.md).
 
 ## 8. What to do next, in order
 
@@ -231,8 +234,8 @@ Do not start with A2b/A3/A4. The one-week completion path is:
 
 | Order | Work | Done when |
 | --- | --- | --- |
-| 1 | Fix and test the three register defects | Done on 2026-11-21: proof-load errors are visible and retryable, note-only edits save, and the dashboard Register link opens the exact session. |
-| 2 | Commit, push, deploy and re-run G2 | Render shows the new commit; local tree is clean. |
+| 1 | Fix and test the register/evidence slice | Done in `d98bec1`: the three register defects are fixed, evidence filtering and draft-only bulk marking work, and auto-present is a per-session opt-in. |
+| 2 | Commit the build fix, push, deploy and re-run G2 | Render shows the reviewed commit; local tree is clean. |
 | 3 | Run G0–G7 from [`testing-plan.md`](testing-plan.md) | Every gate is PASS or explicitly BLOCKED with evidence. |
 | 4 | Run AC → FL → AD → PDF → DP/RS | Every suite records PASS/FAIL/BLOCKED; no open P0/P1 defect. |
 | 5 | Measure the physical cascade and range | 1 m/5 m/10 m both directions, muted control, real phone-to-phone rehearsal; record device models and volume. |

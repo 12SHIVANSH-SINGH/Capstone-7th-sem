@@ -3,7 +3,7 @@
 **Plan version:** 1.0\
 **Written:** 2026-11-09 (reconciled 2026-11-10)\
 **Application:** [https://bio-attend.onrender.com](https://bio-attend.onrender.com)\
-**Repository state at handoff:** `7148994` on `main`; the phone-to-phone cascade is committed and the owner reports Render shows `7148994`. The 2026-11-21 register fixes are newer and must be committed, deployed and re-checked at G2 before FL can pass.\
+**Repository state at handoff:** `d98bec1` on `main`; the phone-to-phone cascade and the 2026-11-21/2026-11-22 slices are committed. The last owner-confirmed Render deploy is `7148994`; the production-build fix is in the working tree, so it must be committed, deployed and re-checked at G2 before FL can pass.\
 **Owner:** project owner (deploy, environment, accounts)\
 **Status:** ready to execute after the preflight gates in §3 pass
 
@@ -216,10 +216,11 @@ git rev-parse --short origin/main
 git status --short
 ```
 
-Expected at handoff: both hashes print `7148994` and `git status --short` is clean once the
-owner commits the 2026-11-21 register fixes. Record the actual hashes; do not assume they are
-still `7148994`. For FL, the published commit must include the cascade and the register fixes;
-if it does not, stop and ask the owner to publish them.
+Expected at handoff: both hashes print `d98bec1`; the working tree has the production-build
+fix and is clean only after the owner commits it. Record the actual hashes; do not assume they
+are still `d98bec1`. For FL, the published commit must include the cascade, the register fixes
+and the per-session auto-present opt-in; if it does not, stop and ask the owner to publish
+them.
 
 Run the local gate:
 
@@ -234,6 +235,7 @@ npm run test:checkin
 npm run test:attendance
 npm run test:studentcheckin
 npm run test:auth
+npm run test:device
 npm run test:rosterimport
 npm run test:timetableimport
 CI=true REACT_APP_API_URL=/api/v1 \
@@ -242,7 +244,7 @@ CI=true REACT_APP_API_URL=/api/v1 \
   npm run build
 ```
 
-Expected at handoff: backend **262/262** in both modes, frontend **109/109**, production build
+Expected at handoff: backend **271/271** in both modes, frontend **120/120**, production build
 compiles. Record the actual counts.
 
 Generate the synthetic PDFs (see §4.4):
@@ -268,9 +270,9 @@ the build compiles.
 This is the most important gate. The live site must be the reviewed commit, not an older
 deploy.
 
-At handoff the owner confirmed the dashboard showed **`7148994`**. The 2026-11-21 register
-fixes are newer; after those are committed and deployed, repeat this gate against the new
-hash.
+At handoff the owner confirmed the dashboard showed **`7148994`**. `d98bec1` and its
+working-tree build fix are newer; after they are committed and deployed, repeat this gate
+against the new hash.
 
 1. Open the Render dashboard for the `bio-attend` service.
 2. Open **Events** or **Deploys** and find the live deploy.
@@ -308,7 +310,8 @@ That is supporting evidence that A2a is deployed. It is **not proof** that the l
 the reviewed one. Only the Render dashboard commit comparison is proof.
 
 **PASS:** the Render dashboard commit equals the reviewed commit the owner published, and that
-commit includes the cascade and the 2026-11-21 register fixes FL exercises.
+commit includes the cascade, the 2026-11-21 register fixes and the 2026-11-22
+evidence/device/auto-present slice FL exercises.
 
 **FAIL:** any mismatch, a missing cascade or register fix, or the dashboard cannot be checked.
 Stop signed testing; ask the owner to deploy the reviewed commit. Do not test an older

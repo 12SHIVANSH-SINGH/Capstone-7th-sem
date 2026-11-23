@@ -13,7 +13,7 @@ Capstone project · NIT Jamshedpur
 
 </div>
 
-**Live prototype:** [https://bio-attend.onrender.com](https://bio-attend.onrender.com) — the last owner-confirmed Render deployment is **`7148994`**, which includes the phone-to-phone relay cascade and the Mongoose security patch. The working tree now adds the three register/UI-defect fixes from 2026-11-21; commit and redeploy them before signed testing, then re-run gate G2. The owner controls every push and deploy. Moving to a new Mac? Start with **[docs/new-device-handoff.md](docs/new-device-handoff.md)**.
+**Live prototype:** [https://bio-attend.onrender.com](https://bio-attend.onrender.com) — the last owner-confirmed Render deployment is **`7148994`**, which includes the phone-to-phone relay cascade and the Mongoose security patch. `HEAD` and `origin/main` are now **`d98bec1`**, which adds the 2026-11-21 register fixes and the 2026-11-22 evidence/device/auto-present slice; its production-build fix is in the working tree and must be committed before deploying. Redeploy and re-run gate G2 before signed testing. The owner controls every push and deploy. Moving to a new Mac? Start with **[docs/new-device-handoff.md](docs/new-device-handoff.md)**.
 
 > **Layer 1 gate status:** the owner has directed that Layer 1 be treated as **passed for build planning only**. This is an assumption, not a measurement. The 2026-10-25 sweep still fails at 5 m (4/10) and 10 m (1/10), and the reverse direction and muted control are unmeasured. Do not read this build as proof that the physical gate passed.
 
@@ -35,7 +35,7 @@ Automatic scoring and the ID round remain future work. The phone-to-phone relay 
 ## What is built
 
 - **Accounts and access** — Google-only sign-in, college-domain and roster gates, environment-gated Gmail test accounts, exact-match `SUPER_ADMIN_EMAILS` grant, and one bound device per student. A first or replacement device waits for teacher approval in production; dev/test personas auto-approve.
-- **Teacher tools** — rooms, classes, CSV/paste rosters, text-based PDF roster extraction with an editable preview, one-tap check-in start with round-0 playback, live two-minute round keys, a server-minted pending relay, an evidence-gated manual advance fallback, session history, teacher-confirmed registers and audit.
+- **Teacher tools** — rooms, classes, CSV/paste rosters, text-based PDF roster extraction with an editable preview, one-tap check-in start with round-0 playback, live two-minute round keys, a server-minted pending relay, an evidence-gated manual advance fallback, session history, teacher-confirmed registers with evidence filtering, draft-only bulk marking, proof detail, quick PDF/XLSX exports, an audited per-session auto-present opt-in and audit.
 - **Student flow** — live-session discovery, consent-gated `/student/check-in`, one Join, local decode, signed evidence, automatic relay of the server-minted next signal, attendance history and 24-hour queries.
 - **Operations** — class/per-student analytics, session trends, branded PDF/Excel exports, notifications, timetable, profile/settings, help and a dark theme.
 - **Super-admin console** — users, classes, sessions, attendance overrides/deletion, queries, audit, settings and time-limited impersonation. Demo seed/reset is development-only and returns 404 in production.
@@ -54,7 +54,7 @@ Automatic scoring and the ID round remain future work. The phone-to-phone relay 
 | Passkey step-up, audit hash chain, export limits, readiness, JWT rotation | ✅ built; browser E2E passed with a Chrome virtual authenticator |
 | Roster PDF extraction → editable preview | ✅ text-based PDFs only, verified with generated fixtures; real college PDFs and scanned OCR still unvalidated |
 | Timetable PDF text extraction → read-only preview | ✅ text-based PDFs only; no row parsing, class matching or slot creation; needs sample timetable PDFs for structured import |
-| Production deployment | ✅ owner-confirmed Render deploy **`7148994`**; the 2026-11-21 UI fixes still need commit and redeploy, then G2 must be re-checked |
+| Production deployment | ✅ owner-confirmed Render deploy **`7148994`**; `d98bec1` is published on `main` but needs the working-tree build fix, a redeploy and a fresh G2 check |
 | Deployed manual test plan | 📋 [docs/testing-plan.md](docs/testing-plan.md) — 4 phones + 3–4 laptops, acoustic range, signed flow, admin security, PDF previews and conditional restore drill |
 | Real Google/phone phone-to-phone cascade rehearsal | ⏳ pending; the deployed test plan is the execution script |
 | Automatic scoring, ID round, mobile app | ⛔ not built / gated |
@@ -114,17 +114,18 @@ available in production. Resetting demo data preserves the signed-in admin accou
 ## Tests
 
 ```bash
-cd attendance-backend && npm test                     # 262 tests
+cd attendance-backend && npm test                     # 271 tests
 cd attendance-backend && npm test -- --test-isolation=none
 cd attendance-frontend && npm run test:proof          # 15 tests
 cd attendance-frontend && npm run test:acoustic       # 51 tests
 cd attendance-frontend && npm run test:checkin        # 10 tests
-cd attendance-frontend && npm run test:attendance     # 7 tests
-cd attendance-frontend && npm run test:studentcheckin # 12 tests
+cd attendance-frontend && npm run test:attendance     # 12 tests
+cd attendance-frontend && npm run test:studentcheckin # 14 tests
 cd attendance-frontend && npm run test:auth           # 2 tests
+cd attendance-frontend && npm run test:device         # 4 tests
 cd attendance-frontend && npm run test:rosterimport   # 6 tests
 cd attendance-frontend && npm run test:timetableimport # 6 tests
-# frontend helper total: 109 tests
+# frontend helper total: 120 tests
 cd attendance-frontend && CI=true REACT_APP_API_URL=/api/v1 npm run build
 
 # synthetic, text-layer PDFs for the manual preview tests

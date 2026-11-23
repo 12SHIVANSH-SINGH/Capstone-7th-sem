@@ -12,13 +12,17 @@ Written for the working tree inspected on **6 November 2026** (`HEAD` reported b
 > signal, then listen again; the teacher starts and plays round 0 in one tap and keeps an
 > evidence-gated manual advance plus a fresh-pending nudge as fallbacks. Closed sessions expose
 > neither key nor pending state. The 2026-11-21 register fixes (proof-load errors, note-only
-> edits and the dashboard deep link) are newer and still need deploy. This book's cascade
-> sections below describe the earlier teacher-driven build. Treat `agent.md`, `plan.md`,
-> `progress.md`, `docs/how-it-works.md` and the code as current; where this book disagrees,
-> those win. The evidence-only rule and the unmeasured physical gate still apply, and the
-> cascade has **not** been measured in a physical classroom. Test counts in this book are the
-> 6 November snapshot; the current local gate is backend **262/262** in both modes and frontend
-> **109/109**.
+> edits and the dashboard deep link) and the 2026-11-22 evidence/device/auto-present slice are
+> newer and still need deploy. This book's cascade sections below describe the earlier
+> teacher-driven build. Treat `agent.md`, `plan.md`, `progress.md`, `docs/how-it-works.md` and
+> the code as current; where this book disagrees, those win. In particular, sections that say
+> the proof route can never mark attendance or that `attendanceDecided` is always false
+> describe the pre-22-November default. The current route still defaults to evidence-only, but
+> a teacher can explicitly enable auto-present for one live session; only a still-pending row
+> is updated, the write is audited, and a manual decision wins. The evidence-only default and
+> the unmeasured physical gate still apply, and the cascade has **not** been measured in a
+> physical classroom. Test counts in most of this book are the 6 November snapshot; the current
+> local gate is backend **271/271** in both modes and frontend **120/120**.
 
 ---
 
@@ -44,7 +48,7 @@ It is written in plain language first, with the formula or code condition immedi
 
 - It is **not** a claim that the physical layer has passed. The owner has treated Layer 1 as passed **for build planning only**. The last recorded distance sweep decoded 10/10 at 1 m, 9/10 at 2 m, 9/10 at 3 m, **4/10 at 5 m** and **1/10 at 10 m**. Reverse direction and the muted control were not measured. Do not describe the acoustic gate as measured-passed.
 - It is **not** a claim that real college PDFs parse accurately. Roster PDF extraction and timetable PDF extraction are tested with generated fixtures. No representative college timetable or roster PDFs have been supplied, and scanned OCR is not built.
-- It is **not** a claim that the live Render deployment matches every later working-tree change. At this snapshot the repository was `433d522`; the cascade is now committed in `b1e31f6` and the owner confirmed Render showed `7148994`, but the 2026-11-21 register fixes are newer. Gate **G2** in [`docs/testing-plan.md`](../testing-plan.md) must be re-checked after the next deploy.
+- It is **not** a claim that the live Render deployment matches every later working-tree change. At this snapshot the repository was `433d522`; the cascade and later slices are now committed through `d98bec1`, and the owner confirmed Render showed `7148994`. The production-build fix is still in the working tree. Gate **G2** in [`docs/testing-plan.md`](../testing-plan.md) must be re-checked after the next deploy.
 - It is **not** a promise that automatic attendance, scoring or the ID round exist. They do not. The multi-hop relay cascade is committed and locally tested but unmeasured; see the 21 November update above.
 
 ## The one-sentence version
@@ -79,15 +83,15 @@ Each technical chapter follows the same pattern:
 
 > **A note on line numbers.** Code line numbers move whenever a file changes. This book names files, functions, constants and exact conditions instead of quoting line numbers. That makes it stable and still precise enough to find the code.
 
-## Status snapshot (updated 21 November 2026)
+## Status snapshot (updated 22 November 2026)
 
 | Item | State |
 | --- | --- |
-| Backend test suite | **262/262** under `npm test` and under `npm test -- --test-isolation=none` |
-| Frontend helper tests | **109/109** total across proof, acoustic, check-in view, attendance draft, auth, roster import and timetable import suites |
+| Backend test suite | **271/271** under `npm test` and under `npm test -- --test-isolation=none` |
+| Frontend helper tests | **120/120** total across proof, acoustic, check-in view, attendance/evidence, student check-in, auth, device fingerprint, roster import and timetable import suites |
 | Production build | Green with `CI=true REACT_APP_API_URL=/api/v1 npm run build` |
 | Acoustic lab, FSK codec, TX/RX pages | Built and tested; link works at 1 m but degrades at 5–10 m |
-| Signed proof transport | Built and tested; stores evidence only |
+| Signed proof transport | Built and tested; stores evidence only by default, with an audited per-session teacher auto-present opt-in |
 | Teacher-confirmed register, queries, analytics, exports | Built and browser-smoke-tested locally |
 | Super-admin console, passkeys, audit chain | Built and locally verified, including a Chrome virtual-authenticator run |
 | Roster PDF extraction | Built for text-layer PDFs; generated fixtures only; no auto-save |
@@ -8882,7 +8886,7 @@ npm test -- --test-isolation=none
 
 runs every test file in the same process. This catches accidental reliance on process-global state, module cache order or environment mutation. A suite that passes with isolation but fails without it is hiding a shared-state bug; a suite that passes both ways is more trustworthy.
 
-The current recorded result is **262/262 in both modes**. The repository has 39 test files. The static `test(...)` count is lower than 255 because several files generate cases in loops or tables; the runner counts each generated case.
+The current recorded result is **271/271 in both modes**. The repository has 42 backend test files. The static `test(...)` count is lower than the runner count because several files generate cases in loops or tables; the runner counts each generated case.
 
 No test requires a live MongoDB. The tests either:
 
@@ -9015,20 +9019,21 @@ The frontend has no Jest component suite. The tested logic is extracted into pur
 
 The test files use the suffix `*.node-tests.js`, not `*.test.js`, so Create React App's Jest runner does not pick them up. The npm scripts name each file explicitly.
 
-### The eight suites
+### The nine suites
 
 | Script | File | Count | What it covers |
 | --- | --- | --- | --- |
 | `test:proof` | `src/acoustic/proof.node-tests.js` | 15 | Proof message format, malformed fields, shared bounds, P-256 signing, signature length, missing key/WebCrypto, submit body, server error surfacing, non-JSON response, missing API URL, 204, null body, unreadable body, network failure |
 | `test:acoustic` | `fsk`, `lab`, `worklet`, `link`, `pcm-worklet` | 51 | Frame structure, value↔digits, random round trips, 48 kHz and 44.1 kHz decoding, leading silence, noise, echo, false positives, checksum, detection margins, probe list, sample-rate gate, verdict boundaries, sweep summary, tone plan/fades, medians, baseline gate, peak hold, meter clamping, mic errors, 19.5 kHz alias test, report formatting, run IDs, links, TX/RX plans and reports, PCM buffer |
 | `test:checkin` | `checkInSessionView.node-tests.js` | 10 | Active-session selection, labels, live key state, fresh-pending nudge, round evidence, pending lifetime, countdown formatting, history durations |
-| `test:attendance` | `sessionAttendanceView.node-tests.js` | 7 | Status-only and note-only register edits, combined edits, reverted notes, clearing a note, malformed rows and null normalisation |
-| `test:studentcheckin` | `studentCheckInView.node-tests.js` | 12 | Session selection, Join gate order, decoded-key bounds, evidence view without key, idempotent retry, malformed response, live listening rules, relay keys, countdown/time formatting |
+| `test:attendance` | `sessionAttendanceView.node-tests.js` | 12 | Status-only and note-only register edits, combined edits, reverted notes, clearing a note, malformed rows, null normalisation, evidence-backed bulk accept, filter behaviour, source labels |
+| `test:studentcheckin` | `studentCheckInView.node-tests.js` | 14 | Session selection, Join gate order, decoded-key bounds, evidence view without key, auto-present status parsing, idempotent retry, malformed response, live listening rules, relay keys, countdown/time formatting |
 | `test:auth` | `auth.node-tests.js` | 2 | Role-to-dashboard routing |
+| `test:device` | `deviceFingerprint.node-tests.js` | 4 | Browser/server canonical hash parity, extra-field stripping, private-key rejection, missing-WebCrypto failure |
 | `test:rosterimport` | `rosterImport.node-tests.js` | 6 | PDF detection by MIME/extension, extraction summary plurals, no-email warning, scanned-PDF message, server-message fallback |
 | `test:timetableimport` | `timetableImport.node-tests.js` | 6 | PDF detection, page/line summary without claiming a slot, missing counts, scanned message, password/size errors, fallback |
 
-Total: **109/109**.
+Total: **120/120**.
 
 ### What the acoustic tests actually do
 
@@ -9211,7 +9216,7 @@ These steps are the short local smoke. The full deployed run — 4 phones, 3–4
 
 A safe sentence:
 
-> The backend suite passes 262/262 in both isolation modes, the frontend helper suites pass 109/109, and the production build is green. Those tests cover the algorithms, route wiring, validation and security contracts. The acoustic range, real college PDFs, live deployment and physical phone rehearsal remain open and are listed as such.
+> The backend suite passes 271/271 in both isolation modes, the frontend helper suites pass 120/120, and the production build is green. Those tests cover the algorithms, route wiring, validation and security contracts. The acoustic range, real college PDFs, live deployment and physical phone rehearsal remain open and are listed as such.
 
 An unsafe sentence:
 
@@ -10203,7 +10208,7 @@ The scripts are tested with stubs, not a real Atlas restore. Until a drill is re
 
 ### Deployment verification
 
-The repository's `HEAD`, `origin/main` and `origin/HEAD` are now `7148994`; the phone-to-phone cascade is committed in `b1e31f6` and the owner confirmed the Render dashboard showed `7148994`. The 2026-11-21 register fixes are newer and still need deploy, so the dashboard comparison remains a hard gate (**G2** in [`docs/testing-plan.md`](../testing-plan.md)) before signed testing:
+The repository's `HEAD`, `origin/main` and `origin/HEAD` are now `d98bec1`; the phone-to-phone cascade is committed in `b1e31f6` and the owner confirmed the Render dashboard showed `7148994`. The 2026-11-22 slice and its production-build fix still need deploy, so the dashboard comparison remains a hard gate (**G2** in [`docs/testing-plan.md`](../testing-plan.md)) before signed testing:
 
 - a deploy may be from a different commit than the book describes;
 - a fix may be in the working tree but not deployed;
@@ -11511,13 +11516,14 @@ The suite uses Node's built-in runner and needs no live MongoDB. See chapters 97
 | `src/index.css` | Global tokens/base styles |
 | `src/components/student/studentCheckInView.node-tests.js` | 12 helper tests |
 | `src/components/teacher/checkInSessionView.node-tests.js` | 10 helper tests |
-| `src/components/teacher/sessionAttendanceView.js` | Register status/note draft helpers |
-| `src/components/teacher/sessionAttendanceView.node-tests.js` | 7 helper tests |
+| `src/components/teacher/sessionAttendanceView.js` | Register status/note/evidence draft helpers |
+| `src/components/teacher/sessionAttendanceView.node-tests.js` | 12 helper tests |
 | `src/utils/auth.node-tests.js` | 2 routing tests |
+| `src/utils/deviceFingerprint.node-tests.js` | 4 fingerprint tests |
 | `src/utils/rosterImport.node-tests.js` | 6 helper tests |
 | `src/utils/timetableImport.node-tests.js` | 6 helper tests |
 
-The acoustic test files are listed in the acoustic table. Total frontend helper tests: **109/109**.
+The acoustic test files are listed in the acoustic table. Total frontend helper tests: **120/120**.
 
 ### Frontend public and PWA files
 
@@ -12361,7 +12367,7 @@ A raw roster contains names and college emails. Sending it to a hosted model is 
 
 **44. What does the test suite prove?**
 
-It proves the pure algorithms, route wiring, validation, security contracts, evidence-only views and startup refusal. Backend 262/262 in both isolation modes; frontend helpers 109/109; production build green. It does not prove physical range, real college PDFs, a live MongoDB, a real Google login, the deployed version or a classroom pilot.
+It proves the pure algorithms, route wiring, validation, security contracts, evidence-only views and startup refusal. Backend 271/271 in both isolation modes; frontend helpers 120/120; production build green. It does not prove physical range, real college PDFs, a live MongoDB, a real Google login, the deployed version or a classroom pilot.
 
 **45. Why run the backend suite with `--test-isolation=none`?**
 
@@ -12431,7 +12437,7 @@ That answer is stronger than "it works" because it cannot be embarrassed by the 
 - "The system records evidence; the teacher decides attendance."
 - "The recorded sweep decoded 33 of 50 frames; 1–3 m was strong, 5–10 m was weak."
 - "Layer 1 is a build-planning assumption, not a measured pass."
-- "The backend suite passes 262/262 in both isolation modes; the frontend helpers pass 109/109; the production build is green."
+- "The backend suite passes 271/271 in both isolation modes; the frontend helpers pass 120/120; the production build is green."
 - "The tests cover algorithms, route wiring, validation and security contracts, not physical range or real college PDFs."
 - "A new device waits for teacher approval."
 - "The audit chain is tamper-evident, not tamper-proof."
@@ -12528,7 +12534,7 @@ Do not put "add AI" first. It is not the bottleneck.
 
 ### The 60-second close
 
-> Bio Attend is a working evidence-only attendance prototype. A teacher starts a session, a phone hears a short-lived key, the phone signs it with an approved device key, and the server records evidence. The teacher decides the register, students can query a mark, and the audit log makes changes visible. The codec and web flows are tested; the backend passes 255 tests in both isolation modes and the frontend helpers pass 96. The honest limits are physical range — strong at 1–3 metres, weak at 5–10 — and unverified real PDFs, deployment and restore. The project does not claim automatic attendance, and that is a design choice, not a missing button.
+> Bio Attend is a working evidence-only attendance prototype. A teacher starts a session, a phone hears a short-lived key, the phone signs it with an approved device key, and the server records evidence. The teacher decides the register by default; auto-present is an explicit, audited per-session opt-in. Students can query a mark, and the audit log makes changes visible. The codec and web flows are tested; the backend passes 271 tests in both isolation modes and the frontend helpers pass 120. The honest limits are physical range — strong at 1–3 metres, weak at 5–10 — and unverified real PDFs, deployment and restore. The project does not claim automatic scoring or the ID round, and that is a design choice, not a missing button.
 
 ### The final checklist before any presentation
 

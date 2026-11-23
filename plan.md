@@ -22,7 +22,8 @@ inside one 20 m × 20 m classroom, using only student smartphones, a web app and
 
 Sound stays inside a room, so hearing a fresh signal is evidence of presence. Phones pass
 the signal on as near-inaudible tones, and the server records signed evidence. A **teacher
-confirms attendance** from that evidence; a decoded tone is never an automatic verdict.
+confirms attendance** from that evidence by default; a decoded tone is never an automatic
+verdict unless the teacher explicitly enables auto-present for one live session.
 
 Location (GPS) cannot be the secret: everyone knows where the room is, phone GPS is often
 5–10 m off and worse indoors, and a web app cannot prove its reading is real. Location is
@@ -172,21 +173,22 @@ teacher-confirmed attendance instead.
 queries, analytics, exports, notifications, timetable, PWA and a production-capable
 super-admin console. Roster PDF text extraction with an editable preview is built, and
 timetable PDF text extraction with a read-only preview is built (A2a). The phone-to-phone relay
-cascade is **committed and locally tested**; the owner reports Render shows `7148994`. The
-2026-11-22 register/device slice is in the working tree and still needs commit, deploy and a
-fresh G2 check. The cascade has not been physically rehearsed. Structured timetable row parsing,
+cascade is **committed and locally tested**; the last owner-confirmed Render deploy is
+`7148994`. The 2026-11-22 register/device slice is committed in `d98bec1`, but its
+production-build fix is still uncommitted and the deploy plus a fresh G2 check remain pending.
+The cascade has not been physically rehearsed. Structured timetable row parsing,
 local OCR and Gemini extraction are not built. The product is still **evidence-only by default**:
 the app does not automatically score attendance or run the ID round. Auto-present is a
 per-session teacher opt-in, off unless the teacher turns it on; the usual attendance decision
 belongs to the teacher and is audited. The click-level execution script for the deployed
 4-phone/3–4-laptop run is [`docs/testing-plan.md`](docs/testing-plan.md).
 
-**Completion path for the one-week push (2026-11-21):**
+**Completion path for the one-week push (from 2026-11-21):**
 
 | Order | Slice | Scope | Pass test |
 | --- | --- | --- | --- |
 | 1 | Register, evidence and device fixes | Proof-load error, note-only edits, dashboard Register deep link, per-session auto-present opt-in, evidence-backed bulk marking, expandable evidence rows, quick session exports, current-device status and the pending-review lockout fix, plus handoff docs | New attendance/device/settings tests pass; production build green; docs match the code |
-| 2 (owner) | Commit, deploy and verify | Commit the working tree, push, redeploy, compare the Render dashboard with the reviewed `HEAD`, verify real Google sign-in and `/admin` | Health/readiness, test-plan G2 commit match, Google sign-in, no demo or dev routes in production |
+| 2 (owner) | Commit, deploy and verify | Commit the production-build fix and reconciled docs, push, redeploy, compare the Render dashboard with the reviewed `HEAD`, verify real Google sign-in and `/admin` | Health/readiness, test-plan G2 commit match, Google sign-in, no demo or dev routes in production |
 | 3 (physical) | 1.10 range diagnosis | Lower the band and/or tune TX settings; rerun 1 m, 5 m, 10 m, then reverse and muted control | ≥95% decoded at 1 m/5 m/10 m both directions; 0 decodes in the muted control |
 | 4 (rehearsal) | 2.6 phone-to-phone cascade rehearsal | 10–20 phones for 5–6 minutes; verify automatic relay, teacher fallback and zero-proof recovery; measure waves, timing and range | Every phone reaches a wave through the relay without a per-wave reload; a fresh pending key is promoted; timing measured; no false-accept claim without scoring |
 | 5 (test) | Deployed manual test run | Execute [`docs/testing-plan.md`](docs/testing-plan.md): AC → FL → AD → PDF → DP/RS with 4 phones and 3–4 laptops | Preflight gates G0–G7 pass; every suite records PASS/FAIL/BLOCKED with evidence; no open P0/P1 defect |
@@ -211,9 +213,9 @@ belongs to the teacher and is audited. The click-level execution script for the 
 
 ## 10. Open items
 
-- Re-check the live Render commit after the 2026-11-22 fixes are deployed (test-plan gate
-  G2). The owner confirmed the dashboard showed `7148994`; a reachable service is not proof
-  that a later working tree is current.
+- Commit the production-build fix for `d98bec1`, deploy it, and re-check the live Render
+  commit (test-plan gate G2). The owner confirmed the dashboard showed `7148994`; a reachable
+  service is not proof that a later working tree is current.
 - Run the signed real-student Google flow on Render (`docs/testing-plan.md`, suite FL); the
   local smokes used a JWT cookie and, for the student shell, fake audio.
 - Confirm Render free-plan behaviour during a live 5–6 minute check-in.
@@ -229,8 +231,8 @@ belongs to the teacher and is audited. The click-level execution script for the 
 
 **Status (2026-11-06):** implemented and tested locally. The P1 slice passed at backend
 **227/227** in both test modes and frontend **84/84**; after the roster and timetable PDF
-text-preview, cascade and register-fix slices the current gate is backend **262/262** and
-frontend **109/109**. The
+text-preview, cascade, register-fix and evidence/device slices the current gate is backend
+**271/271** and frontend **120/120**. The
 production build is green, and a
 Chrome virtual-authenticator run passed the full enrollment → 428 → step-up →
 settings-save → chain-verify path.

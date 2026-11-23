@@ -142,8 +142,11 @@ normal development; CORS allows `localhost:3000` and `127.0.0.1:3000`.
    signal; **Play this round**, **Stop sound**, **Nudge the class** and an evidence-gated
    **Advance round** stay available as fallbacks.
 6. When the class is done, **confirm close** on the check-in screen. Then open the
-   **Register**, mark students present/absent/excused and **finalise**. Finalising publishes
-   the register; the 24-hour query window started when the session closed.
+   **Register**, filter pending rows by evidence, accept proof-backed rows, mark
+   present/absent/excused and **finalise**. Bulk changes stay drafts until Save. Auto-present
+   is off by default and can be enabled only while the session is live; it is audited and the
+   teacher can override it. Finalising publishes the register; the 24-hour query window
+   started when the session closed.
 
 ### As a student
 
@@ -261,16 +264,17 @@ cd ../attendance-frontend
 npm run test:proof                       # 15
 npm run test:acoustic                    # 51
 npm run test:checkin                     # 10
-npm run test:attendance                  # 7
-npm run test:studentcheckin              # 12
+npm run test:attendance                  # 12
+npm run test:studentcheckin              # 14
 npm run test:auth                        # 2
+npm run test:device                      # 4
 npm run test:rosterimport                # 6
 npm run test:timetableimport             # 6
 CI=true REACT_APP_API_URL=/api/v1 npm run build
 ```
 
-The current expected counts are **backend 262/262** in both default and
-`--test-isolation=none` modes, and **frontend 109/109** across the eight frontend suites. The
+The current expected counts are **backend 271/271** in both default and
+`--test-isolation=none` modes, and **frontend 120/120** across the nine frontend suites. The
 production build writes `attendance-frontend/build/`; the backend serves it automatically
 when that folder exists.
 

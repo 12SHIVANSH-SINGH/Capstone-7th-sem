@@ -153,12 +153,15 @@ A student opens `/student/check-in` while the session is live and taps **Join on
    and submits the proof. An acoustic frame carries only the key, so the phone tries the
    displayed round and the next two; the server accepts only its current or pending pair.
 4. The server checks the signature, active roster enrollment, approved binding and key
-   freshness, then stores the proof as **evidence only**. Retries are idempotent per
-   student/round, submissions are capped at 60/minute per student, and evidence expires
-   after about one day.
-5. The response includes the server-minted **next relay signal**. The phone plays it three
-   times through its speaker, then goes back to listening. Every phone whose proof was
-   accepted or already recorded relays; identical signals add instead of colliding.
+   freshness, then stores the proof as **evidence**. By default it does not change the
+   attendance row. If the teacher enabled auto-present for this one session, the first
+   accepted proof updates a still-pending row to present with source `evidence` and an audit
+   entry; a manual teacher decision always wins. Retries are idempotent per student/round,
+   submissions are capped at 60/minute per student, and evidence expires after about one day.
+5. The response includes the server-minted **next relay signal** and the current
+   `attendanceStatus`/`autoMarked` state. The phone plays the relay three times through its
+   speaker, then goes back to listening. Every phone whose proof was accepted or already
+   recorded relays; identical signals add instead of colliding.
 
 The cascade advances itself:
 
@@ -175,9 +178,10 @@ The cascade advances itself:
   accepted.
 
 The teacher **Evidence** card is read-only: student email, round, recorded time and per-round
-counts, with `attendanceDecided: false`. It selects no key, signature, protocol version or
-device fingerprint. The teacher view returns the current key and pending signal only while
-the session is active, and a key-free history; students never receive key history.
+counts. It selects no key, signature, protocol version or device fingerprint, and the
+attendance status lives on the separate register row. The teacher view returns the current
+key and pending signal only while the session is active, and a key-free history; students
+never receive key history.
 
 The cascade is **built and locally tested**, but it has **not** been measured in a physical
 classroom. Owner-reported phone runs are planning evidence, not measured results. Scoring and
@@ -188,10 +192,17 @@ the ID round remain future work.
 A session starts with one attendance row per active roster student. When the check-in is
 over the teacher closes the session, then opens the **Register**, sees the proof evidence,
 optional location and event timeline for each student, marks **present / absent / excused**,
-and **finalises** the register. Finalising publishes it and turns remaining pending rows
-into absent. The 24-hour query window is tied to the session close, not to finalisation.
-Later corrections keep a decision note and an audit entry; a super-admin can override or
-delete a row with the same audit trail.
+and **finalises** the register. The register can filter pending rows by evidence, accept a
+proof-backed row in one click, and bulk-accept only the visible evidence-backed pending rows
+as **drafts**; nothing saves until the teacher presses Save. Quick PDF/XLSX buttons export the
+saved session. Finalising publishes it and turns remaining pending rows into absent. The
+24-hour query window is tied to the session close, not to finalisation. Later corrections
+keep a decision note and an audit entry; a super-admin can override or delete a row with the
+same audit trail.
+
+Auto-present is off by default. It can be enabled only while the session is live and
+unfinalised; the first accepted proof then marks a still-pending student present, the change
+is audited, and the teacher can override it. It is not a scoring or ID-round decision.
 
 After a session closes, a student who was present but unmarked can raise a **query** for
 **24 hours**. The teacher sees the reason plus the student's check-in/query location, the
